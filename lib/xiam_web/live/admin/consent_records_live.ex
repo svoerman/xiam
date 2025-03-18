@@ -178,28 +178,10 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
     ~H"""
     <div class={["min-h-screen", @theme]} phx-hook="Theme" id="theme-container">
     <div class="container mx-auto px-4 py-8 bg-background text-foreground">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold text-foreground">Consent Records</h1>
-          <div class="text-sm text-muted-foreground">
-            Manage and track user consent for GDPR compliance
-          </div>
-        </div>
-        <div class="flex items-center gap-4">
-          <button
-            phx-click="toggle_theme"
-            class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground">
-            <%= if @theme == "dark" do %>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all mr-2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>Light
-            <% else %>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all mr-2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>Dark
-            <% end %>
-          </button>
-          <.link patch={~p"/admin"} class="text-primary hover:text-primary/80 transition-colors">
-            ← Back to Dashboard
-          </.link>
-        </div>
-      </div>
+      <.admin_header
+        title="Consent Records"
+        subtitle="Manage and track user consent for GDPR compliance"
+      />
       
       <!-- Filters -->
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border overflow-hidden mb-8">

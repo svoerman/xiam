@@ -219,50 +219,15 @@ defmodule XIAMWeb.Admin.RolesLive do
     Repo.all(roles_query)
   end
   
-  @impl true
-  def handle_event("toggle_theme", _, socket) do
-    {:noreply, socket}
-  end
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="container mx-auto px-4 py-8">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold mb-2 text-foreground">Roles & Capabilities Management</h1>
-          <div class="text-sm text-muted-foreground">
-            Define roles and capabilities for your RBAC system
-          </div>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="theme-toggle">
-            <button
-              id="theme-toggle-btn"
-              phx-click="toggle_theme"
-              class="rounded-full p-2 bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Toggle theme"
-            >
-              <svg 
-                class="h-5 w-5 text-muted-foreground" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  stroke-linecap="round" 
-                  stroke-linejoin="round" 
-                  stroke-width="2" 
-                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                />
-              </svg>
-            </button>
-          </div>
-          <.link patch={~p"/admin"} class="text-primary hover:text-primary/80 transition-colors">
-            ← Back to Dashboard
-          </.link>
-        </div>
-      </div>
+      <.admin_header
+        title="Roles & Capabilities Management"
+        subtitle="Define roles and capabilities for your RBAC system"
+      />
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Roles Section -->

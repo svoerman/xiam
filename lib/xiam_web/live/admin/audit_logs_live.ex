@@ -5,7 +5,6 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
   alias XIAM.Audit
   alias XIAM.Audit.AuditLog
   alias XIAM.Users.User
-  import XIAMWeb.CoreComponents
   
   import Ecto.Query
 
@@ -157,42 +156,17 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
     |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
   end
 
-  @impl true
-  def handle_event("toggle_theme", _, socket) do
-    new_theme = if socket.assigns.theme == "light", do: "dark", else: "light"
-    {:noreply, assign(socket, theme: new_theme)}
-  end
+    # Theme is now handled by the app layout
   
   @impl true
   def render(assigns) do
     ~H"""
     <div class={["min-h-screen", @theme]} phx-hook="Theme" id="theme-container">
     <div class="container mx-auto px-4 py-8 bg-background text-foreground">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold text-foreground">Audit Logs</h1>
-          <div class="text-sm text-muted-foreground">
-            View and search system audit logs for security and compliance
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <.link patch={~p"/admin"} class="text-primary hover:text-primary/80 transition-colors">
-            ← Back to Dashboard
-          </.link>
-          <div class="theme-toggle">
-            <button
-              id="theme-toggle-btn"
-              phx-click="toggle_theme"
-              class="rounded-full p-2 bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Toggle theme"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class={["h-5 w-5 transition-transform", @theme == "dark" && "rotate-180"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+      <.admin_header
+        title="Audit Logs"
+        subtitle="View and search system audit logs for security and compliance"
+      />
       
       <!-- Filter Form -->
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border overflow-hidden mb-8">

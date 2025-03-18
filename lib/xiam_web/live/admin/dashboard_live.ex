@@ -15,36 +15,10 @@ defmodule XIAMWeb.Admin.DashboardLive do
   def render(assigns) do
     ~H"""
     <div class="container mx-auto px-4 py-8">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold mb-2 text-foreground">XIAM Admin Dashboard</h1>
-          <div class="text-sm text-muted-foreground">
-            Manage your CIAM system including users, roles, and permissions
-          </div>
-        </div>
-        <div class="theme-toggle">
-          <button
-            id="theme-toggle-btn"
-            phx-click="toggle_theme"
-            class="rounded-full p-2 bg-muted hover:bg-muted/80 transition-colors"
-            aria-label="Toggle theme"
-          >
-            <svg 
-              class="h-5 w-5 text-muted-foreground" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path 
-                stroke-linecap="round" 
-                stroke-linejoin="round" 
-                stroke-width="2" 
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <.admin_header
+        title="XIAM Admin Dashboard"
+        subtitle="Manage your CIAM system including users, roles, and permissions"
+      />
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Users Management Card -->

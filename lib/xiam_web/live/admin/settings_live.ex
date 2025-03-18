@@ -4,7 +4,6 @@ defmodule XIAMWeb.Admin.SettingsLive do
   #alias XIAM.Repo
   alias XIAM.System.Settings
   alias XIAM.Audit
-  import XIAMWeb.CoreComponents
   
   @impl true
   def mount(_params, _session, socket) do
@@ -171,31 +170,10 @@ defmodule XIAMWeb.Admin.SettingsLive do
     ~H"""
     <div class={["min-h-screen", @theme]} phx-hook="Theme" id="theme-container">
     <div class="container mx-auto px-4 py-8 bg-background text-foreground">
-      <div class="flex justify-between items-center mb-8">
-        <div>
-          <h1 class="text-3xl font-bold text-foreground">System Settings</h1>
-          <div class="text-sm text-muted-foreground">
-            Configure system settings, OAuth providers, MFA, and security options
-          </div>
-        </div>
-        <div class="flex items-center space-x-4">
-          <.link patch={~p"/admin"} class="text-primary hover:text-primary/80 transition-colors">
-            ← Back to Dashboard
-          </.link>
-          <div class="theme-toggle">
-            <button
-              id="theme-toggle-btn"
-              phx-click="toggle_theme"
-              class="rounded-full p-2 bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Toggle theme"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class={["h-5 w-5 transition-transform", @theme == "dark" && "rotate-180"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+      <.admin_header
+        title="System Settings"
+        subtitle="Configure system settings, OAuth providers, MFA, and security options"
+      />
 
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border overflow-hidden">
         <div class="border-b border-border">

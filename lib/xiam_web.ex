@@ -91,6 +91,8 @@ defmodule XIAMWeb do
       import XIAMWeb.CoreComponents
       # shadcn UI components
       import XIAMWeb.Components.UI
+      # Admin interface components
+      import XIAMWeb.AdminComponents
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS
