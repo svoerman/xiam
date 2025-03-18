@@ -43,11 +43,17 @@ defmodule XIAM.Audit.AuditLog do
       {:resource_id, resource_id}, query when is_binary(resource_id) ->
         where(query, [a], a.resource_id == ^resource_id)
       
-      {:date_from, date_from}, query ->
+      {:date_from, date_from}, query when not is_nil(date_from) ->
         where(query, [a], a.inserted_at >= ^date_from)
       
-      {:date_to, date_to}, query ->
+      {:date_to, date_to}, query when not is_nil(date_to) ->
         where(query, [a], a.inserted_at <= ^date_to)
+        
+      {:date_from, nil}, query ->
+        query
+        
+      {:date_to, nil}, query ->
+        query
       
       _, query -> query
     end)

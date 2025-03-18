@@ -118,12 +118,21 @@ defmodule XIAMWeb.Admin.StatusLive do
   end
   
   defp get_oban_stats do
+    # Get the Oban config safely without using Access behavior
+    _oban_config = Oban.config()
+    # Get queues from Oban - in a safer way
+    queues = case Keyword.get(Application.get_env(:xiam, Oban, []), :queues) do
+      queues when is_map(queues) -> Map.to_list(queues)
+      queues when is_list(queues) -> queues
+      _ -> []
+    end
+    
     %{
       jobs_completed: get_oban_metric(:jobs_completed),
       jobs_pending: get_oban_metric(:jobs_pending),
       jobs_failed: get_oban_metric(:jobs_failed),
       jobs_cancelled: get_oban_metric(:jobs_cancelled),
-      queues: Oban.config()[:queues] |> Map.to_list()
+      queues: queues
     }
   end
   
@@ -490,43 +499,43 @@ defmodule XIAMWeb.Admin.StatusLive do
         </div>
         
         <!-- System Info -->
-        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div class="p-4 border-b border-gray-200 bg-gray-50">
-            <h3 class="font-medium">System Information</h3>
+        <div class="bg-card text-card-foreground rounded-lg border shadow-sm overflow-hidden">
+          <div class="p-4 border-b bg-muted/50">
+            <h3 class="font-medium text-foreground">System Information</h3>
           </div>
           <div class="p-4">
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
               <div>
-                <dt class="text-sm font-medium text-gray-500">BEAM Version</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:version) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">BEAM Version</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:version) %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">Elixir Version</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= System.version() %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">Elixir Version</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= System.version() %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">Node Name</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= node() %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">Node Name</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= node() %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">System Architecture</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:system_architecture) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">System Architecture</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:system_architecture) %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">Process Limit</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:process_limit) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">Process Limit</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:process_limit) %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">Atom Limit</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:atom_limit) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">Atom Limit</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:atom_limit) %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">Scheduler Count</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:schedulers_online) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">Scheduler Count</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:schedulers_online) %></dd>
               </div>
               <div>
-                <dt class="text-sm font-medium text-gray-500">OTP Release</dt>
-                <dd class="mt-1 text-sm text-gray-900"><%= :erlang.system_info(:otp_release) %></dd>
+                <dt class="text-sm font-medium text-muted-foreground">OTP Release</dt>
+                <dd class="mt-1 text-sm text-foreground"><%= :erlang.system_info(:otp_release) %></dd>
               </div>
             </dl>
           </div>

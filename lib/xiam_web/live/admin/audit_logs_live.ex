@@ -22,7 +22,7 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
       |> assign(total_entries: 0)
       |> assign(filter: %{
         action: nil,
-        user_id: nil,
+        actor_id: nil,
         date_from: nil,
         date_to: nil,
         search: nil
@@ -90,13 +90,12 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
     pagination = %{page: page, per_page: per_page}
     
     # Get audit logs with pagination and filtering
-    %{entries: audit_logs, total_entries: total_entries, total_pages: total_pages} = 
-      Audit.list_audit_logs(filter, pagination)
+    pagination_result = Audit.list_audit_logs(filter, pagination)
     
     socket
-    |> assign(audit_logs: audit_logs)
-    |> assign(total_pages: total_pages)
-    |> assign(total_entries: total_entries)
+    |> assign(audit_logs: pagination_result.items)
+    |> assign(total_pages: pagination_result.total_pages)
+    |> assign(total_entries: pagination_result.total_count)
   end
   
   # We've moved filter implementation to the Audit context
@@ -131,7 +130,7 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
     # In a real app, you might want to limit this or load asynchronously
     # Here we're just getting users who have audit log entries
     query = from log in AuditLog,
-            join: user in User, on: log.user_id == user.id,
+            join: user in User, on: log.actor_id == user.id,
             select: {user.email, user.id},
             distinct: user.id,
             order_by: user.email,
