@@ -109,7 +109,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
     pagination = %{page: page, per_page: per_page}
     
     # Get consent records with pagination and filtering
-    %{entries: consent_records, total_entries: total_entries, total_pages: total_pages} = 
+    %{items: consent_records, total_count: total_entries, total_pages: total_pages} = 
       Consent.list_consent_records(filter, pagination)
     
     socket
