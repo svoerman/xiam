@@ -83,3 +83,9 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# Configure Joken for JWT token signing
+config :joken, default_signer: [
+  signer_alg: "HS256",
+  key_octet: "8n7jD++V6KLSs4qGRX1S/AlCATiv0fP9cziGirflKQ8ckN2ywEIRSICkYVH+k/Me"
+]

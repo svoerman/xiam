@@ -62,6 +62,8 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+
+
 config :xiam, :pow,
   user: XIAM.Users.User,
   repo: XIAM.Repo,

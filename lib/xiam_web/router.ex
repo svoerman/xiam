@@ -69,6 +69,16 @@ defmodule XIAMWeb.Router do
     plug XIAMWeb.Plugs.APIAuthPlug
   end
   
+  # Documentation routes
+  scope "/", XIAMWeb do
+    pipe_through :browser
+    
+    # API Documentation UI
+    get "/api/docs", SwaggerController, :index
+    # Direct access to Swagger JSON
+    get "/swagger/api-spec.json", SwaggerController, :api_json
+  end
+  
   # Unprotected API routes
   scope "/api", XIAMWeb.API do
     pipe_through :api

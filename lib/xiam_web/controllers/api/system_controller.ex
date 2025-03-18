@@ -29,7 +29,12 @@ defmodule XIAMWeb.API.SystemController do
     health_data = Health.check_health()
     
     # Convert memory values to MB for better readability
-    memory_data = Map.new(health_data.memory, fn {k, v} -> {k, Float.round(v / 1_048_576, 2)} end)
+    memory_data = Map.new(health_data.memory, fn {k, v} -> 
+      case is_integer(v) do
+        true -> {k, Float.round(v / 1_048_576, 2)}
+        false -> {k, v} # Keep original value if not a number
+      end
+    end)
     health_data = Map.put(health_data, :memory, memory_data)
     
     json(conn, health_data)

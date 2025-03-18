@@ -11,6 +11,10 @@ defmodule XIAMWeb.API.AuthController do
   #alias XIAM.Repo
   alias XIAM.Jobs.AuditLogger
   
+  # Private helper to format IP address for JSON compatibility
+  defp format_ip(ip) when is_tuple(ip), do: ip |> Tuple.to_list() |> Enum.join(".")
+  defp format_ip(ip), do: to_string(ip)
+  
   @doc """
   API login endpoint. Authenticates a user and issues a JWT token.
   """
@@ -20,7 +24,7 @@ defmodule XIAMWeb.API.AuthController do
         user = Pow.Plug.current_user(conn)
         
         # Log the successful login
-        AuditLogger.log_action("api_login_success", user.id, %{ip: conn.remote_ip}, email)
+        AuditLogger.log_action("api_login_success", user.id, %{ip: format_ip(conn.remote_ip)}, email)
         
         case JWT.generate_token(user) do
           {:ok, token, _claims} ->
@@ -43,13 +47,15 @@ defmodule XIAMWeb.API.AuthController do
         
       {:error, conn} ->
         # Log the failed login attempt
-        AuditLogger.log_action("api_login_failure", nil, %{ip: conn.remote_ip}, email)
+        AuditLogger.log_action("api_login_failure", nil, %{ip: format_ip(conn.remote_ip)}, email)
         
         conn
         |> put_status(:unauthorized)
         |> json(%{error: "Invalid email or password"})
     end
   end
+  
+
   
   @doc """
   Refreshes a JWT token.
@@ -62,7 +68,7 @@ defmodule XIAMWeb.API.AuthController do
     case JWT.refresh_token(claims) do
       {:ok, token, _claims} ->
         # Log the token refresh
-        AuditLogger.log_action("api_token_refresh", user.id, %{ip: conn.remote_ip}, user.email)
+        AuditLogger.log_action("api_token_refresh", user.id, %{ip: format_ip(conn.remote_ip)}, user.email)
         
         conn
         |> put_status(:ok)
@@ -77,6 +83,8 @@ defmodule XIAMWeb.API.AuthController do
         |> json(%{error: "Failed to refresh token: #{inspect(reason)}"})
     end
   end
+  
+
   
   @doc """
   Verifies a token is valid and returns the associated user information.
@@ -108,6 +116,8 @@ defmodule XIAMWeb.API.AuthController do
     })
   end
   
+
+  
   @doc """
   Logout endpoint for API.
   This is primarily for audit logging since JWTs are stateless.
@@ -116,7 +126,7 @@ defmodule XIAMWeb.API.AuthController do
     user = conn.assigns.current_user
     
     # Log the logout
-    AuditLogger.log_action("api_logout", user.id, %{ip: conn.remote_ip}, user.email)
+    AuditLogger.log_action("api_logout", user.id, %{ip: format_ip(conn.remote_ip)}, user.email)
     
     conn
     |> put_status(:ok)

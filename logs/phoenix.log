@@ -1,0 +1,274 @@
+[notice]     :alarm_handler: {:set, {{:disk_almost_full, ~c"/System/Volumes/Data"}, []}}
+[notice]     :alarm_handler: {:set, {{:disk_almost_full, ~c"/Volumes/Docker"}, []}}
+[info] Running XIAMWeb.Endpoint with Bandit 1.6.8 at 127.0.0.1:4000 (http)
+[info] Access XIAMWeb.Endpoint at http://localhost:4000
+[watch] build finished, watching for changes...
+
+Rebuilding...
+
+Done in 226ms.
+[debug] QUERY OK source="settings" db=6.7ms queue=2.7ms idle=929.0ms
+SELECT s0."id", s0."key", s0."value", s0."data_type", s0."category", s0."description", s0."is_editable", s0."inserted_at", s0."updated_at" FROM "settings" AS s0 ORDER BY s0."key" []
+[90m↳ XIAM.System.Settings.init_cache/0, at: lib/xiam/system/settings.ex:26[0m
+[info] GET /api/docs
+[debug] Processing with XIAMWeb.SwaggerController.index/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 46ms
+[info] GET /api/system/status
+[debug] Processing with XIAMWeb.API.SystemController.status/2
+  Parameters: %{}
+  Pipelines: [:api, :api_jwt]
+[info] Sent 401 in 2ms
+[debug] Phoenix.Router halted in :api_jwt/2
+[info] POST /api/auth/login
+[debug] Processing with XIAMWeb.API.AuthController.login/2
+  Parameters: %{"email" => "sander@voerman.biz", "password" => "[FILTERED]"}
+  Pipelines: [:api]
+[debug] QUERY OK source="users" db=1.3ms queue=0.6ms idle=1621.4ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."email" = $1) ["sander@voerman.biz"]
+[90m↳ Pow.Ecto.Context.do_authenticate/4, at: lib/pow/ecto/context.ex:105[0m
+[info] AUDIT: User 2 performed api_login_success from sander@voerman.biz. Details: %{"ip" => "127.0.0.1"}
+[info] Sent 200 in 219ms
+[info] GET /api/docs
+[debug] Processing with XIAMWeb.SwaggerController.index/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 788µs
+[info] GET /api/system/status
+[debug] Processing with XIAMWeb.API.SystemController.status/2
+  Parameters: %{}
+  Pipelines: [:api, :api_jwt]
+[debug] QUERY OK source="users" db=0.7ms queue=0.4ms idle=1149.6ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."id" = $1) [2]
+[90m↳ XIAM.Auth.JWT.get_user_from_claims/1, at: lib/xiam/auth/jwt.ex:75[0m
+[debug] QUERY OK source="users" db=0.2ms queue=0.4ms idle=804.4ms
+SELECT count(u0."id") FROM "users" AS u0 []
+[90m↳ XIAM.System.Health.check_database/0, at: lib/xiam/system/health.ex:32[0m
+[debug] QUERY OK db=0.1ms queue=0.1ms idle=805.0ms
+SELECT version(); []
+[info] Sent 200 in 14ms
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 13ms
+[info] GET /admin
+[debug] Processing with XIAMWeb.Admin.DashboardLive.index/2
+  Parameters: %{}
+  Pipelines: [:browser, :admin_protected]
+[info] Sent 302 in 4ms
+[debug] Phoenix.Router halted in :admin_protected/2
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 1ms
+[info] GET /session/new
+[debug] Processing with Pow.Phoenix.SessionController.new/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 302 in 12ms
+[debug] Pow.Phoenix.SessionController halted in :require_not_authenticated/2
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 1ms
+[info] GET /session/new
+[debug] Processing with Pow.Phoenix.SessionController.new/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 302 in 1ms
+[debug] Pow.Phoenix.SessionController halted in :require_not_authenticated/2
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 977µs
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 961µs
+[info] GET /api/users
+[debug] Processing with XIAMWeb.API.UsersController.index/2
+  Parameters: %{"page" => "1", "per_page" => "20"}
+  Pipelines: [:api, :api_jwt]
+[info] Sent 401 in 657µs
+[debug] Phoenix.Router halted in :api_jwt/2
+[info] POST /api/auth/logout
+[debug] Processing with XIAMWeb.API.AuthController.logout/2
+  Parameters: %{}
+  Pipelines: [:api, :api_jwt]
+[info] Sent 401 in 643µs
+[debug] Phoenix.Router halted in :api_jwt/2
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 980µs
+[info] GET /session/new
+[debug] Processing with Pow.Phoenix.SessionController.new/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 302 in 1ms
+[debug] Pow.Phoenix.SessionController halted in :require_not_authenticated/2
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 1ms
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 616µs
+[info] GET /session/new
+[debug] Processing with Pow.Phoenix.SessionController.new/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 9ms
+[info] POST /session
+[debug] Processing with Pow.Phoenix.SessionController.create/2
+  Parameters: %{"_csrf_token" => "FwEDKRAoFmkzKBgrNQ95JhQzBUAmMzYfFjRhcBE3JcvGBM-lelS4pAwN", "user" => %{"email" => "admin@example.com", "password" => "[FILTERED]"}}
+  Pipelines: [:browser]
+[debug] QUERY OK source="users" db=0.2ms idle=816.7ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."email" = $1) ["admin@example.com"]
+[90m↳ Pow.Ecto.Context.do_authenticate/4, at: lib/pow/ecto/context.ex:105[0m
+[debug] QUERY OK source="roles" db=0.6ms queue=0.4ms idle=1005.8ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Pow.ControllerCallbacks.before_respond/4, at: lib/xiam_web/controllers/pow/controller_callbacks.ex:11[0m
+[debug] QUERY OK source="capabilities" db=0.8ms queue=0.4ms idle=1009.8ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Pow.ControllerCallbacks.before_respond/4, at: lib/xiam_web/controllers/pow/controller_callbacks.ex:11[0m
+[info] Admin user logged in: admin@example.com
+[info] Sent 302 in 195ms
+[error] ** (Plug.Conn.AlreadySentError) the response was already sent
+    (plug 1.17.0) lib/plug/conn.ex:885: Plug.Conn.put_resp_header/3
+    (phoenix 1.7.20) lib/phoenix/controller.ex:495: Phoenix.Controller.redirect/2
+    (pow 1.0.39) lib/pow/phoenix/controllers/session_controller.ex:1: Pow.Phoenix.SessionController.action/2
+    (pow 1.0.39) lib/pow/phoenix/controllers/session_controller.ex:1: Pow.Phoenix.SessionController.phoenix_controller_pipeline/2
+    (phoenix 1.7.20) lib/phoenix/router.ex:484: Phoenix.Router.__call__/5
+    (xiam 0.1.0) lib/xiam_web/endpoint.ex:1: XIAMWeb.Endpoint.plug_builder_call/2
+    (xiam 0.1.0) deps/plug/lib/plug/debugger.ex:155: XIAMWeb.Endpoint."call (overridable 3)"/2
+    (xiam 0.1.0) lib/xiam_web/endpoint.ex:1: XIAMWeb.Endpoint.call/2
+    (phoenix 1.7.20) lib/phoenix/endpoint/sync_code_reload_plug.ex:22: Phoenix.Endpoint.SyncCodeReloadPlug.do_call/4
+    (bandit 1.6.8) lib/bandit/pipeline.ex:130: Bandit.Pipeline.call_plug!/2
+    (bandit 1.6.8) lib/bandit/pipeline.ex:40: Bandit.Pipeline.run/4
+    (bandit 1.6.8) lib/bandit/http1/handler.ex:12: Bandit.HTTP1.Handler.handle_data/3
+    (bandit 1.6.8) lib/bandit/delegating_handler.ex:18: Bandit.DelegatingHandler.handle_data/3
+    (bandit 1.6.8) lib/bandit/delegating_handler.ex:8: Bandit.DelegatingHandler.handle_info/2
+    (stdlib 6.2) gen_server.erl:2345: :gen_server.try_handle_info/3
+    (stdlib 6.2) gen_server.erl:2433: :gen_server.handle_msg/6
+    (stdlib 6.2) proc_lib.erl:329: :proc_lib.init_p_do_apply/3
+
+[info] GET /admin
+[debug] Processing with XIAMWeb.Admin.DashboardLive.index/2
+  Parameters: %{}
+  Pipelines: [:browser, :admin_protected]
+[debug] QUERY OK source="roles" db=0.6ms idle=1032.1ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="capabilities" db=0.8ms idle=999.3ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[info] Sent 200 in 15ms
+[info] GET /admin/roles
+[debug] Processing with XIAMWeb.Admin.RolesLive.index/2
+  Parameters: %{}
+  Pipelines: [:browser, :admin_protected]
+[debug] QUERY OK source="roles" db=0.9ms idle=1365.1ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="capabilities" db=1.0ms idle=1327.3ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="roles" db=0.5ms queue=0.7ms idle=931.2ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at" FROM "roles" AS r0 ORDER BY r0."name" []
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:12[0m
+[debug] QUERY OK source="capabilities" db=1.0ms idle=371.1ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:12[0m
+[debug] QUERY OK source="capabilities" db=0.1ms queue=0.1ms idle=372.3ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at" FROM "capabilities" AS c0 []
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:13[0m
+[info] Sent 200 in 13ms
+[info] GET /api/docs
+[debug] Processing with XIAMWeb.SwaggerController.index/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 648µs
+[info] GET /api/docs
+[debug] Processing with XIAMWeb.SwaggerController.index/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 688µs
+[info] POST /api/auth/login
+[debug] Processing with XIAMWeb.API.AuthController.login/2
+  Parameters: %{"email" => "sander.voerman@kabisa.nl", "password" => "[FILTERED]"}
+  Pipelines: [:api]
+[debug] QUERY OK source="users" db=3.4ms idle=1312.8ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."email" = $1) ["sander.voerman@kabisa.nl"]
+[90m↳ Pow.Ecto.Context.do_authenticate/4, at: lib/pow/ecto/context.ex:105[0m
+[info] Sent 401 in 192ms
+[info] AUDIT: User  performed api_login_failure from sander.voerman@kabisa.nl. Details: %{"ip" => "127.0.0.1"}
+[info] POST /api/auth/login
+[debug] Processing with XIAMWeb.API.AuthController.login/2
+  Parameters: %{"email" => "admin@example.com", "password" => "[FILTERED]"}
+  Pipelines: [:api]
+[debug] QUERY OK source="users" db=2.6ms idle=1189.7ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."email" = $1) ["admin@example.com"]
+[90m↳ Pow.Ecto.Context.do_authenticate/4, at: lib/pow/ecto/context.ex:105[0m
+[info] Sent 200 in 188ms
+[info] AUDIT: User 1 performed api_login_success from admin@example.com. Details: %{"ip" => "127.0.0.1"}
+[info] GET /api/auth/verify
+[debug] Processing with XIAMWeb.API.AuthController.verify_token/2
+  Parameters: %{}
+  Pipelines: [:api, :api_jwt]
+[debug] QUERY OK source="users" db=2.7ms idle=140.6ms
+SELECT u0."id", u0."password_hash", u0."email", u0."mfa_enabled", u0."mfa_secret", u0."mfa_backup_codes", u0."role_id", u0."inserted_at", u0."updated_at" FROM "users" AS u0 WHERE (u0."id" = $1) [1]
+[90m↳ XIAM.Auth.JWT.get_user_from_claims/1, at: lib/xiam/auth/jwt.ex:75[0m
+[debug] QUERY OK source="roles" db=1.0ms idle=143.4ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Plugs.APIAuthPlug.call/2, at: lib/xiam_web/plugs/api_auth_plug.ex:28[0m
+[debug] QUERY OK source="capabilities" db=2.6ms idle=144.5ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Plugs.APIAuthPlug.call/2, at: lib/xiam_web/plugs/api_auth_plug.ex:28[0m
+[info] Sent 200 in 7ms
+[info] GET /
+[debug] Processing with XIAMWeb.PageController.home/2
+  Parameters: %{}
+  Pipelines: [:browser]
+[info] Sent 200 in 730µs
+[info] GET /admin
+[debug] Processing with XIAMWeb.Admin.DashboardLive.index/2
+  Parameters: %{}
+  Pipelines: [:browser, :admin_protected]
+[debug] QUERY OK source="roles" db=0.9ms idle=1695.9ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="capabilities" db=0.4ms idle=1697.0ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[info] Sent 200 in 3ms
+[info] GET /admin/roles
+[debug] Processing with XIAMWeb.Admin.RolesLive.index/2
+  Parameters: %{}
+  Pipelines: [:browser, :admin_protected]
+[debug] QUERY OK source="roles" db=0.3ms idle=1521.9ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at", r0."id" FROM "roles" AS r0 WHERE (r0."id" = $1) [1]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="capabilities" db=1.4ms idle=808.0ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Plugs.AdminAuthPlug.has_admin_privileges?/1, at: lib/xiam_web/plugs/admin_auth_plug.ex:33[0m
+[debug] QUERY OK source="roles" db=0.5ms idle=809.5ms
+SELECT r0."id", r0."name", r0."description", r0."inserted_at", r0."updated_at" FROM "roles" AS r0 ORDER BY r0."name" []
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:12[0m
+[debug] QUERY OK source="capabilities" db=0.9ms idle=810.1ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at", r1."role_id"::bigint FROM "capabilities" AS c0 INNER JOIN "roles_capabilities" AS r1 ON c0."id" = r1."capability_id" WHERE (r1."role_id" = ANY($1)) ORDER BY r1."role_id"::bigint [[1]]
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:12[0m
+[debug] QUERY OK source="capabilities" db=0.2ms idle=811.2ms
+SELECT c0."id", c0."name", c0."description", c0."inserted_at", c0."updated_at" FROM "capabilities" AS c0 []
+[90m↳ XIAMWeb.Admin.RolesLive.mount/3, at: lib/xiam_web/live/admin/roles_live.ex:13[0m
+[info] Sent 200 in 5ms

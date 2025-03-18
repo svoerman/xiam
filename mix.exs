@@ -66,7 +66,9 @@ defmodule XIAM.MixProject do
       {:libcluster, "~> 3.3"},
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:joken, "~> 2.6"},
-      {:cors_plug, "~> 3.0"}
+      {:cors_plug, "~> 3.0"},
+      
+      # API documentation
     ]
   end
 
