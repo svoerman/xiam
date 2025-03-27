@@ -2,8 +2,11 @@ defmodule XIAMWeb.Admin.RolesLive do
   use XIAMWeb, :live_view
 
   import XIAMWeb.Components.UI.Button
-  import XIAMWeb.CoreComponents, except: [button: 1]
+  import XIAMWeb.Components.UI.Modal
+  import XIAMWeb.CoreComponents, except: [button: 1, modal: 1]
+  import XIAMWeb.Components.UI
 
+  alias XIAM.RBAC
   alias XIAM.RBAC.Role
   alias XIAM.RBAC.Capability
   alias XIAM.Repo
@@ -11,33 +14,20 @@ defmodule XIAMWeb.Admin.RolesLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    IO.puts("==========================================")
-    IO.puts("DEBUG: RolesLive mount function called")
-
-    roles_query = from r in Role, order_by: r.name, preload: [:capabilities]
-    roles = Repo.all(roles_query)
-    capabilities = Capability.list_capabilities()
-
-    # Create empty changesets for new roles and capabilities
-    role_changeset = Role.changeset(%Role{}, %{})
-    capability_changeset = Capability.changeset(%Capability{}, %{})
+    roles = RBAC.list_roles()
+    changeset = RBAC.change_capability(%Capability{})
 
     socket = assign(socket,
-      page_title: "Manage Roles & Capabilities",
+      page_title: "Roles & Capabilities",
       roles: roles,
-      capabilities: capabilities,
+      capabilities: RBAC.list_capabilities(),
       selected_role: nil,
+      capability_changeset: changeset,
       selected_capability: nil,
+      form_mode: nil,
       show_role_modal: false,
-      show_capability_modal: false,
-      show_test_modal: false,
-      form_mode: nil, # :new_role, :edit_role, :new_capability, :edit_capability
-      role_changeset: role_changeset,
-      capability_changeset: capability_changeset
+      show_capability_modal: false
     )
-
-    IO.puts("DEBUG: Mount completed with assigns:")
-    IO.inspect(socket.assigns, label: "Socket Assigns", pretty: true)
 
     {:ok, socket}
   end
@@ -63,19 +53,13 @@ defmodule XIAMWeb.Admin.RolesLive do
 
   @impl true
   def handle_event("show_new_role_modal", _params, socket) do
-    IO.puts("DEBUG: show_new_role_modal event triggered")
-    IO.inspect(socket.assigns, label: "Socket Assigns Before", pretty: true)
-
     role_changeset = Role.changeset(%Role{}, %{})
-    result = assign(socket,
+    {:noreply, assign(socket,
       show_role_modal: true,
       form_mode: :new_role,
       selected_role: nil,
       role_changeset: role_changeset
-    )
-
-    IO.inspect(result.assigns, label: "Socket Assigns After", pretty: true)
-    {:noreply, result |> put_flash(:info, "Opening new role modal")}
+    )}
   end
 
   def handle_event("show_edit_role_modal", %{"id" => id}, socket) do
@@ -90,19 +74,13 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("show_new_capability_modal", _params, socket) do
-    IO.puts("DEBUG: show_new_capability_modal event triggered")
-    IO.inspect(socket.assigns, label: "Socket Assigns Before", pretty: true)
-
     capability_changeset = Capability.changeset(%Capability{}, %{})
-    result = assign(socket,
+    {:noreply, assign(socket,
       show_capability_modal: true,
       form_mode: :new_capability,
       selected_capability: nil,
       capability_changeset: capability_changeset
-    )
-
-    IO.inspect(result.assigns, label: "Socket Assigns After", pretty: true)
-    {:noreply, result |> put_flash(:info, "Opening new capability modal")}
+    )}
   end
 
   def handle_event("show_edit_capability_modal", %{"id" => id}, socket) do
@@ -131,9 +109,6 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("save_role", %{"role" => role_params}, socket) do
-    IO.puts("==========================================")
-    IO.puts("EVENT: save_role event triggered with params: #{inspect(role_params)}")
-
     case socket.assigns.form_mode do
       :new_role ->
         case Role.create_role(role_params) do
@@ -174,9 +149,6 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("save_capability", %{"capability" => capability_params}, socket) do
-    IO.puts("==========================================")
-    IO.puts("EVENT: save_capability event triggered with params: #{inspect(capability_params)}")
-
     case socket.assigns.form_mode do
       :new_capability ->
         case Capability.create_capability(capability_params) do
@@ -278,28 +250,6 @@ defmodule XIAMWeb.Admin.RolesLive do
     else
       {:noreply, socket |> put_flash(:error, "Capability not found")}
     end
-  end
-
-  def handle_event("debug_click", _params, socket) do
-    IO.puts("Debug button clicked! LiveView events are working!")
-    {:noreply, socket |> put_flash(:info, "Debug button works! LiveView events are functional.")}
-  end
-
-  def handle_event("debug_modal", _params, socket) do
-    IO.puts("Debug modal button clicked!")
-    {:noreply, socket
-      |> assign(show_role_modal: true)
-      |> put_flash(:info, "Debug modal opened")}
-  end
-
-  def handle_event("close_test_modal", _params, socket) do
-    IO.puts("Close test modal button clicked!")
-    {:noreply, socket |> assign(show_test_modal: false) |> put_flash(:info, "Test modal close button works!")}
-  end
-
-  def handle_event("show_test_modal", _params, socket) do
-    IO.puts("Show test modal button clicked!")
-    {:noreply, socket |> assign(show_test_modal: true) |> put_flash(:info, "Showing test modal")}
   end
 
   # Private helpers

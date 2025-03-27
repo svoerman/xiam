@@ -131,9 +131,9 @@ defmodule XIAMWeb.CoreComponents do
           </p>
           <p class="text-sm text-muted-foreground mt-1">{msg}</p>
         </div>
-        <button 
-          type="button" 
-          class="shrink-0 h-5 w-5 text-muted-foreground hover:text-foreground" 
+        <button
+          type="button"
+          class="shrink-0 h-5 w-5 text-muted-foreground hover:text-foreground"
           aria-label={gettext("close")}
           phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
           onclick={"document.getElementById('#{@id}').style.display = 'none'"}

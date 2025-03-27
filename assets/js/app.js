@@ -1,28 +1,8 @@
-// If you want to use Phoenix channels, run `mix help phx.gen.channel`
-// to get started and then uncomment the line below.
-// import "./user_socket.js"
-
-// You can include dependencies in two ways.
-//
-// The simplest option is to put them in assets/vendor and
-// import them using relative paths:
-//
-//     import "../vendor/some-package.js"
-//
-// Alternatively, you can `npm install some-package --prefix assets` and import
-// them using a path starting with the package name:
-//
-//     import "some-package"
-//
-
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
-import "../vendor/phoenix_html.js"
-// Import Phoenix Socket module
-import {Socket} from "../vendor/phoenix.js"
+import "../node_modules/phoenix_html"
+import {Socket} from "../node_modules/phoenix"
+import {LiveSocket} from "../node_modules/phoenix_live_view"
 import topbar from "../vendor/topbar"
-
-// Import Phoenix LiveView
-import {LiveSocket} from "../vendor/live_view.js"
 
 // Theme handling functions
 const getThemePreference = () => {
@@ -85,20 +65,10 @@ Hooks.AdminFormDebug = {
   }
 };
 
-// Import our debug helpers and register debug hooks
-import "./debug_helpers";
-
-// Get the AdminFormDebug hook for LiveView
-Hooks.AdminFormDebug = window.AdminFormDebug;
-
-
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
-// Enable debug mode for LiveView
 let liveSocket = new LiveSocket("/live", Socket, {
-  longPollFallbackMs: 2500,
   hooks: Hooks,
-  params: {_csrf_token: csrfToken},
-  debug: true // Enable verbose debugging
+  params: {_csrf_token: csrfToken}
 })
 
 // Show progress bar on live navigation and form submits
@@ -110,13 +80,7 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 liveSocket.connect()
 
 // expose liveSocket on window for web console debug logs and latency simulation:
-// Enable debug mode to diagnose event issues
-liveSocket.enableDebug()
-// >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
-// >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
-
-console.log('Phoenix liveSocket attached to window', window.liveSocket);
 
 // Add debugging for form submission
 document.addEventListener('submit', (e) => {
@@ -168,35 +132,4 @@ window.addEventListener("phx:click", e => {
 
 window.addEventListener("phx:page-loading-start", info => console.log("Loading start:", info));
 window.addEventListener("phx:page-loading-stop", info => console.log("Loading stop:", info));
-
-// Add this at the end of the file to debug any LiveView click events
-console.log("Adding LiveView click debugger...");
-
-document.addEventListener('click', (event) => {
-  const element = event.target.closest('[phx-click]');
-  if (element) {
-    const eventName = element.getAttribute('phx-click');
-    console.log('Element with phx-click detected:', {
-      element: element,
-      eventName: eventName,
-      id: element.id,
-      classList: Array.from(element.classList)
-    });
-  }
-}, true);
-
-// Debug all button clicks
-document.addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (button) {
-    console.log('Button clicked:', {
-      button: button,
-      id: button.id,
-      text: button.textContent.trim(),
-      attributes: Array.from(button.attributes).map(attr => ({ name: attr.name, value: attr.value }))
-    });
-  }
-}, true);
-
-console.log("LiveView click debugger added.")
 
