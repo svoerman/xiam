@@ -80,19 +80,28 @@ config :xiam, Oban,
   queues: [default: 10, audit: 20, emails: 10]
 
 # Configure LibCluster for node clustering
-cluster_topologies = 
+cluster_topologies =
   case System.get_env("CLUSTER_ENABLED", "true") do
     "true" -> [
       xiam: [
         strategy: Cluster.Strategy.Epmd,
-        config: [hosts: [node()]],
-        connect: true
+        config: [
+          hosts: [
+            :"node1@127.0.0.1",
+            :"node2@127.0.0.1",
+            :"node3@127.0.0.1"
+          ],
+          connect: true,
+          polling_interval: 1000,
+          timeout: 5000
+        ]
       ]
     ]
     _ -> []
   end
 
 config :libcluster,
+  debug: true,
   topologies: cluster_topologies
 
 # Configure PowAssent providers

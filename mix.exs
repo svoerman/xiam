@@ -67,6 +67,7 @@ defmodule XIAM.MixProject do
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:joken, "~> 2.6"},
       {:cors_plug, "~> 3.0"},
+      {:plug_cowboy, "~> 2.7", [hex: :plug_cowboy, repo: "hexpm", optional: false]},
 
       # API documentation
     ]

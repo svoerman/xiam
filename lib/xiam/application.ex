@@ -15,7 +15,7 @@ defmodule XIAM.Application do
 
     # Only start clustering if explicitly enabled and properly configured
     cluster_enabled = System.get_env("CLUSTER_ENABLED") == "true"
-    _topologies = if cluster_enabled, do: (Application.get_env(:libcluster, :topologies) || []), else: []
+    topologies = if cluster_enabled, do: (Application.get_env(:libcluster, :topologies) || []), else: []
 
     # Base children that are always started
     children = [
@@ -27,6 +27,8 @@ defmodule XIAM.Application do
       {Finch, name: XIAM.Finch},
       # Start Oban for background job processing
       {Oban, Application.get_env(:xiam, Oban)},
+      # Start libcluster for node clustering
+      {Cluster.Supervisor, [topologies, [name: XIAM.ClusterSupervisor]]},
       # Start to serve requests, typically the last entry
       XIAMWeb.Endpoint
     ]

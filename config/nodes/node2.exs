@@ -7,12 +7,12 @@ config :xiam, XIAMWeb.Endpoint,
     port: 4002
   ],
   server: true,
-  secret_key_base: "y/pgsbymAZ8IRPqlIouDG+wJCZz53bZCcu/JfPdw8rJydnUh7se/XJYJV/s1zpL4",
-  live_view: [signing_salt: "y/pgsbymAZ8IRPqlIouDG+wJCZz53bZCcu/JfPdw8rJydnUh7se/XJYJV/s1zpL4"]
+  secret_key_base: "kQKYX3P4Vpg4wTKnqgurs1u6qZeLeXg9bMUGvSMaWzbCa7H73u093jk+OSMF6dFq",
+  live_view: [signing_salt: "kQKYX3P4Vpg4wTKnqgurs1u6qZeLeXg9bMUGvSMaWzbCa7H73u093jk+OSMF6dFq"]
 
 # Set the cookie for distributed Erlang
 config :xiam,
-  cookie: "XH1LVSXAI9Qtryg/PiTvCR3MjwXPDofqflhPYmaWrq4pAcuqy1k/lXGdihHlUJMs"
+  cookie: "b31C872wdf6cmobom8YGm8yFN7Giy+Y7JDlMEYfFybl2wVqJYfGI6Q4/sk7Da89D"
 
 # Override the database configuration
 config :xiam, XIAM.Repo,
@@ -51,8 +51,9 @@ config :libcluster,
           :"node2@127.0.0.1",
           :"node3@127.0.0.1"
         ],
-        polling_interval: 5_000,
-        timeout: 30_000
+        connect: true,
+        polling_interval: 1000,
+        timeout: 5000
       ]
     ]
   ]
