@@ -57,7 +57,8 @@ defmodule XIAM.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
-      
+      {:plug_cowboy, "~> 2.5"},
+
       # CIAM specific dependencies
       {:pow, "~> 1.0.29"},
       {:pow_assent, "~> 0.4.16"},
@@ -67,7 +68,7 @@ defmodule XIAM.MixProject do
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:joken, "~> 2.6"},
       {:cors_plug, "~> 3.0"},
-      
+
       # API documentation
     ]
   end

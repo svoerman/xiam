@@ -1,3 +1,4 @@
+// Enhanced LiveSocket class implementation with proper event handling
 export class LiveSocket {
   constructor(url, socket, opts = {}) {
     this.url = url;
@@ -201,8 +202,15 @@ export class LiveSocket {
       console.log(`Handling modal event: ${event}`, params);
     }
     
-    // Let Phoenix LiveView handle all modal functionality
-    // This is critical to prevent event conflicts between custom JS and LiveView
+    // Create a custom event that will be picked up by Phoenix LiveView
+    const customEvent = new CustomEvent(`phx:${event}`, {
+      bubbles: true,
+      cancelable: true,
+      detail: { params: params }
+    });
+    
+    // Dispatch the event on the document to be picked up by Phoenix
+    document.dispatchEvent(customEvent);
   }
   
   // Directly simulate a server-side event handling for modals - DISABLED
@@ -218,6 +226,7 @@ export class LiveSocket {
       // Handle closing the modal
       this._closeModal();
     }
+  }
   }
 
   // Handle form submissions
@@ -256,6 +265,27 @@ export class LiveSocket {
     this.debug = true;
     console.log("LiveView debug mode enabled");
     this._setupDebugListeners();
+    return this;
+  }
+  
+  // Disable debug mode
+  disableDebug() {
+    this.debug = false;
+    console.log("LiveView debug mode disabled");
+    return this;
+  }
+
+  // Enable latency simulation for testing
+  enableLatencySim(timeMs) {
+    this.latency = timeMs;
+    console.log(`LiveView latency simulation enabled: ${timeMs}ms`);
+    return this;
+  }
+
+  // Disable latency simulation
+  disableLatencySim() {
+    this.latency = null;
+    console.log("LiveView latency simulation disabled");
     return this;
   }
 }

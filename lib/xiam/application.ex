@@ -9,13 +9,13 @@ defmodule XIAM.Application do
   def start(_type, _args) do
     # Store application start time for uptime calculations
     Application.put_env(:xiam, :started_at, System.system_time(:second))
-    
+
     # Initialize settings cache
     init_settings_cache()
-    
+
     # Only start clustering if explicitly enabled and properly configured
     cluster_enabled = System.get_env("CLUSTER_ENABLED") == "true"
-    _topologies = if cluster_enabled, do: (Application.get_env(:libcluster, :topologies) || []), else: []    
+    topologies = if cluster_enabled, do: Application.get_env(:libcluster, :topologies) || [], else: []
 
     # Base children that are always started
     children = [
@@ -27,6 +27,8 @@ defmodule XIAM.Application do
       {Finch, name: XIAM.Finch},
       # Start Oban for background job processing
       {Oban, Application.get_env(:xiam, Oban)},
+      # Start clustering supervisor if enabled
+      {Cluster.Supervisor, [topologies, [name: XIAM.ClusterSupervisor]]},
       # Start to serve requests, typically the last entry
       XIAMWeb.Endpoint
     ]
@@ -44,7 +46,7 @@ defmodule XIAM.Application do
     XIAMWeb.Endpoint.config_change(changed, removed)
     :ok
   end
-  
+
   # Initialize settings cache on application startup
   defp init_settings_cache do
     # Skip in test environment
@@ -53,18 +55,18 @@ defmodule XIAM.Application do
       Task.start(fn ->
         # Sleep briefly to ensure repo is started
         Process.sleep(1000)
-        
+
         try do
           # Initialize the settings cache
           XIAM.System.Settings.init_cache()
-          
+
           # Schedule initial health check
           XIAM.Workers.HealthCheckWorker.schedule()
-          
+
           # Schedule initial data retention job
           XIAM.Workers.DataRetentionWorker.schedule()
         rescue
-          e -> 
+          e ->
             # Log any errors during initialization
             require Logger
             Logger.error("Error initializing settings: #{inspect(e)}")
