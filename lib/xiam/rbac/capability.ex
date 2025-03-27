@@ -24,7 +24,8 @@ defmodule XIAM.RBAC.Capability do
   Returns a list of all capabilities.
   """
   def list_capabilities do
-    XIAM.Repo.all(__MODULE__)
+    from(c in __MODULE__, order_by: c.name)
+    |> XIAM.Repo.all()
   end
 
   @doc """

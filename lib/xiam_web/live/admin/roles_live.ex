@@ -64,7 +64,10 @@ defmodule XIAMWeb.Admin.RolesLive do
 
   def handle_event("show_edit_role_modal", %{"id" => id}, socket) do
     role = Repo.get(Role, id) |> Repo.preload(:capabilities)
-    role_changeset = Role.changeset(role, %{})
+    role_changeset = Role.changeset(role, %{
+      name: role.name,
+      description: role.description
+    })
     {:noreply, assign(socket,
       show_role_modal: true,
       form_mode: :edit_role,
@@ -85,7 +88,10 @@ defmodule XIAMWeb.Admin.RolesLive do
 
   def handle_event("show_edit_capability_modal", %{"id" => id}, socket) do
     capability = Repo.get(Capability, id)
-    capability_changeset = Capability.changeset(capability, %{})
+    capability_changeset = Capability.changeset(capability, %{
+      name: capability.name,
+      description: capability.description
+    })
     {:noreply, assign(socket,
       show_capability_modal: true,
       form_mode: :edit_capability,
