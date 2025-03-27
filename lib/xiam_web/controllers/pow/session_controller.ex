@@ -27,7 +27,7 @@ defmodule XIAMWeb.Pow.SessionController do
       errors: conn.assigns.changeset.errors,
       user_id_field: Pow.Ecto.Schema.user_id_field(Plug.fetch_config(conn)),
       params: params["user"],
-      csrf_token: Plug.CSRFProtection.get_csrf_token()
+      csrf_token: Phoenix.Controller.get_csrf_token()
     )
   end
 

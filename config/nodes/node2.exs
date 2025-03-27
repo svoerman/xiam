@@ -7,12 +7,12 @@ config :xiam, XIAMWeb.Endpoint,
     port: 4002
   ],
   server: true,
-  secret_key_base: "IEg6/DIXMuMxodxryp/i564LCc8xkkKwkOkL2qrApz8TlJfFwHOdnDtZaJ/Bi1Ce",
-  live_view: [signing_salt: "IEg6/DIXMuMxodxryp/i564LCc8xkkKwkOkL2qrApz8TlJfFwHOdnDtZaJ/Bi1Ce"]
+  secret_key_base: "wzg+XhYy6FVn1iiEuhCDD4PvV034uq5SmH71m0Wlx9tna4/DD+v432Lj6LCBrhgv",
+  live_view: [signing_salt: "wzg+XhYy6FVn1iiEuhCDD4PvV034uq5SmH71m0Wlx9tna4/DD+v432Lj6LCBrhgv"]
 
 # Set the cookie for distributed Erlang
 config :xiam,
-  cookie: "w0oIuVNI8XFFo/g4adGhIEKcck/FPegcxYWhFbVyL0eeyhzBYx/U9jo1I3woClj/"
+  cookie: "w4g5mNaAeFA6Qmu1SDwl9j8WQ2GP/IASOfdTImqTx1Z/30YUbXf13ugdAabfJrad"
 
 # Override the database configuration
 config :xiam, XIAM.Repo,
