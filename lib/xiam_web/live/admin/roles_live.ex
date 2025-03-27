@@ -114,10 +114,17 @@ defmodule XIAMWeb.Admin.RolesLive do
     )}
   end
 
-  def handle_event("save_role", %{"role" => role_params}, socket) do
+  def handle_event("save_role", %{"role" => role_params, "capability_ids" => capability_ids}, socket) do
     case socket.assigns.form_mode do
       :new_role ->
-        case Role.create_role(role_params) do
+        # Parse the capability IDs for new roles too
+        capability_ids = capability_ids
+                       |> Enum.filter(fn {_k, v} -> v == "true" end)
+                       |> Enum.map(fn {k, _v} -> String.to_integer(k) end)
+
+        # Create role with capabilities
+        role = %Role{}
+        case Role.update_role_with_capabilities(role, role_params, capability_ids) do
           {:ok, _role} ->
             roles = refresh_roles(socket)
             role_changeset = Role.changeset(%Role{}, %{})
@@ -135,7 +142,13 @@ defmodule XIAMWeb.Admin.RolesLive do
           nil ->
             {:noreply, socket |> put_flash(:error, "No role selected")}
           role ->
-            case Role.update_role(role, role_params) do
+            # Parse the capability IDs (Phoenix sends them as a map with string keys)
+            capability_ids = capability_ids
+                           |> Enum.filter(fn {_k, v} -> v == "true" end)
+                           |> Enum.map(fn {k, _v} -> String.to_integer(k) end)
+
+            # Update role with both details and capabilities
+            case Role.update_role_with_capabilities(role, role_params, capability_ids) do
               {:ok, updated_role} ->
                 roles = refresh_roles(socket)
                 role_changeset = Role.changeset(%Role{}, %{})
@@ -191,30 +204,6 @@ defmodule XIAMWeb.Admin.RolesLive do
 
       _other ->
         {:noreply, socket |> put_flash(:error, "Invalid form mode")}
-    end
-  end
-
-  def handle_event("update_role_capabilities", %{"capability_ids" => capability_ids}, socket) do
-    case socket.assigns.selected_role do
-      nil ->
-        {:noreply, socket |> put_flash(:error, "No role selected")}
-      role ->
-        # Parse the capability IDs (Phoenix sends them as a map with string keys)
-        capability_ids = capability_ids
-                         |> Enum.filter(fn {_k, v} -> v == "true" end)
-                         |> Enum.map(fn {k, _v} -> String.to_integer(k) end)
-
-        case Role.update_role_capabilities(role, capability_ids) do
-          {:ok, updated_role} ->
-            roles = refresh_roles(socket)
-
-            {:noreply, socket
-              |> assign(roles: roles, selected_role: updated_role, show_role_modal: false)
-              |> put_flash(:info, "Role capabilities updated successfully")}
-
-          {:error, _changeset} ->
-            {:noreply, socket |> put_flash(:error, "Failed to update role capabilities")}
-        end
     end
   end
 

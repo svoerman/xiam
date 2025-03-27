@@ -101,30 +101,24 @@
         <div class="mt-6 pt-6 border-t">
           <h4 class="font-medium text-sm mb-3">Assign Capabilities</h4>
           
-          <.form :let={_cf} for={%{}} phx-submit="update_role_capabilities" class="space-y-4">
-            <div class="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md">
-              <%= for capability <- @capabilities do %>
-                <div class="flex items-center">
-                  <input 
-                    type="checkbox"
-                    id={"capability-#{capability.id}"}
-                    name={"capability_ids[#{capability.id}]"}
-                    value="true"
-                    checked={@selected_role && Enum.any?(@selected_role.capabilities, fn c -> c.id == capability.id end)}
-                    class="w-4 h-4 mr-2 rounded border-primary text-primary focus:ring-primary"
-                  />
-                  <label for={"capability-#{capability.id}"} class="text-sm">
-                    <span class="font-medium"><%= capability.name %></span>
-                    <span class="text-muted-foreground text-xs ml-1"><%= capability.description %></span>
-                  </label>
-                </div>
-              <% end %>
-            </div>
-            
-            <div class="flex justify-end">
-              <.button type="submit">Update Capabilities</.button>
-            </div>
-          </.form>
+          <div class="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md">
+            <%= for capability <- @capabilities do %>
+              <div class="flex items-center">
+                <input 
+                  type="checkbox"
+                  id={"capability-#{capability.id}"}
+                  name={"capability_ids[#{capability.id}]"}
+                  value="true"
+                  checked={@selected_role && Enum.any?(@selected_role.capabilities, fn c -> c.id == capability.id end)}
+                  class="w-4 h-4 mr-2 rounded border-primary text-primary focus:ring-primary"
+                />
+                <label for={"capability-#{capability.id}"} class="text-sm">
+                  <span class="font-medium"><%= capability.name %></span>
+                  <span class="text-muted-foreground text-xs ml-1"><%= capability.description %></span>
+                </label>
+              </div>
+            <% end %>
+          </div>
         </div>
       <% end %>
     </.form>

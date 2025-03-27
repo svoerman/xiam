@@ -1,17 +1,17 @@
 defmodule XIAMWeb.Admin.SettingsLive do
   use XIAMWeb, :live_view
-  
+
   #alias XIAM.Repo
   alias XIAM.System.Settings
   alias XIAM.Audit
-  
+
   @impl true
   def mount(_params, _session, socket) do
     theme = if connected?(socket), do: get_connect_params(socket)["theme"], else: "light"
 
     # Get settings from the database through our Settings module
     db_settings = Settings.list_settings()
-    
+
     # Transform settings into our UI format
     settings = %{
       "general" => get_general_settings(db_settings),
@@ -19,8 +19,8 @@ defmodule XIAMWeb.Admin.SettingsLive do
       "mfa" => get_mfa_settings(db_settings),
       "security" => get_security_settings(db_settings)
     }
-    
-    {:ok, assign(socket, 
+
+    {:ok, assign(socket,
       page_title: "System Settings",
       theme: theme || "light",
       active_tab: "general",
@@ -36,7 +36,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
   def handle_params(%{"tab" => tab}, _uri, socket) when tab in ["general", "oauth", "mfa", "security"] do
     {:noreply, assign(socket, active_tab: tab)}
   end
-  
+
   def handle_params(_params, _uri, socket) do
     {:noreply, socket}
   end
@@ -45,10 +45,10 @@ defmodule XIAMWeb.Admin.SettingsLive do
   def handle_event("change_tab", %{"tab" => tab}, socket) do
     {:noreply, push_patch(socket, to: ~p"/admin/settings?tab=#{tab}")}
   end
-  
+
   def handle_event("show_edit_modal", %{"section" => section, "key" => key}, socket) do
     current_value = get_in(socket.assigns.settings, [section, key])
-    
+
     {:noreply, assign(socket,
       show_edit_modal: true,
       edit_section: section,
@@ -56,7 +56,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
       edit_value: current_value
     )}
   end
-  
+
   def handle_event("close_modal", _, socket) do
     {:noreply, assign(socket, show_edit_modal: false)}
   end
@@ -65,38 +65,38 @@ defmodule XIAMWeb.Admin.SettingsLive do
     new_theme = if socket.assigns.theme == "light", do: "dark", else: "light"
     {:noreply, assign(socket, theme: new_theme)}
   end
-  
+
   def handle_event("save_setting", %{"setting" => %{"value" => value}}, socket) do
     %{edit_section: section, edit_key: key} = socket.assigns
     current_user = socket.assigns[:current_user]
-    
+
     # Save setting to the database using our Settings module
     setting_key = db_setting_key(section, key)
     case Settings.update_setting(setting_key, value) do
       {:ok, _updated_setting} ->
         # Log the action in audit logs
         Audit.log_action("update_setting", %{key: setting_key, value: value}, current_user)
-        
+
         # Update local settings map
         settings = update_in(socket.assigns.settings, [section, key], fn _ -> value end)
-        
+
         # Refresh settings cache
         Settings.refresh_cache()
-        
-        {:noreply, socket 
+
+        {:noreply, socket
           |> assign(settings: settings, show_edit_modal: false)
           |> put_flash(:info, "Setting updated successfully")}
-      
+
       {:error, changeset} ->
         error_message = format_changeset_errors(changeset)
-        {:noreply, socket 
+        {:noreply, socket
           |> put_flash(:error, "Failed to update setting: #{error_message}")
           |> assign(show_edit_modal: true)}
     end
   end
-  
+
   # Private helper functions to get different setting categories from the database
-  
+
   defp get_general_settings(db_settings) do
     %{
       "application_name" => get_setting_value(db_settings, "application_name", "XIAM"),
@@ -105,19 +105,19 @@ defmodule XIAMWeb.Admin.SettingsLive do
       "default_locale" => get_setting_value(db_settings, "default_locale", "en")
     }
   end
-  
+
   defp get_oauth_settings(db_settings) do
     %{
       "github_enabled" => get_setting_value(db_settings, "github_enabled", "false"),
       "github_client_id" => get_setting_value(db_settings, "github_client_id", ""),
       "github_client_secret" => get_setting_value(db_settings, "github_client_secret", "[REDACTED]"),
-      
+
       "google_enabled" => get_setting_value(db_settings, "google_enabled", "false"),
       "google_client_id" => get_setting_value(db_settings, "google_client_id", ""),
       "google_client_secret" => get_setting_value(db_settings, "google_client_secret", "[REDACTED]")
     }
   end
-  
+
   defp get_mfa_settings(db_settings) do
     %{
       "mfa_required" => get_setting_value(db_settings, "mfa_required", "false"),
@@ -126,7 +126,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
       "backup_codes_count" => get_setting_value(db_settings, "backup_codes_count", "10")
     }
   end
-  
+
   defp get_security_settings(db_settings) do
     %{
       "minimum_password_length" => get_setting_value(db_settings, "minimum_password_length", "8"),
@@ -141,19 +141,19 @@ defmodule XIAMWeb.Admin.SettingsLive do
       "api_rate_limit" => get_setting_value(db_settings, "api_rate_limit", "100")
     }
   end
-  
+
   # Helper function to get setting value from the list of settings
   defp get_setting_value(db_settings, key, default) do
     Enum.find_value(db_settings, default, fn setting ->
       if setting.key == key, do: setting.value, else: nil
     end)
   end
-  
+
   # Convert UI section/key to database key
   defp db_setting_key(_section, key) do
     key
   end
-  
+
   # Format changeset errors for display
   defp format_changeset_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
@@ -178,25 +178,25 @@ defmodule XIAMWeb.Admin.SettingsLive do
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border border-border overflow-hidden">
         <div class="border-b border-border">
           <nav class="-mb-px flex" aria-label="Tabs">
-            <button 
+            <button
               phx-click="change_tab"
               phx-value-tab="general"
               class={"w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm #{if @active_tab == "general", do: "border-primary text-primary", else: "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"}"}>
               General
             </button>
-            <button 
+            <button
               phx-click="change_tab"
               phx-value-tab="oauth"
               class={"w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm #{if @active_tab == "oauth", do: "border-primary text-primary", else: "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"}"}>
               OAuth Providers
             </button>
-            <button 
+            <button
               phx-click="change_tab"
               phx-value-tab="mfa"
               class={"w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm #{if @active_tab == "mfa", do: "border-primary text-primary", else: "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"}"}>
               Multi-Factor Auth
             </button>
-            <button 
+            <button
               phx-click="change_tab"
               phx-value-tab="security"
               class={"w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm #{if @active_tab == "security", do: "border-primary text-primary", else: "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"}"}>
@@ -204,7 +204,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
             </button>
           </nav>
         </div>
-        
+
         <div class="p-6">
           <%= case @active_tab do %>
             <% "general" -> %>
@@ -232,11 +232,11 @@ defmodule XIAMWeb.Admin.SettingsLive do
                   </table>
                 </div>
               </div>
-            
+
             <% "oauth" -> %>
               <div>
                 <h2 class="text-lg font-medium text-foreground mb-4">OAuth Provider Settings</h2>
-                
+
                 <!-- GitHub Settings -->
                 <div class="mb-8">
                   <div class="flex justify-between items-center mb-2">
@@ -245,7 +245,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                       <%= if @settings["oauth"]["github_enabled"] == "true", do: "Enabled", else: "Disabled" %>
                     </div>
                   </div>
-                  
+
                   <div class="overflow-hidden rounded-md border border-border">
                     <table class="min-w-full divide-y divide-gray-200">
                       <tbody class="bg-white divide-y divide-gray-200">
@@ -268,7 +268,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                     </table>
                   </div>
                 </div>
-                
+
                 <!-- Google Settings -->
                 <div>
                   <div class="flex justify-between items-center mb-2">
@@ -277,7 +277,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                       <%= if @settings["oauth"]["google_enabled"] == "true", do: "Enabled", else: "Disabled" %>
                     </div>
                   </div>
-                  
+
                   <div class="overflow-hidden rounded-md border border-border">
                     <table class="min-w-full divide-y divide-gray-200">
                       <tbody class="bg-white divide-y divide-gray-200">
@@ -301,7 +301,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                   </div>
                 </div>
               </div>
-            
+
             <% "mfa" -> %>
               <div>
                 <h2 class="text-lg font-medium text-foreground mb-4">Multi-Factor Authentication Settings</h2>
@@ -327,7 +327,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                   </table>
                 </div>
               </div>
-            
+
             <% "security" -> %>
               <div>
                 <h2 class="text-lg font-medium text-foreground mb-4">Security Settings</h2>
@@ -356,7 +356,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
           <% end %>
         </div>
       </div>
-      
+
       <!-- Edit Setting Modal -->
       <%= if @show_edit_modal do %>
         <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -369,33 +369,33 @@ defmodule XIAMWeb.Admin.SettingsLive do
                 </svg>
               </button>
             </div>
-            
+
             <.form for={%{}} phx-submit="save_setting">
               <div class="mb-4">
                 <label class="block text-sm font-medium text-foreground mb-1"><%= format_key(@edit_key) %></label>
-                
+
                 <%= case value_type(@edit_key) do %>
                   <% :boolean -> %>
                     <select name="setting[value]" class="block w-full p-2 bg-background border border-input rounded-md shadow-sm text-foreground focus:ring-2 focus:ring-primary/25 focus:border-primary">
                       <option value="true" selected={@edit_value == "true"}>Yes</option>
                       <option value="false" selected={@edit_value == "false"}>No</option>
                     </select>
-                    
+
                   <% :number -> %>
                     <input type="number" name="setting[value]" value={@edit_value}
                       class="block w-full p-2 bg-background border border-input rounded-md shadow-sm text-foreground focus:ring-2 focus:ring-primary/25 focus:border-primary" />
-                    
+
                   <% :sensitive -> %>
                     <input type="password" name="setting[value]" placeholder="Enter new value to change"
                       class="block w-full p-2 bg-background border border-input rounded-md shadow-sm text-foreground focus:ring-2 focus:ring-primary/25 focus:border-primary" />
                     <p class="mt-1 text-xs text-muted-foreground">Leave empty to keep current value</p>
-                    
+
                   <% :text -> %>
                     <input type="text" name="setting[value]" value={@edit_value}
                       class="block w-full p-2 bg-background border border-input rounded-md shadow-sm text-foreground focus:ring-2 focus:ring-primary/25 focus:border-primary" />
                 <% end %>
               </div>
-              
+
               <div class="flex justify-end mt-6">
                 <button type="button" phx-click="close_modal" class="mr-3 px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                   Cancel
@@ -412,9 +412,9 @@ defmodule XIAMWeb.Admin.SettingsLive do
     </div>
     """
   end
-  
+
   # Helper functions for formatting and display
-  
+
   defp format_key(key) do
     key
     |> String.replace("_", " ")
@@ -422,34 +422,34 @@ defmodule XIAMWeb.Admin.SettingsLive do
     |> Enum.map(&String.capitalize/1)
     |> Enum.join(" ")
   end
-  
+
   defp format_value(key, value) do
     case value_type(key) do
       :boolean ->
         if value == "true", do: "Yes", else: "No"
-      
+
       :sensitive ->
         if String.contains?(key, "secret") or String.contains?(key, "password"), do: "••••••••", else: value
-      
+
       _ ->
         value
     end
   end
-  
+
   defp value_type(key) do
     cond do
       String.ends_with?(key, "enabled") or
       String.starts_with?(key, "password_requires_") -> :boolean
-      
+
       String.contains?(key, "length") or
       String.contains?(key, "timeout") or
       String.contains?(key, "expiry") or
       String.contains?(key, "period") or
       String.contains?(key, "count") -> :number
-      
+
       String.contains?(key, "secret") or
       String.contains?(key, "password") -> :sensitive
-      
+
       true -> :text
     end
   end

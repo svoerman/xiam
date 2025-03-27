@@ -7,7 +7,9 @@ defmodule XIAM.RBAC.Role do
     field :name, :string
     field :description, :string
 
-    many_to_many :capabilities, XIAM.RBAC.Capability, join_through: "roles_capabilities"
+    many_to_many :capabilities, XIAM.RBAC.Capability,
+      join_through: "roles_capabilities",
+      on_replace: :delete
     has_many :users, XIAM.Users.User
 
     timestamps()
@@ -81,7 +83,7 @@ defmodule XIAM.RBAC.Role do
   """
   def update_role_capabilities(%__MODULE__{} = role, capability_ids) when is_list(capability_ids) do
     capabilities = Enum.map(capability_ids, &XIAM.RBAC.Capability.get_capability!/1)
-    
+
     role
     |> XIAM.Repo.preload(:capabilities)
     |> change()
@@ -94,9 +96,22 @@ defmodule XIAM.RBAC.Role do
   """
   def has_capability?(%__MODULE__{} = role, capability_name) when is_binary(capability_name) do
     role = XIAM.Repo.preload(role, :capabilities)
-    
+
     Enum.any?(role.capabilities, fn capability ->
       capability.name == capability_name
     end)
+  end
+
+  @doc """
+  Updates a role with both attributes and capabilities.
+  """
+  def update_role_with_capabilities(%__MODULE__{} = role, attrs, capability_ids) when is_list(capability_ids) do
+    capabilities = Enum.map(capability_ids, &XIAM.RBAC.Capability.get_capability!/1)
+
+    role
+    |> XIAM.Repo.preload(:capabilities)
+    |> changeset(attrs)
+    |> put_assoc(:capabilities, capabilities)
+    |> XIAM.Repo.update()
   end
 end

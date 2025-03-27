@@ -63,6 +63,7 @@ defmodule XIAM.RBAC do
   """
   def list_capabilities do
     Capability
+    |> order_by([c], c.name)
     |> Repo.all()
   end
 

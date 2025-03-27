@@ -1,11 +1,11 @@
 defmodule XIAMWeb.Admin.DashboardLive do
   use XIAMWeb, :live_view
-  
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok, assign(socket, page_title: "Admin Dashboard")}
   end
-  
+
   @impl true
   def handle_event("toggle_theme", _, socket) do
     {:noreply, socket}

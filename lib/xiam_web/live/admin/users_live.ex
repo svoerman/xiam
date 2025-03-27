@@ -1,24 +1,24 @@
 defmodule XIAMWeb.Admin.UsersLive do
   use XIAMWeb, :live_view
-  
+
   alias XIAM.Users.User
   alias XIAM.RBAC.Role
   alias XIAM.Repo
   import Ecto.Query
-  
+
   @impl true
   def mount(_params, _session, socket) do
     theme = if connected?(socket), do: get_connect_params(socket)["theme"], else: "light"
-    
-    users_query = from u in User, 
+
+    users_query = from u in User,
                   left_join: r in assoc(u, :role),
                   preload: [role: r],
                   order_by: [desc: u.inserted_at]
-                  
+
     users = Repo.all(users_query)
     roles = Repo.all(Role)
-    
-    {:ok, assign(socket, 
+
+    {:ok, assign(socket,
       page_title: "Manage Users",
       theme: theme || "light",
       users: users,
@@ -36,7 +36,7 @@ defmodule XIAMWeb.Admin.UsersLive do
       user -> {:noreply, assign(socket, selected_user: user)}
     end
   end
-  
+
   def handle_params(_params, _uri, socket) do
     {:noreply, assign(socket, selected_user: nil)}
   end
@@ -46,55 +46,55 @@ defmodule XIAMWeb.Admin.UsersLive do
     user = Repo.get(User, id) |> Repo.preload(:role)
     {:noreply, assign(socket, selected_user: user, show_edit_modal: true)}
   end
-  
+
   def handle_event("close_modal", _, socket) do
     {:noreply, assign(socket, show_edit_modal: false, show_mfa_modal: false)}
   end
-  
+
   def handle_event("update_user_role", %{"user" => %{"role_id" => role_id}}, socket) do
     role_id = if role_id == "", do: nil, else: role_id
-    
+
     case socket.assigns.selected_user do
-      nil -> 
+      nil ->
         {:noreply, socket |> put_flash(:error, "No user selected")}
       user ->
         case User.role_changeset(user, %{role_id: role_id}) |> Repo.update() do
           {:ok, _updated_user} ->
             users = refresh_users(socket)
-            
-            {:noreply, socket 
+
+            {:noreply, socket
               |> assign(users: users, show_edit_modal: false)
               |> put_flash(:info, "User role updated successfully")}
-          
+
           {:error, changeset} ->
             {:noreply, socket |> put_flash(:error, "Failed to update user: #{inspect(changeset.errors)}")}
         end
     end
   end
-  
+
   def handle_event("toggle_mfa", %{"id" => id}, socket) do
     user = Repo.get(User, id) |> Repo.preload(:role)
-    
+
     case user.mfa_enabled do
       true ->
         # Disable MFA
         case User.mfa_changeset(user, %{mfa_enabled: false, mfa_secret: nil, mfa_backup_codes: nil}) |> Repo.update() do
           {:ok, _updated_user} ->
             users = refresh_users(socket)
-            
+
             {:noreply, socket
               |> assign(users: users)
               |> put_flash(:info, "MFA disabled for user")}
-            
+
           {:error, _changeset} ->
             {:noreply, socket |> put_flash(:error, "Failed to disable MFA")}
         end
-        
+
       false ->
         # Show MFA setup modal
         mfa_secret = User.generate_totp_secret()
         backup_codes = User.generate_backup_codes()
-        
+
         {:noreply, socket
           |> assign(
             selected_user: user,
@@ -105,10 +105,10 @@ defmodule XIAMWeb.Admin.UsersLive do
           )}
     end
   end
-  
+
   def handle_event("enable_mfa", _params, socket) do
     user = socket.assigns.selected_user
-    
+
     case User.mfa_changeset(user, %{
       mfa_enabled: true,
       mfa_secret: socket.assigns.mfa_secret,
@@ -116,24 +116,24 @@ defmodule XIAMWeb.Admin.UsersLive do
     }) |> Repo.update() do
       {:ok, _updated_user} ->
         users = refresh_users(socket)
-        
+
         {:noreply, socket
           |> assign(users: users, show_mfa_modal: false)
           |> put_flash(:info, "MFA enabled successfully")}
-        
+
       {:error, _changeset} ->
         {:noreply, socket |> put_flash(:error, "Failed to enable MFA")}
     end
   end
-  
+
   # Private helpers
-  
+
   defp refresh_users(_socket) do
-    users_query = from u in User, 
+    users_query = from u in User,
                   left_join: r in assoc(u, :role),
                   preload: [role: r],
                   order_by: [desc: u.inserted_at]
-                  
+
     Repo.all(users_query)
   end
 
@@ -200,7 +200,7 @@ defmodule XIAMWeb.Admin.UsersLive do
           </table>
         </div>
       </div>
-      
+
       <%= if @show_edit_modal do %>
         <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div class="bg-card text-card-foreground rounded-lg shadow-xl max-w-md w-full mx-auto p-6 border border-border">
@@ -214,13 +214,13 @@ defmodule XIAMWeb.Admin.UsersLive do
                 </svg>
               </button>
             </div>
-            
+
             <div class="mb-4">
               <p class="text-sm text-muted-foreground">
                 Editing user: <span class="font-medium"><%= @selected_user.email %></span>
               </p>
             </div>
-            
+
             <.form for={%{}} phx-submit="update_user_role">
               <div class="mb-4">
                 <label for="role_id" class="block text-sm font-medium text-foreground mb-1">Assign Role</label>
@@ -231,7 +231,7 @@ defmodule XIAMWeb.Admin.UsersLive do
                   <% end %>
                 </select>
               </div>
-              
+
               <div class="flex justify-end mt-6">
                 <button type="button" phx-click="close_modal" class="mr-3 px-4 py-2 border border-input bg-background text-foreground rounded-md hover:bg-accent transition-colors text-sm">
                   Cancel
@@ -244,7 +244,7 @@ defmodule XIAMWeb.Admin.UsersLive do
           </div>
         </div>
       <% end %>
-      
+
       <%= if @show_mfa_modal do %>
         <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div class="bg-card text-card-foreground rounded-lg shadow-xl max-w-lg w-full mx-auto p-6 border border-border">
@@ -256,12 +256,12 @@ defmodule XIAMWeb.Admin.UsersLive do
                 </svg>
               </button>
             </div>
-            
+
             <div class="mb-6">
               <p class="text-sm text-muted-foreground mb-4">
                 Enabling MFA for user: <span class="font-medium"><%= @selected_user.email %></span>
               </p>
-              
+
               <div class="mb-4">
                 <h4 class="font-medium mb-2 text-foreground">1. Scan this QR code with your authenticator app</h4>
                 <div class="bg-muted p-4 rounded-md flex justify-center">
@@ -271,14 +271,14 @@ defmodule XIAMWeb.Admin.UsersLive do
                   </div>
                 </div>
               </div>
-              
+
               <div class="mb-4">
                 <h4 class="font-medium mb-2 text-foreground">2. Or enter this code manually</h4>
                 <div class="bg-muted p-3 rounded-md font-mono text-center text-foreground">
                   <%= Base.encode32(@mfa_secret, padding: false) %>
                 </div>
               </div>
-              
+
               <div class="mb-4">
                 <h4 class="font-medium mb-2 text-foreground">3. Save these backup codes (they will only be shown once)</h4>
                 <div class="bg-muted p-3 rounded-md font-mono text-sm grid grid-cols-2 gap-2">
@@ -288,7 +288,7 @@ defmodule XIAMWeb.Admin.UsersLive do
                 </div>
               </div>
             </div>
-            
+
             <div class="flex justify-end">
               <button type="button" phx-click="close_modal" class="mr-3 px-4 py-2 border border-input bg-background text-foreground rounded-md hover:bg-accent transition-colors text-sm">
                 Cancel

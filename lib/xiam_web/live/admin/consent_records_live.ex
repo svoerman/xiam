@@ -1,14 +1,14 @@
 defmodule XIAMWeb.Admin.ConsentRecordsLive do
   use XIAMWeb, :live_view
-  
+
   # Import form helpers
   import Phoenix.Component
   import XIAMWeb.Components.UI
-  
+
   alias XIAM.Consent
   alias XIAM.Users.User
   alias XIAM.Repo
-  
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok, socket
@@ -30,16 +30,16 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       |> assign(theme: "light")
       |> load_consent_records()}
   end
-  
+
   @impl true
   def handle_params(params, _url, socket) do
     page = parse_page(params)
-    
-    {:noreply, socket 
+
+    {:noreply, socket
       |> assign(page: page)
       |> load_consent_records()}
   end
-  
+
   @impl true
   def handle_event("filter", %{"filter" => filter_params}, socket) do
     filter = %{
@@ -49,12 +49,12 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       date_from: filter_params["date_from"],
       date_to: filter_params["date_to"]
     }
-    
+
     {:noreply, socket
       |> assign(filter: filter, page: 1)
       |> load_consent_records()}
   end
-  
+
   def handle_event("clear_filters", _, socket) do
     filter = %{
       consent_type: nil,
@@ -63,34 +63,34 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       date_from: nil,
       date_to: nil
     }
-    
+
     {:noreply, socket
       |> assign(filter: filter, page: 1)
       |> load_consent_records()}
   end
-  
+
   def handle_event("change_page", %{"page" => page}, socket) do
     {:noreply, push_patch(socket, to: ~p"/admin/consents?page=#{page}")}
   end
-  
+
   def handle_event("show_details", %{"id" => id}, socket) do
     consent_record = Consent.get_consent_record!(id)
-    
+
     {:noreply, socket
       |> assign(selected_record: consent_record)
       |> assign(show_detail_modal: true)}
   end
-  
+
   def handle_event("close_modal", _, socket) do
     {:noreply, assign(socket, show_detail_modal: false)}
   end
-  
+
   def handle_event("toggle_theme", _, socket) do
     current_theme = socket.assigns.theme
     new_theme = if current_theme == "light", do: "dark", else: "light"
     {:noreply, assign(socket, theme: new_theme)}
   end
-  
+
   defp parse_page(params) do
     case params do
       %{"page" => page} ->
@@ -101,23 +101,23 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       _ -> 1
     end
   end
-  
+
   defp load_consent_records(socket) do
     %{page: page, per_page: per_page, filter: filter} = socket.assigns
-    
+
     # Get pagination params
     pagination = %{page: page, per_page: per_page}
-    
+
     # Get consent records with pagination and filtering
-    %{items: consent_records, total_count: total_entries, total_pages: total_pages} = 
+    %{items: consent_records, total_count: total_entries, total_pages: total_pages} =
       Consent.list_consent_records(filter, pagination)
-    
+
     socket
     |> assign(consent_records: consent_records)
     |> assign(total_pages: total_pages)
     |> assign(total_entries: total_entries)
   end
-  
+
   # Get common consent types for filter dropdown
   defp consent_types do
     [
@@ -131,7 +131,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       "analytics"
     ]
   end
-  
+
   # Format consent status for display
   defp consent_status(record) do
     cond do
@@ -140,7 +140,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       true -> "Rejected"
     end
   end
-  
+
   # Get color for status pill
   defp status_color(record) do
     cond do
@@ -149,14 +149,14 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       true -> "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
     end
   end
-  
+
   # Format datetime for display
   defp format_datetime(datetime) do
     datetime
     |> DateTime.truncate(:second)
     |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
   end
-  
+
   # Format user info
   defp format_user(nil), do: "Unknown"
   defp format_user(user_id) do
@@ -165,14 +165,14 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       _ -> "User ##{user_id}"
     end
   end
-  
+
   # Format consent type for display
   defp format_consent_type(type) do
     type
     |> String.replace("_", " ")
     |> String.capitalize()
   end
-  
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -182,7 +182,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
         title="Consent Records"
         subtitle="Manage and track user consent for GDPR compliance"
       />
-      
+
       <!-- Filters -->
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border overflow-hidden mb-8">
         <div class="px-4 py-3 border-b bg-muted">
@@ -200,7 +200,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
                   <% end %>
                 </select>
               </div>
-              
+
               <div>
                 <label class="block text-sm font-medium text-foreground mb-1.5">Status</label>
                 <select name="filter[status]" class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
@@ -210,28 +210,28 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
                   <option value="rejected" selected={@filter.status == "rejected"}>Rejected</option>
                 </select>
               </div>
-              
+
               <div>
                 <label class="block text-sm font-medium text-foreground mb-1.5">User ID</label>
-                <input type="text" name="filter[user_id]" value={@filter.user_id} placeholder="User ID or Email" 
+                <input type="text" name="filter[user_id]" value={@filter.user_id} placeholder="User ID or Email"
                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label class="block text-sm font-medium text-foreground mb-1.5">From Date</label>
-                <input type="date" name="filter[date_from]" value={@filter.date_from} 
+                <input type="date" name="filter[date_from]" value={@filter.date_from}
                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
-              
+
               <div>
                 <label class="block text-sm font-medium text-foreground mb-1.5">To Date</label>
-                <input type="date" name="filter[date_to]" value={@filter.date_to} 
+                <input type="date" name="filter[date_to]" value={@filter.date_to}
                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
             </div>
-            
+
             <div class="flex justify-end space-x-3">
               <button type="button" phx-click="clear_filters" class="px-4 py-2 inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                 Clear Filters
@@ -243,7 +243,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
           </form>
         </div>
       </div>
-      
+
       <!-- Consent Records Table -->
       <div class="bg-card text-card-foreground rounded-lg shadow-sm border overflow-hidden">
         <div class="border-b p-4 bg-muted flex items-center justify-between">
@@ -251,7 +251,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
             Consent Records <span class="text-sm text-muted-foreground">(<%= @total_entries %> total)</span>
           </h3>
         </div>
-        
+
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-border">
             <thead class="bg-muted/50">
@@ -312,7 +312,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
             </tbody>
           </table>
         </div>
-        
+
         <!-- Empty State -->
         <%= if @consent_records == [] do %>
           <div class="text-center py-12">
@@ -325,7 +325,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
             </p>
           </div>
         <% end %>
-        
+
         <!-- Pagination -->
         <%= if @total_pages > 1 do %>
           <div class="border-t border-border px-4 py-3 flex items-center justify-between">
@@ -336,24 +336,24 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
             </div>
             <nav class="relative z-0 inline-flex shadow-sm -space-x-px" aria-label="Pagination">
               <!-- Previous Page -->
-              <button phx-click="change_page" phx-value-page={@page - 1} disabled={@page == 1} 
+              <button phx-click="change_page" phx-value-page={@page - 1} disabled={@page == 1}
                 class={["relative inline-flex items-center px-2 py-2 rounded-l-md border border-input text-sm font-medium transition-colors", if(@page == 1, do: "text-muted-foreground/40 cursor-not-allowed", else: "text-foreground hover:bg-accent")]}>
                 <span class="sr-only">Previous</span>
                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
               </button>
-              
+
               <!-- Page Numbers -->
               <%= for page_num <- max(1, @page - 2)..min(@total_pages, @page + 2) do %>
-                <button phx-click="change_page" phx-value-page={page_num} 
+                <button phx-click="change_page" phx-value-page={page_num}
                   class={["relative inline-flex items-center px-4 py-2 border border-input text-sm font-medium transition-colors", if(page_num == @page, do: "bg-primary/10 text-primary z-10", else: "bg-background text-foreground hover:bg-accent")]}>
                   <%= page_num %>
                 </button>
               <% end %>
-              
+
               <!-- Next Page -->
-              <button phx-click="change_page" phx-value-page={@page + 1} disabled={@page >= @total_pages} 
+              <button phx-click="change_page" phx-value-page={@page + 1} disabled={@page >= @total_pages}
                 class={["relative inline-flex items-center px-2 py-2 rounded-r-md border border-input text-sm font-medium transition-colors", if(@page >= @total_pages, do: "text-muted-foreground/40 cursor-not-allowed", else: "text-foreground hover:bg-accent")]}>
                 <span class="sr-only">Next</span>
                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -364,7 +364,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
           </div>
         <% end %>
       </div>
-      
+
       <%= if @show_detail_modal do %>
         <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div class="bg-card text-card-foreground rounded-lg shadow-lg overflow-hidden w-full max-w-lg border border-border">
@@ -379,23 +379,23 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
                 </button>
               </div>
             </div>
-            
+
             <div class="p-4">
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">ID</div>
                 <div class="text-foreground"><%= @selected_record.id %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">User</div>
                 <div class="text-foreground"><%= format_user(@selected_record.user_id) %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Consent Type</div>
                 <div class="text-foreground"><%= format_consent_type(@selected_record.consent_type) %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Status</div>
                 <div>
@@ -404,40 +404,40 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
                   </span>
                 </div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Created At</div>
                 <div class="text-foreground"><%= format_datetime(@selected_record.inserted_at) %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Last Modified</div>
                 <div class="text-foreground"><%= format_datetime(@selected_record.updated_at) %></div>
               </div>
-              
+
               <%= if @selected_record.revoked_at do %>
                 <div class="mb-4">
                   <div class="text-sm font-medium text-muted-foreground mb-1">Revoked At</div>
                   <div class="text-foreground"><%= format_datetime(@selected_record.revoked_at) %></div>
                 </div>
               <% end %>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">IP Address</div>
                 <div class="text-foreground"><%= @selected_record.ip_address %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">User Agent</div>
                 <div class="break-words text-foreground"><%= @selected_record.user_agent || "N/A" %></div>
               </div>
-              
+
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Consent Details</div>
                 <div class="break-words text-foreground"><%= @selected_record.consent_text || "N/A" %></div>
               </div>
             </div>
-            
+
             <div class="bg-muted/50 px-4 py-3 border-t border-border flex justify-end">
               <button phx-click="close_modal" class="px-3 py-2 inline-flex items-center justify-center rounded-md bg-background text-foreground border border-input shadow-sm hover:bg-accent transition-colors text-sm">Close</button>
             </div>
