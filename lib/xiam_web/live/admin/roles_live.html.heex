@@ -93,9 +93,34 @@
   </:title>
   
   <:content>
-    <.form :let={f} for={@role_changeset} phx-submit="save_role" id="role-form" class="space-y-4">
-      <.input field={f[:name]} label="Name" required />
-      <.input field={f[:description]} label="Description" />
+    <.form :let={f} for={@role_changeset} phx-submit="save_role" id="role-form" class="space-y-6" phx-window-keydown="close_modal" phx-key="escape">
+      <div class="space-y-2">
+        <label for={f[:name].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Name
+        </label>
+        <input type="text" 
+          name={f[:name].name} 
+          id={f[:name].id} 
+          value={f[:name].value} 
+          required
+          autofocus
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:name].errors}><%= msg %></.error>
+      </div>
+
+      <div class="space-y-2">
+        <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Description
+        </label>
+        <input type="text" 
+          name={f[:description].name} 
+          id={f[:description].id} 
+          value={f[:description].value}
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:description].errors}><%= msg %></.error>
+      </div>
       
       <%= if @form_mode == :edit_role and @selected_role do %>
         <div class="mt-6 pt-6 border-t">
@@ -142,9 +167,34 @@
   </:title>
   
   <:content>
-    <.form :let={f} for={@capability_changeset} phx-submit="save_capability" id="capability-form" class="space-y-4">
-      <.input field={f[:name]} label="Name" required />
-      <.input field={f[:description]} label="Description" />
+    <.form :let={f} for={@capability_changeset} phx-submit="save_capability" id="capability-form" class="space-y-6" phx-window-keydown="close_modal" phx-key="escape">
+      <div class="space-y-2">
+        <label for={f[:name].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Name
+        </label>
+        <input type="text" 
+          name={f[:name].name} 
+          id={f[:name].id} 
+          value={f[:name].value} 
+          required
+          autofocus
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:name].errors}><%= msg %></.error>
+      </div>
+
+      <div class="space-y-2">
+        <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Description
+        </label>
+        <input type="text" 
+          name={f[:description].name} 
+          id={f[:description].id} 
+          value={f[:description].value}
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:description].errors}><%= msg %></.error>
+      </div>
     </.form>
   </:content>
   

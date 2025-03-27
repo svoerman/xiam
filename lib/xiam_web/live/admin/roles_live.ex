@@ -114,17 +114,13 @@ defmodule XIAMWeb.Admin.RolesLive do
     )}
   end
 
-  def handle_event("save_role", %{"role" => role_params, "capability_ids" => capability_ids}, socket) do
+  def handle_event("save_role", %{"role" => role_params} = params, socket) do
+    capability_ids = params["capability_ids"] || %{}
+
     case socket.assigns.form_mode do
       :new_role ->
-        # Parse the capability IDs for new roles too
-        capability_ids = capability_ids
-                       |> Enum.filter(fn {_k, v} -> v == "true" end)
-                       |> Enum.map(fn {k, _v} -> String.to_integer(k) end)
-
-        # Create role with capabilities
-        role = %Role{}
-        case Role.update_role_with_capabilities(role, role_params, capability_ids) do
+        # Create role without capabilities first
+        case Role.create_role(role_params) do
           {:ok, _role} ->
             roles = refresh_roles(socket)
             role_changeset = Role.changeset(%Role{}, %{})
