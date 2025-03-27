@@ -16,12 +16,30 @@ config :xiam,
 config :xiam, XIAMWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
+  http: [
+    ip: {127, 0, 0, 1}
+  ],
   render_errors: [
     formats: [html: XIAMWeb.ErrorHTML, json: XIAMWeb.ErrorJSON],
     layout: false
   ],
   pubsub_server: XIAM.PubSub,
-  live_view: [signing_salt: "B05JLS67"]
+  live_view: [signing_salt: "B05JLS67"],
+  secret_key_base: "your-secret-key-base-here",
+  session: [
+    key: "_xiam_session",
+    max_age: 60 * 60 * 24 * 7, # 7 days
+    same_site: "Lax",
+    secure: false,
+    http_only: true
+  ],
+  plug_session: [
+    key: "_xiam_session",
+    max_age: 60 * 60 * 24 * 7, # 7 days
+    same_site: "Lax",
+    secure: false,
+    http_only: true
+  ]
 
 # Configures the mailer
 #

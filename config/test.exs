@@ -9,7 +9,7 @@ config :xiam, XIAM.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "xiam_test#{System.get_env("MIX_TEST_PARTITION")}",
+  database: "xiam_test1",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 

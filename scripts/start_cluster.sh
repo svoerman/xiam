@@ -40,7 +40,6 @@ start_node() {
     
     # Set the environment variables for the node
     export XIAM_NODE_NUM=$node_num
-    export MIX_TEST_PARTITION=$node_num
     export CLUSTER_ENABLED=true
     export RELEASE_COOKIE=$CLUSTER_COOKIE
     export ELIXIR_ERL_OPTIONS="-kernel inet_dist_listen_min 9100 inet_dist_listen_max 9105"
@@ -95,18 +94,16 @@ done
 echo "Generating node configurations..."
 ./scripts/generate_node_configs.sh
 
-# Create test databases
-echo "Creating test databases..."
+# Create test database
+echo "Creating test database..."
 ./scripts/create_test_dbs.sh
 
-# Run migrations and seeds for each database
-echo "Running migrations and seeds for each database..."
-for i in {1..3}; do
-    echo "Setting up xiam_test${i}..."
-    export MIX_TEST_PARTITION=$i
-    MIX_ENV=test mix ecto.migrate -r XIAM.Repo
-    MIX_ENV=test mix run priv/repo/seeds.exs
-done
+# Run migrations and seeds for the database
+echo "Running migrations and seeds for xiam_test1..."
+export MIX_TEST_PARTITION=1
+export XIAM_DATABASE=xiam_test1
+MIX_ENV=test mix ecto.migrate -r XIAM.Repo
+MIX_ENV=test mix run priv/repo/seeds.exs
 
 # Start three nodes with delays between them
 echo "Starting cluster nodes..."

@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Create test databases for each node
-for i in {1..3}; do
-    echo "Creating database xiam_test${i}..."
-    createdb xiam_test${i}
-done
+# Create test database
+echo "Creating database xiam_test1..."
+createdb xiam_test1
 
-echo "Created test databases for nodes 1-3" 
+echo "Created test database xiam_test1" 

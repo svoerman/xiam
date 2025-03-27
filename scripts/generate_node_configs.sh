@@ -37,7 +37,7 @@ config :xiam, XIAM.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "xiam_test${i}",
+  database: "xiam_test1",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10,
   pool_timeout: 60000,
@@ -82,12 +82,9 @@ config :xiam, :sandbox, false
 # Override the endpoint server setting
 config :xiam, XIAMWeb.Endpoint, server: true
 
-# Override the test partition to ensure we use the correct database
-config :xiam, :mix_test_partition, "${i}"
-
 # Enable clustering
 config :xiam, :cluster_enabled, true
 EOF
 done
 
-echo "Generated config files for nodes 1-3" 
+echo "Generated node configs with xiam_test1 database for all nodes" 

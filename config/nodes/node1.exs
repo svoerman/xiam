@@ -7,12 +7,12 @@ config :xiam, XIAMWeb.Endpoint,
     port: 4001
   ],
   server: true,
-  secret_key_base: "kQKYX3P4Vpg4wTKnqgurs1u6qZeLeXg9bMUGvSMaWzbCa7H73u093jk+OSMF6dFq",
-  live_view: [signing_salt: "kQKYX3P4Vpg4wTKnqgurs1u6qZeLeXg9bMUGvSMaWzbCa7H73u093jk+OSMF6dFq"]
+  secret_key_base: "IEg6/DIXMuMxodxryp/i564LCc8xkkKwkOkL2qrApz8TlJfFwHOdnDtZaJ/Bi1Ce",
+  live_view: [signing_salt: "IEg6/DIXMuMxodxryp/i564LCc8xkkKwkOkL2qrApz8TlJfFwHOdnDtZaJ/Bi1Ce"]
 
 # Set the cookie for distributed Erlang
 config :xiam,
-  cookie: "b31C872wdf6cmobom8YGm8yFN7Giy+Y7JDlMEYfFybl2wVqJYfGI6Q4/sk7Da89D"
+  cookie: "w0oIuVNI8XFFo/g4adGhIEKcck/FPegcxYWhFbVyL0eeyhzBYx/U9jo1I3woClj/"
 
 # Override the database configuration
 config :xiam, XIAM.Repo,
@@ -63,9 +63,6 @@ config :xiam, :sandbox, false
 
 # Override the endpoint server setting
 config :xiam, XIAMWeb.Endpoint, server: true
-
-# Override the test partition to ensure we use the correct database
-config :xiam, :mix_test_partition, "1"
 
 # Enable clustering
 config :xiam, :cluster_enabled, true
