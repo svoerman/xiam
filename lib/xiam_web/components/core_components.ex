@@ -112,9 +112,10 @@ defmodule XIAMWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
+      phx-hook="Flash"
       role="alert"
       class={[
-        "fixed top-4 right-4 w-auto max-w-sm z-50 rounded-lg border shadow-lg",
+        "fixed top-4 right-4 w-auto max-w-sm z-50 rounded-lg border shadow-lg transition-opacity duration-300",
         @kind == :info && "bg-background border-border text-foreground",
         @kind == :error && "bg-destructive/15 border-destructive text-destructive-foreground"
       ]}
@@ -136,7 +137,6 @@ defmodule XIAMWeb.CoreComponents do
           class="shrink-0 h-5 w-5 text-muted-foreground hover:text-foreground"
           aria-label={gettext("close")}
           phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
-          onclick={"document.getElementById('#{@id}').style.display = 'none'"}
         >
           <.icon name="hero-x-mark" class="h-5 w-5" />
         </button>
@@ -184,18 +184,6 @@ defmodule XIAMWeb.CoreComponents do
         <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 animate-spin" />
       </.flash>
     </div>
-
-    <script>
-      // Auto-hide regular flash messages after 5 seconds (not error connection messages)
-      document.addEventListener("DOMContentLoaded", function() {
-        const flashMessages = document.querySelectorAll("#flash-info, #flash-error");
-        flashMessages.forEach(el => {
-          setTimeout(() => {
-            if (el) el.style.display = "none";
-          }, 5000);
-        });
-      });
-    </script>
     """
   end
 

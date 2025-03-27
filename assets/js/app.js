@@ -3,6 +3,7 @@ import "../node_modules/phoenix_html"
 import {Socket} from "../node_modules/phoenix"
 import {LiveSocket} from "../node_modules/phoenix_live_view"
 import topbar from "../vendor/topbar"
+import Hooks from "./hooks"
 
 // Theme handling functions
 const getThemePreference = () => {
@@ -22,9 +23,6 @@ const setTheme = (theme) => {
 // Initialize theme on page load
 const theme = getThemePreference();
 setTheme(theme);
-
-// Define custom hooks
-let Hooks = {};
 
 // Add hook for handling confirmation dialogs
 Hooks.ConfirmDialog = {
@@ -66,7 +64,10 @@ Hooks.AdminFormDebug = {
 };
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
-let liveSocket = new LiveSocket("/live", Socket, {params: {_csrf_token: csrfToken}})
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: Hooks,
+  params: {_csrf_token: csrfToken}
+})
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
