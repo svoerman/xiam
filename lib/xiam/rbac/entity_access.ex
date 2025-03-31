@@ -2,6 +2,7 @@ defmodule Xiam.Rbac.EntityAccess do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {Jason.Encoder, only: [:id, :user_id, :entity_type, :entity_id, :role_id]}
   schema "entity_access" do
     belongs_to :user, XIAM.Users.User
     field :entity_type, :string

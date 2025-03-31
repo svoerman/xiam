@@ -10,9 +10,18 @@ defmodule XIAMWeb.API.AccessControlController do
       role: role
     }) do
       {:ok, access} ->
+        # Format the access entry for JSON response
+        formatted_access = %{
+          id: access.id,
+          user_id: access.user_id,
+          entity_type: access.entity_type,
+          entity_id: access.entity_id,
+          role_id: access.role_id
+        }
+
         conn
         |> put_status(:ok)
-        |> json(%{data: access})
+        |> json(%{data: formatted_access})
 
       {:error, changeset} ->
         conn
@@ -22,8 +31,22 @@ defmodule XIAMWeb.API.AccessControlController do
   end
 
   def get_user_access(conn, %{"user_id" => user_id}) do
-    access = AccessControl.get_user_access(user_id)
-    json(conn, %{data: access})
+    access_list = AccessControl.get_user_access(user_id)
+
+    # Format the access entries for JSON response
+    formatted_access = Enum.map(access_list, fn access ->
+      %{
+        id: access.id,
+        user_id: access.user_id,
+        entity_type: access.entity_type,
+        entity_id: access.entity_id,
+        role_id: access.role_id
+      }
+    end)
+
+    conn
+    |> put_status(:ok)
+    |> json(%{data: formatted_access})
   end
 
   def create_product(conn, %{"product_name" => product_name}) do

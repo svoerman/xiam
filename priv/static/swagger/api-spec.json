@@ -100,6 +100,31 @@
             "description": "Error message"
           }
         }
+      },
+      "EntityAccess": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Access entry's unique identifier"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "ID of the user"
+          },
+          "entity_type": {
+            "type": "string",
+            "description": "Type of the entity (e.g., 'document', 'project')"
+          },
+          "entity_id": {
+            "type": "string",
+            "description": "ID of the specific entity"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "ID of the role assigned for this access"
+          }
+        }
       }
     }
   },
@@ -1065,6 +1090,196 @@
           },
           "404": {
             "description": "Consent record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access": {
+      "post": {
+        "summary": "Set user access to entity",
+        "description": "Create or update user access to a specific entity",
+        "tags": ["Access Control"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "entity_type", "entity_id", "role_id"],
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "ID of the user"
+                  },
+                  "entity_type": {
+                    "type": "string",
+                    "description": "Type of the entity"
+                  },
+                  "entity_id": {
+                    "type": "string",
+                    "description": "ID of the specific entity"
+                  },
+                  "role_id": {
+                    "type": "string",
+                    "description": "ID of the role to assign"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access set successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EntityAccess"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get user access",
+        "description": "Get all access entries for a specific user",
+        "tags": ["Access Control"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "ID of the user",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of access entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EntityAccess"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/{id}": {
+      "delete": {
+        "summary": "Delete entity access",
+        "description": "Delete a specific entity access entry",
+        "tags": ["Access Control"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Access entry ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Success status"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Access entry not found",
             "content": {
               "application/json": {
                 "schema": {
