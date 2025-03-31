@@ -40,6 +40,24 @@ defmodule XIAMWeb.Admin.DashboardLive do
           </.link>
         </div>
 
+        <!-- Entity Access Card -->
+        <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
+          <h2 class="text-xl font-semibold mb-4 text-foreground">Entity Access</h2>
+          <p class="text-muted-foreground mb-4">Manage fine-grained access control for specific entities and resources.</p>
+          <.link patch={~p"/admin/entity-access"} class="text-primary hover:text-primary/80 font-medium transition-colors">
+            Manage Entity Access →
+          </.link>
+        </div>
+
+        <!-- Products & Capabilities Card -->
+        <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
+          <h2 class="text-xl font-semibold mb-4 text-foreground">Products & Capabilities</h2>
+          <p class="text-muted-foreground mb-4">Define products and their associated capabilities for access control.</p>
+          <.link patch={~p"/admin/products"} class="text-primary hover:text-primary/80 font-medium transition-colors">
+            Manage Products →
+          </.link>
+        </div>
+
         <!-- GDPR Compliance Card -->
         <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
           <h2 class="text-xl font-semibold mb-4 text-foreground">GDPR Compliance</h2>
@@ -52,9 +70,9 @@ defmodule XIAMWeb.Admin.DashboardLive do
         <!-- System Settings Card -->
         <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
           <h2 class="text-xl font-semibold mb-4 text-foreground">System Settings</h2>
-          <p class="text-muted-foreground mb-4">Configure social login providers, MFA settings, and other system parameters.</p>
+          <p class="text-muted-foreground mb-4">Configure system-wide settings and preferences.</p>
           <.link patch={~p"/admin/settings"} class="text-primary hover:text-primary/80 font-medium transition-colors">
-            System Settings →
+            Manage Settings →
           </.link>
         </div>
 

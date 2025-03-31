@@ -11,7 +11,7 @@ defmodule XIAMWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
   end
-  
+
   pipeline :admin_protected do
     plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
     plug XIAMWeb.Plugs.AdminAuthPlug
@@ -51,10 +51,14 @@ defmodule XIAMWeb.Router do
   # Admin routes
   scope "/admin", XIAMWeb.Admin do
     pipe_through [:browser, :admin_protected]
-    
+
     live "/", DashboardLive, :index
     live "/users", UsersLive, :index
+    live "/users/:id", UsersLive, :show
     live "/roles", RolesLive, :index
+    live "/roles/:id", RolesLive, :show
+    live "/entity-access", EntityAccessLive, :index
+    live "/products", ProductsLive, :index
     live "/gdpr", GDPRLive, :index
     live "/settings", SettingsLive, :index
     live "/audit-logs", AuditLogsLive, :index
@@ -68,49 +72,56 @@ defmodule XIAMWeb.Router do
     plug CORSPlug, origin: ["*"]
     plug XIAMWeb.Plugs.APIAuthPlug
   end
-  
+
   # Documentation routes
   scope "/", XIAMWeb do
     pipe_through :browser
-    
+
     # API Documentation UI
     get "/api/docs", SwaggerController, :index
     # Direct access to Swagger JSON
     get "/swagger/api-spec.json", SwaggerController, :api_json
   end
-  
+
   # Unprotected API routes
   scope "/api", XIAMWeb.API do
     pipe_through :api
-    
+
     post "/auth/login", AuthController, :login
     get "/health", SystemController, :health
   end
-  
+
   # Protected API routes requiring JWT authentication
   scope "/api", XIAMWeb.API do
     pipe_through [:api, :api_jwt]
-    
+
     # Auth routes
     post "/auth/refresh", AuthController, :refresh_token
     get "/auth/verify", AuthController, :verify_token
     post "/auth/logout", AuthController, :logout
-    
+
     # System routes
     get "/system/status", SystemController, :status
-    
+
     # User management routes with capability checks
     get "/users", UsersController, :index
     get "/users/:id", UsersController, :show
     post "/users", UsersController, :create
     put "/users/:id", UsersController, :update
     delete "/users/:id", UsersController, :delete
-    
+
     # Consent management routes
     get "/consents", ConsentsController, :index
     post "/consents", ConsentsController, :create
     put "/consents/:id", ConsentsController, :update
     delete "/consents/:id", ConsentsController, :delete
+
+    # Access Control Routes
+    post "/access", AccessControlController, :set_user_access
+    get "/access", AccessControlController, :get_user_access
+    resources "/products", ProductController, only: [:index, :create]
+    get "/products/:product_id/capabilities", AccessControlController, :get_product_capabilities
+    post "/capabilities", AccessControlController, :create_capability
   end
 
   # Enable Swoosh mailbox preview in development

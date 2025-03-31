@@ -1,12 +1,12 @@
-defmodule XIAM.RBAC do
+defmodule Xiam.Rbac do
   @moduledoc """
   The RBAC context.
   """
 
   import Ecto.Query, warn: false
   alias XIAM.Repo
-  alias XIAM.RBAC.Role
-  alias XIAM.RBAC.Capability
+  alias Xiam.Rbac.Role
+  alias Xiam.Rbac.Capability
 
   @doc """
   Returns the list of roles.

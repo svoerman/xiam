@@ -13,7 +13,7 @@ defmodule XIAM.Users.User do
     field :mfa_backup_codes, {:array, :string}
 
     # Role relationship
-    belongs_to :role, XIAM.RBAC.Role
+    belongs_to :role, Xiam.Rbac.Role
 
     timestamps()
   end
@@ -64,10 +64,10 @@ defmodule XIAM.Users.User do
   """
   def has_capability?(%__MODULE__{} = user, capability_name) when is_binary(capability_name) do
     user = XIAM.Repo.preload(user, :role)
-    
+
     case user.role do
       nil -> false
-      role -> XIAM.RBAC.Role.has_capability?(role, capability_name)
+      role -> Xiam.Rbac.Role.has_capability?(role, capability_name)
     end
   end
 
@@ -111,12 +111,12 @@ defmodule XIAM.Users.User do
     if user.mfa_backup_codes && backup_code in user.mfa_backup_codes do
       # Remove the used backup code
       new_backup_codes = List.delete(user.mfa_backup_codes, backup_code)
-      
+
       {:ok, updated_user} =
         user
         |> change(mfa_backup_codes: new_backup_codes)
         |> XIAM.Repo.update()
-      
+
       {:ok, updated_user}
     else
       {:error, :invalid_backup_code}

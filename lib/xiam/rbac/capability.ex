@@ -1,4 +1,4 @@
-defmodule XIAM.RBAC.Capability do
+defmodule Xiam.Rbac.Capability do
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query, warn: false
@@ -7,7 +7,7 @@ defmodule XIAM.RBAC.Capability do
     field :name, :string
     field :description, :string
 
-    many_to_many :roles, XIAM.RBAC.Role, join_through: "roles_capabilities"
+    belongs_to :product, Xiam.Rbac.Product
 
     timestamps()
   end
@@ -15,9 +15,9 @@ defmodule XIAM.RBAC.Capability do
   @doc false
   def changeset(capability, attrs) do
     capability
-    |> cast(attrs, [:name, :description])
-    |> validate_required([:name])
-    |> unique_constraint(:name)
+    |> cast(attrs, [:name, :description, :product_id])
+    |> validate_required([:name, :product_id])
+    |> unique_constraint([:product_id, :name])
   end
 
   @doc """

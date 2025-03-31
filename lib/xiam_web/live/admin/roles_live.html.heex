@@ -1,81 +1,77 @@
-<.admin_header title="Roles & Capabilities" subtitle="Manage user roles and their capabilities" />
+<.admin_header title="Roles & Capabilities" subtitle="Manage roles and their associated capabilities" />
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-  <!-- Roles Section -->
-  <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-semibold">Roles</h2>
-      <.button 
-        id="add-role-button" 
-        phx-click="show_new_role_modal"
-        type="button"
-      >
-        <.icon name="hero-plus" class="h-4 w-4 mr-2" />
-        Add Role
-      </.button>
-    </div>
+<div class="container mx-auto py-6">
+  <div class="grid grid-cols-2 gap-6">
+    <!-- Roles Column -->
+    <div class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold">Roles</h2>
+        <.button phx-click="show_new_role_modal">
+          <.icon name="hero-plus" class="h-4 w-4 mr-2" />
+          Add Role
+        </.button>
+      </div>
 
-    <div class="bg-card rounded-lg border">
-      <div class="divide-y">
-        <%= for role <- @roles do %>
-          <div class="p-4 flex items-center justify-between">
-            <div>
-              <h3 class="font-medium"><%= role.name %></h3>
-              <p class="text-sm text-muted-foreground"><%= role.description %></p>
-              <div class="mt-2 flex flex-wrap gap-1">
-                <%= for capability <- role.capabilities do %>
-                  <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                    <%= capability.name %>
-                  </span>
-                <% end %>
+      <div class="bg-card rounded-lg border">
+        <div class="divide-y">
+          <%= for role <- @roles do %>
+            <div class="p-4">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-medium"><%= role.name %></h3>
+                  <p class="text-sm text-muted-foreground"><%= role.description %></p>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <%= for capability <- role.capabilities do %>
+                      <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        <%= capability.name %>
+                      </span>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <.button variant="outline" size="sm" phx-click="show_edit_role_modal" phx-value-id={role.id}>
+                    <.icon name="hero-pencil-square" class="h-4 w-4" />
+                  </.button>
+                  <.button variant="destructive" size="sm" phx-click="delete_role" phx-value-id={role.id}>
+                    <.icon name="hero-trash" class="h-4 w-4" />
+                  </.button>
+                </div>
               </div>
             </div>
-            <div class="flex gap-2">
-              <.button variant="outline" size="sm" phx-click="show_edit_role_modal" phx-value-id={role.id}>
-                <.icon name="hero-pencil-square" class="h-4 w-4" />
-              </.button>
-              <.button variant="destructive" size="sm" phx-click="delete_role" phx-value-id={role.id}>
-                <.icon name="hero-trash" class="h-4 w-4" />
-              </.button>
-            </div>
-          </div>
-        <% end %>
+          <% end %>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Capabilities Section -->
-  <div class="space-y-4">
-    <div class="flex justify-between items-center">
-      <h2 class="text-xl font-semibold">Capabilities</h2>
-      <.button 
-        id="add-capability-button" 
-        phx-click="show_new_capability_modal"
-        type="button"
-      >
-        <.icon name="hero-plus" class="h-4 w-4 mr-2" />
-        Add Capability
-      </.button>
-    </div>
+    <!-- Capabilities Column -->
+    <div class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold">Capabilities</h2>
+        <.button phx-click="show_new_capability_modal">
+          <.icon name="hero-plus" class="h-4 w-4 mr-2" />
+          Add Capability
+        </.button>
+      </div>
 
-    <div class="bg-card rounded-lg border">
-      <div class="divide-y">
-        <%= for capability <- @capabilities do %>
-          <div class="p-4 flex items-center justify-between">
-            <div>
-              <h3 class="font-medium"><%= capability.name %></h3>
-              <p class="text-sm text-muted-foreground"><%= capability.description %></p>
+      <div class="bg-card rounded-lg border">
+        <div class="divide-y">
+          <%= for capability <- @capabilities do %>
+            <div class="p-4 flex items-center justify-between">
+              <div>
+                <h3 class="font-medium"><%= capability.name %></h3>
+                <p class="text-sm text-muted-foreground"><%= capability.description %></p>
+              </div>
+              <div class="flex gap-2">
+                <.button variant="outline" size="sm" phx-click="show_edit_capability_modal" phx-value-id={capability.id}>
+                  <.icon name="hero-pencil-square" class="h-4 w-4" />
+                </.button>
+                <.button variant="destructive" size="sm" phx-click="delete_capability" phx-value-id={capability.id}>
+                  <.icon name="hero-trash" class="h-4 w-4" />
+                </.button>
+              </div>
             </div>
-            <div class="flex gap-2">
-              <.button variant="outline" size="sm" phx-click="show_edit_capability_modal" phx-value-id={capability.id}>
-                <.icon name="hero-pencil-square" class="h-4 w-4" />
-              </.button>
-              <.button variant="destructive" size="sm" phx-click="delete_capability" phx-value-id={capability.id}>
-                <.icon name="hero-trash" class="h-4 w-4" />
-              </.button>
-            </div>
-          </div>
-        <% end %>
+          <% end %>
+        </div>
       </div>
     </div>
   </div>
@@ -83,9 +79,9 @@
 
 <!-- Role Modal -->
 <.modal 
-  :if={@show_role_modal} 
+  :if={@show_modal} 
   id="role-modal" 
-  show={@show_role_modal} 
+  show={@show_modal} 
   on_close={JS.push("close_modal")}
 >
   <:title>
@@ -113,39 +109,36 @@
         <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
           Description
         </label>
-        <input type="text" 
+        <textarea 
           name={f[:description].name} 
           id={f[:description].id} 
-          value={f[:description].value}
-          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        />
+          rows="4"
+          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        ><%= f[:description].value %></textarea>
         <.error :for={msg <- f[:description].errors}><%= msg %></.error>
       </div>
-      
-      <%= if @form_mode == :edit_role and @selected_role do %>
-        <div class="mt-6 pt-6 border-t">
-          <h4 class="font-medium text-sm mb-3">Assign Capabilities</h4>
-          
-          <div class="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md">
-            <%= for capability <- @capabilities do %>
-              <div class="flex items-center">
-                <input 
-                  type="checkbox"
-                  id={"capability-#{capability.id}"}
-                  name={"capability_ids[#{capability.id}]"}
-                  value="true"
-                  checked={@selected_role && Enum.any?(@selected_role.capabilities, fn c -> c.id == capability.id end)}
-                  class="w-4 h-4 mr-2 rounded border-primary text-primary focus:ring-primary"
-                />
-                <label for={"capability-#{capability.id}"} class="text-sm">
-                  <span class="font-medium"><%= capability.name %></span>
-                  <span class="text-muted-foreground text-xs ml-1"><%= capability.description %></span>
-                </label>
-              </div>
-            <% end %>
-          </div>
+
+      <div class="space-y-2">
+        <label class="text-sm font-medium leading-none">Capabilities</label>
+        <div class="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md">
+          <%= for capability <- @capabilities do %>
+            <div class="flex items-center">
+              <input 
+                type="checkbox"
+                id={"capability-#{capability.id}"}
+                name={"capability_ids[#{capability.id}]"}
+                value="true"
+                checked={@selected_role && Enum.any?(@selected_role.capabilities, fn c -> c.id == capability.id end)}
+                class="w-4 h-4 mr-2 rounded border-primary text-primary focus:ring-primary"
+              />
+              <label for={"capability-#{capability.id}"} class="text-sm">
+                <span class="font-medium"><%= capability.name %></span>
+                <span class="text-muted-foreground text-xs ml-1"><%= capability.description %></span>
+              </label>
+            </div>
+          <% end %>
         </div>
-      <% end %>
+      </div>
     </.form>
   </:content>
   
@@ -187,12 +180,12 @@
         <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
           Description
         </label>
-        <input type="text" 
+        <textarea 
           name={f[:description].name} 
           id={f[:description].id} 
-          value={f[:description].value}
-          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        />
+          rows="4"
+          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        ><%= f[:description].value %></textarea>
         <.error :for={msg <- f[:description].errors}><%= msg %></.error>
       </div>
     </.form>

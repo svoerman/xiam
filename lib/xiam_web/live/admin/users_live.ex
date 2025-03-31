@@ -2,7 +2,7 @@ defmodule XIAMWeb.Admin.UsersLive do
   use XIAMWeb, :live_view
 
   alias XIAM.Users.User
-  alias XIAM.RBAC.Role
+  alias Xiam.Rbac.Role
   alias XIAM.Repo
   import Ecto.Query
 

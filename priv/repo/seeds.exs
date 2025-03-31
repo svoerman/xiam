@@ -11,13 +11,13 @@
 # and so on) as they will fail if something goes wrong.
 
 alias XIAM.Repo
-alias XIAM.RBAC.Role
-alias XIAM.RBAC.Capability
+alias Xiam.Rbac.Role
+alias Xiam.Rbac.Capability
 alias XIAM.Users.User
 import Ecto.Query
 
 # Check if capabilities already exist to prevent duplicates
-admin_access = Repo.get_by(Capability, name: "admin_access") || 
+admin_access = Repo.get_by(Capability, name: "admin_access") ||
   (
     {:ok, cap} = Repo.insert(%Capability{
       name: "admin_access",
@@ -26,16 +26,16 @@ admin_access = Repo.get_by(Capability, name: "admin_access") ||
     cap
   )
 
-admin_users = Repo.get_by(Capability, name: "admin_users") || 
+admin_users = Repo.get_by(Capability, name: "admin_users") ||
   (
     {:ok, cap} = Repo.insert(%Capability{
-      name: "admin_users", 
+      name: "admin_users",
       description: "Manage users from admin panel"
     })
     cap
   )
 
-admin_consents = Repo.get_by(Capability, name: "admin_consents") || 
+admin_consents = Repo.get_by(Capability, name: "admin_consents") ||
   (
     {:ok, cap} = Repo.insert(%Capability{
       name: "admin_consents",
@@ -65,7 +65,7 @@ if Enum.empty?(admin_role.capabilities) do
   Enum.each([admin_access, admin_users, admin_consents], fn capability ->
     Repo.insert!(%{role_id: admin_role.id, capability_id: capability.id}, prefix: "roles_capabilities")
   end)
-  
+
   # Reload role with capabilities
   admin_role = Repo.get!(Role, admin_role.id) |> Repo.preload(:capabilities)
 end
@@ -75,11 +75,11 @@ admin_user = Repo.get_by(User, email: "admin@example.com")
 
 if admin_user do
   # Update existing user with admin role
-  admin_user = 
+  admin_user =
     admin_user
     |> Ecto.Changeset.change(role_id: admin_role.id)
     |> Repo.update!()
-  
+
   IO.puts("\nUpdated existing admin user with proper role")
 else
   # Create new admin user
@@ -101,12 +101,12 @@ IO.puts("Admin user created: admin@example.com | Password: Admin123456!")
 
 if admin_user.role do
   IO.puts("Role assigned: #{admin_user.role.name}")
-  
-  capability_names = 
-    if admin_user.role.capabilities, 
-      do: Enum.map_join(admin_user.role.capabilities, ", ", & &1.name), 
+
+  capability_names =
+    if admin_user.role.capabilities,
+      do: Enum.map_join(admin_user.role.capabilities, ", ", & &1.name),
       else: "none"
-  
+
   IO.puts("Capabilities: #{capability_names}")
 else
   IO.puts("ERROR: No role assigned to admin user!")

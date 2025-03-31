@@ -1,4 +1,4 @@
-defmodule XIAM.RBAC.Role do
+defmodule Xiam.Rbac.Role do
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query, warn: false
@@ -7,7 +7,7 @@ defmodule XIAM.RBAC.Role do
     field :name, :string
     field :description, :string
 
-    many_to_many :capabilities, XIAM.RBAC.Capability,
+    many_to_many :capabilities, Xiam.Rbac.Capability,
       join_through: "roles_capabilities",
       on_replace: :delete
     has_many :users, XIAM.Users.User
@@ -82,7 +82,7 @@ defmodule XIAM.RBAC.Role do
   Updates the capabilities of a role.
   """
   def update_role_capabilities(%__MODULE__{} = role, capability_ids) when is_list(capability_ids) do
-    capabilities = Enum.map(capability_ids, &XIAM.RBAC.Capability.get_capability!/1)
+    capabilities = Enum.map(capability_ids, &Xiam.Rbac.Capability.get_capability!/1)
 
     role
     |> XIAM.Repo.preload(:capabilities)
@@ -96,7 +96,6 @@ defmodule XIAM.RBAC.Role do
   """
   def has_capability?(%__MODULE__{} = role, capability_name) when is_binary(capability_name) do
     role = XIAM.Repo.preload(role, :capabilities)
-
     Enum.any?(role.capabilities, fn capability ->
       capability.name == capability_name
     end)
@@ -106,12 +105,24 @@ defmodule XIAM.RBAC.Role do
   Updates a role with both attributes and capabilities.
   """
   def update_role_with_capabilities(%__MODULE__{} = role, attrs, capability_ids) when is_list(capability_ids) do
-    capabilities = Enum.map(capability_ids, &XIAM.RBAC.Capability.get_capability!/1)
+    capabilities = Enum.map(capability_ids, &Xiam.Rbac.Capability.get_capability!/1)
 
     role
     |> XIAM.Repo.preload(:capabilities)
     |> changeset(attrs)
     |> put_assoc(:capabilities, capabilities)
     |> XIAM.Repo.update()
+  end
+
+  @doc """
+  Creates a role with associated capabilities.
+  """
+  def create_role_with_capabilities(attrs, capability_ids) when is_list(capability_ids) do
+    capabilities = Enum.map(capability_ids, &Xiam.Rbac.Capability.get_capability!/1)
+
+    %__MODULE__{}
+    |> changeset(attrs)
+    |> put_assoc(:capabilities, capabilities)
+    |> XIAM.Repo.insert()
   end
 end

@@ -1,0 +1,175 @@
+<div class="container mx-auto px-4 py-8 bg-background text-foreground">
+  <.admin_header
+    title="Products & Capabilities"
+    subtitle="Manage products and their associated capabilities"
+  />
+
+  <div class="space-y-4">
+    <div class="flex justify-between items-center">
+      <h2 class="text-xl font-semibold">Products</h2>
+      <.button 
+        id="add-product-button" 
+        phx-click="show_new_product_modal"
+        type="button"
+      >
+        <.icon name="hero-plus" class="h-4 w-4 mr-2" />
+        Add Product
+      </.button>
+    </div>
+
+    <div class="bg-card rounded-lg border">
+      <div class="divide-y">
+        <%= for product <- @products do %>
+          <div class="p-4 flex items-center justify-between">
+            <div class="flex-1">
+              <h3 class="font-medium"><%= product.product_name %></h3>
+              <p class="text-sm text-muted-foreground"><%= product.description %></p>
+              <div class="mt-2 flex flex-wrap gap-1">
+                <%= for capability <- product.capabilities do %>
+                  <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    <%= capability.name %>
+                    <.button 
+                      variant="ghost" 
+                      size="sm" 
+                      phx-click="show_edit_capability_modal" 
+                      phx-value-id={capability.id}
+                      class="ml-1"
+                    >
+                      <.icon name="hero-pencil-square" class="h-3 w-3" />
+                    </.button>
+                    <.button 
+                      variant="ghost" 
+                      size="sm" 
+                      phx-click="delete_capability" 
+                      phx-value-id={capability.id}
+                      class="ml-1"
+                    >
+                      <.icon name="hero-trash" class="h-3 w-3" />
+                    </.button>
+                  </span>
+                <% end %>
+                <.button 
+                  variant="outline" 
+                  size="sm" 
+                  phx-click="show_new_capability_modal" 
+                  phx-value-product_id={product.id}
+                  class="ml-1"
+                >
+                  <.icon name="hero-plus" class="h-3 w-3" />
+                  Add Capability
+                </.button>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <.button variant="outline" size="sm" phx-click="show_edit_product_modal" phx-value-id={product.id}>
+                <.icon name="hero-pencil-square" class="h-4 w-4" />
+              </.button>
+              <.button variant="destructive" size="sm" phx-click="delete_product" phx-value-id={product.id}>
+                <.icon name="hero-trash" class="h-4 w-4" />
+              </.button>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<.modal 
+  :if={@show_modal} 
+  id="product-modal" 
+  show={@show_modal} 
+  on_close={JS.push("close_modal")}
+>
+  <:title>
+    <%= if @form_mode == :new_product, do: "New Product", else: "Edit Product" %>
+  </:title>
+  
+  <:content>
+    <.form :let={f} for={@product_changeset} phx-submit="save_product" id="product-form" class="space-y-6" phx-window-keydown="close_modal" phx-key="escape">
+      <div class="space-y-2">
+        <label for={f[:product_name].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Product Name
+        </label>
+        <input type="text" 
+          name={f[:product_name].name} 
+          id={f[:product_name].id} 
+          value={f[:product_name].value} 
+          required
+          autofocus
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:product_name].errors}><%= msg %></.error>
+      </div>
+
+      <div class="space-y-2">
+        <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Description
+        </label>
+        <textarea 
+          name={f[:description].name} 
+          id={f[:description].id} 
+          rows="4"
+          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        ><%= f[:description].value %></textarea>
+        <.error :for={msg <- f[:description].errors}><%= msg %></.error>
+      </div>
+    </.form>
+  </:content>
+
+  <:footer>
+    <.button variant="outline" type="button" phx-click="close_modal">Cancel</.button>
+    <.button type="submit" form="product-form">Save</.button>
+  </:footer>
+</.modal>
+
+<.modal 
+  :if={@show_capability_modal} 
+  id="capability-modal" 
+  show={@show_capability_modal} 
+  on_close={JS.push("close_modal")}
+>
+  <:title>
+    <%= if @form_mode == :new_capability, do: "New Capability", else: "Edit Capability" %>
+  </:title>
+  
+  <:content>
+    <.form :let={f} for={@capability_changeset} phx-submit="save_capability" id="capability-form" class="space-y-6" phx-window-keydown="close_modal" phx-key="escape">
+      <%= if @form_mode == :new_capability do %>
+        <input type="hidden" name="capability[product_id]" value={@selected_product.id} />
+      <% end %>
+      <div class="space-y-2">
+        <label for={f[:name].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Name
+        </label>
+        <input type="text" 
+          name={f[:name].name} 
+          id={f[:name].id} 
+          value={f[:name].value} 
+          required
+          autofocus
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <.error :for={msg <- f[:name].errors}><%= msg %></.error>
+      </div>
+
+      <div class="space-y-2">
+        <label for={f[:description].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Description
+        </label>
+        <textarea 
+          name={f[:description].name} 
+          id={f[:description].id} 
+          rows="4"
+          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        ><%= f[:description].value %></textarea>
+        <.error :for={msg <- f[:description].errors}><%= msg %></.error>
+      </div>
+    </.form>
+  </:content>
+  
+  <:footer>
+    <.button variant="outline" type="button" phx-click="close_modal">Cancel</.button>
+    <.button type="submit" form="capability-form">Save</.button>
+  </:footer>
+</.modal> 

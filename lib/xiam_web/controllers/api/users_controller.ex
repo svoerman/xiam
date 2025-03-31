@@ -3,15 +3,15 @@ defmodule XIAMWeb.API.UsersController do
   Controller for API user management endpoints.
   Provides CRUD operations for users with proper authorization.
   """
-  
+
   use XIAMWeb, :controller
-  
+
   alias XIAM.Users.User
-  alias XIAM.RBAC.Role
+  alias Xiam.Rbac.Role
   alias XIAM.Repo
   alias XIAM.Jobs.AuditLogger
   import Ecto.Query
-  
+
   @doc """
   Lists all users with optional pagination and filtering.
   Requires the "list_users" capability.
@@ -20,31 +20,31 @@ defmodule XIAMWeb.API.UsersController do
     # Extract pagination parameters with defaults
     page = Map.get(params, "page", "1") |> String.to_integer()
     per_page = Map.get(params, "per_page", "20") |> String.to_integer()
-    
+
     # Calculate offset
     offset = (page - 1) * per_page
-    
+
     # Build query with optional filters
     query = from u in User,
             left_join: r in assoc(u, :role),
             preload: [role: r]
-    
+
     # Apply filters if provided
     query = if params["role_id"], do: where(query, [u], u.role_id == ^params["role_id"]), else: query
     query = if params["email"], do: where(query, [u], ilike(u.email, ^"%#{params["email"]}%")), else: query
-    
+
     # Get total count
     total_count = Repo.aggregate(query, :count, :id)
-    
+
     # Apply pagination
     query = query
             |> limit(^per_page)
             |> offset(^offset)
             |> order_by([u], desc: u.inserted_at)
-    
+
     # Execute query
     users = Repo.all(query)
-    
+
     # Format the users for JSON response, excluding sensitive fields
     users_json = Enum.map(users, fn user ->
       %{
@@ -56,7 +56,7 @@ defmodule XIAMWeb.API.UsersController do
         updated_at: user.updated_at
       }
     end)
-    
+
     # Return paginated response
     conn
     |> put_status(:ok)
@@ -71,7 +71,7 @@ defmodule XIAMWeb.API.UsersController do
       }
     })
   end
-  
+
   @doc """
   Retrieves a specific user by ID.
   Requires the "view_user" capability.
@@ -82,12 +82,12 @@ defmodule XIAMWeb.API.UsersController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "User not found"})
-        
+
       user ->
         # Log the user view
         current_user = conn.assigns.current_user
         AuditLogger.log_action("api_user_view", current_user.id, %{target_user_id: user.id}, current_user.email)
-        
+
         # Format the user for JSON response, excluding sensitive fields
         user_json = %{
           id: user.id,
@@ -97,7 +97,7 @@ defmodule XIAMWeb.API.UsersController do
           inserted_at: user.inserted_at,
           updated_at: user.updated_at
         }
-        
+
         conn
         |> put_status(:ok)
         |> json(%{
@@ -106,7 +106,7 @@ defmodule XIAMWeb.API.UsersController do
         })
     end
   end
-  
+
   @doc """
   Creates a new user.
   Requires the "create_user" capability.
@@ -119,9 +119,9 @@ defmodule XIAMWeb.API.UsersController do
     else
       user_params
     end
-    
+
     current_user = conn.assigns.current_user
-    
+
     # Create user with Pow
     case Pow.Ecto.Context.create(User, user_params) do
       {:ok, user} ->
@@ -130,7 +130,7 @@ defmodule XIAMWeb.API.UsersController do
           new_user_id: user.id,
           new_user_email: user.email
         }, current_user.email)
-        
+
         conn
         |> put_status(:created)
         |> json(%{
@@ -141,7 +141,7 @@ defmodule XIAMWeb.API.UsersController do
           },
           message: "User created successfully"
         })
-        
+
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -151,20 +151,20 @@ defmodule XIAMWeb.API.UsersController do
         })
     end
   end
-  
+
   @doc """
   Updates an existing user.
   Requires the "update_user" capability.
   """
   def update(conn, %{"id" => id, "user" => user_params}) do
     current_user = conn.assigns.current_user
-    
+
     case Repo.get(User, id) do
       nil ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "User not found"})
-        
+
       user ->
         # Remove password fields if they're empty
         user_params = if user_params["password"] == "" do
@@ -172,10 +172,10 @@ defmodule XIAMWeb.API.UsersController do
         else
           user_params
         end
-        
+
         # Handle role_id specially
         {role_id, user_params} = Map.pop(user_params, "role_id")
-        
+
         # Update basic user fields with Pow
         case Pow.Ecto.Context.update(User, user, user_params) do
           {:ok, updated_user} ->
@@ -188,13 +188,13 @@ defmodule XIAMWeb.API.UsersController do
             else
               updated_user
             end
-            
+
             # Log the user update
             AuditLogger.log_action("api_user_update", current_user.id, %{
               target_user_id: updated_user.id,
               changes: Map.drop(user_params, ["password", "password_confirmation"])
             }, current_user.email)
-            
+
             conn
             |> put_status(:ok)
             |> json(%{
@@ -205,7 +205,7 @@ defmodule XIAMWeb.API.UsersController do
               },
               message: "User updated successfully"
             })
-            
+
           {:error, changeset} ->
             conn
             |> put_status(:unprocessable_entity)
@@ -216,20 +216,20 @@ defmodule XIAMWeb.API.UsersController do
         end
     end
   end
-  
+
   @doc """
   Deletes a user.
   Requires the "delete_user" capability.
   """
   def delete(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user
-    
+
     case Repo.get(User, id) do
       nil ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "User not found"})
-        
+
       user ->
         # Prevent self-deletion
         if user.id == current_user.id do
@@ -242,7 +242,7 @@ defmodule XIAMWeb.API.UsersController do
             target_user_id: user.id,
             target_user_email: user.email
           }, current_user.email)
-          
+
           case Repo.delete(user) do
             {:ok, _} ->
               conn
@@ -251,7 +251,7 @@ defmodule XIAMWeb.API.UsersController do
                 success: true,
                 message: "User deleted successfully"
               })
-              
+
             {:error, changeset} ->
               conn
               |> put_status(:unprocessable_entity)
@@ -263,7 +263,7 @@ defmodule XIAMWeb.API.UsersController do
         end
     end
   end
-  
+
   # Helper function to format changeset errors
   defp error_details(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

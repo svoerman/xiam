@@ -5,28 +5,28 @@ defmodule XIAMWeb.Admin.RolesLive do
   import XIAMWeb.Components.UI.Modal
   import XIAMWeb.CoreComponents, except: [button: 1, modal: 1]
   import XIAMWeb.Components.UI
-
-  alias XIAM.RBAC
-  alias XIAM.RBAC.Role
-  alias XIAM.RBAC.Capability
-  alias XIAM.Repo
   import Ecto.Query
+
+  alias Xiam.Rbac.{Role, Capability}
+  alias XIAM.Repo
+  alias Phoenix.LiveView.JS
 
   @impl true
   def mount(_params, _session, socket) do
-    roles = RBAC.list_roles()
-    changeset = RBAC.change_capability(%Capability{})
+    roles = refresh_roles(socket)
+    capabilities = Capability.list_capabilities()
+    role_changeset = Role.changeset(%Role{}, %{})
 
     socket = assign(socket,
       page_title: "Roles & Capabilities",
       roles: roles,
-      capabilities: RBAC.list_capabilities(),
+      capabilities: capabilities,
       selected_role: nil,
-      capability_changeset: changeset,
-      selected_capability: nil,
+      role_changeset: role_changeset,
       form_mode: nil,
-      show_role_modal: false,
-      show_capability_modal: false
+      show_modal: false,
+      show_capability_modal: false,
+      selected_capability: nil
     )
 
     {:ok, socket}
@@ -55,7 +55,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   def handle_event("show_new_role_modal", _params, socket) do
     role_changeset = Role.changeset(%Role{}, %{})
     {:noreply, assign(socket,
-      show_role_modal: true,
+      show_modal: true,
       form_mode: :new_role,
       selected_role: nil,
       role_changeset: role_changeset
@@ -63,17 +63,21 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("show_edit_role_modal", %{"id" => id}, socket) do
-    role = Repo.get(Role, id) |> Repo.preload(:capabilities)
-    role_changeset = Role.changeset(role, %{
-      name: role.name,
-      description: role.description
-    })
-    {:noreply, assign(socket,
-      show_role_modal: true,
-      form_mode: :edit_role,
-      selected_role: role,
-      role_changeset: role_changeset
-    )}
+    case Role.get_role_with_capabilities(id) do
+      nil ->
+        {:noreply, socket |> put_flash(:error, "Role not found")}
+      role ->
+        role_changeset = Role.changeset(role, %{
+          name: role.name,
+          description: role.description
+        })
+        {:noreply, assign(socket,
+          show_modal: true,
+          form_mode: :edit_role,
+          selected_role: role,
+          role_changeset: role_changeset
+        )}
+    end
   end
 
   def handle_event("show_new_capability_modal", _params, socket) do
@@ -89,7 +93,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   def handle_event("show_edit_capability_modal", %{"id" => id}, socket) do
     capability = Repo.get(Capability, id)
     capability_changeset = Capability.changeset(capability, %{
-      name: capability.name,
+      capability_name: capability.capability_name,
       description: capability.description
     })
     {:noreply, assign(socket,
@@ -101,32 +105,26 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("close_modal", _, socket) do
-    # Create fresh changesets
-    role_changeset = Role.changeset(%Role{}, %{})
-    capability_changeset = Capability.changeset(%Capability{}, %{})
-
     {:noreply, assign(socket,
-      show_role_modal: false,
-      show_capability_modal: false,
+      show_modal: false,
       form_mode: nil,
-      role_changeset: role_changeset,
-      capability_changeset: capability_changeset
+      selected_role: nil,
+      role_changeset: nil
     )}
   end
 
-  def handle_event("save_role", %{"role" => role_params} = params, socket) do
-    capability_ids = params["capability_ids"] || %{}
+  def handle_event("save_role", %{"role" => role_params, "capability_ids" => capability_ids}, socket) do
+    capability_ids = Enum.map(capability_ids, fn {id, _} -> id end)
 
     case socket.assigns.form_mode do
       :new_role ->
-        # Create role without capabilities first
-        case Role.create_role(role_params) do
+        case Role.create_role_with_capabilities(role_params, capability_ids) do
           {:ok, _role} ->
             roles = refresh_roles(socket)
             role_changeset = Role.changeset(%Role{}, %{})
 
             {:noreply, socket
-              |> assign(roles: roles, show_role_modal: false, role_changeset: role_changeset)
+              |> assign(roles: roles, show_modal: false, role_changeset: role_changeset)
               |> put_flash(:info, "Role created successfully")}
 
           {:error, changeset} ->
@@ -138,19 +136,13 @@ defmodule XIAMWeb.Admin.RolesLive do
           nil ->
             {:noreply, socket |> put_flash(:error, "No role selected")}
           role ->
-            # Parse the capability IDs (Phoenix sends them as a map with string keys)
-            capability_ids = capability_ids
-                           |> Enum.filter(fn {_k, v} -> v == "true" end)
-                           |> Enum.map(fn {k, _v} -> String.to_integer(k) end)
-
-            # Update role with both details and capabilities
             case Role.update_role_with_capabilities(role, role_params, capability_ids) do
-              {:ok, updated_role} ->
+              {:ok, _role} ->
                 roles = refresh_roles(socket)
                 role_changeset = Role.changeset(%Role{}, %{})
 
                 {:noreply, socket
-                  |> assign(roles: roles, selected_role: updated_role, show_role_modal: false, role_changeset: role_changeset)
+                  |> assign(roles: roles, show_modal: false, role_changeset: role_changeset)
                   |> put_flash(:info, "Role updated successfully")}
 
               {:error, changeset} ->
@@ -161,6 +153,10 @@ defmodule XIAMWeb.Admin.RolesLive do
       _other ->
         {:noreply, socket |> put_flash(:error, "Invalid form mode")}
     end
+  end
+
+  def handle_event("save_role", %{"role" => role_params}, socket) do
+    handle_event("save_role", %{"role" => role_params, "capability_ids" => %{}}, socket)
   end
 
   def handle_event("save_capability", %{"capability" => capability_params}, socket) do
@@ -204,21 +200,20 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("delete_role", %{"id" => id}, socket) do
-    role = Repo.get(Role, id)
+    case Role.get_role!(id) do
+      nil ->
+        {:noreply, socket |> put_flash(:error, "Role not found")}
+      role ->
+        case Role.delete_role(role) do
+          {:ok, _} ->
+            roles = refresh_roles(socket)
+            {:noreply, socket
+              |> assign(roles: roles)
+              |> put_flash(:info, "Role deleted successfully")}
 
-    if role do
-      case Repo.delete(role) do
-        {:ok, _} ->
-          roles = refresh_roles(socket)
-          {:noreply, socket
-            |> assign(roles: roles, selected_role: nil)
-            |> put_flash(:info, "Role deleted successfully")}
-
-        {:error, _changeset} ->
-          {:noreply, socket |> put_flash(:error, "Failed to delete role. It may be in use.")}
-      end
-    else
-      {:noreply, socket |> put_flash(:error, "Role not found")}
+          {:error, _changeset} ->
+            {:noreply, socket |> put_flash(:error, "Failed to delete role. It may be in use.")}
+        end
     end
   end
 
@@ -248,5 +243,14 @@ defmodule XIAMWeb.Admin.RolesLive do
   defp refresh_roles(_socket) do
     roles_query = from r in Role, order_by: r.name, preload: [:capabilities]
     Repo.all(roles_query)
+  end
+
+  def render_capability(%Capability{} = capability) do
+    %{
+      id: capability.id,
+      name: capability.name,
+      description: capability.description,
+      product_id: capability.product_id
+    }
   end
 end

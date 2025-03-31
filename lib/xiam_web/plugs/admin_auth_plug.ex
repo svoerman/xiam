@@ -7,9 +7,6 @@ defmodule XIAMWeb.Plugs.AdminAuthPlug do
   import Plug.Conn
   import Phoenix.Controller
 
-  #alias XIAM.Users.User
-  #alias XIAM.RBAC.Role
-  #alias XIAM.RBAC.Capability
   alias XIAM.Repo
 
   def init(opts), do: opts
@@ -29,7 +26,7 @@ defmodule XIAMWeb.Plugs.AdminAuthPlug do
 
   # Checks if the current user has admin capabilities
   defp has_admin_privileges?(nil), do: false
-  defp has_admin_privileges?(user) do
+  defp has_admin_privileges?(%XIAM.Users.User{} = user) do
     user = user |> Repo.preload(role: :capabilities)
 
     # User has admin privileges if:
@@ -37,8 +34,8 @@ defmodule XIAMWeb.Plugs.AdminAuthPlug do
     # 2. They have been specifically granted admin access
     case user.role do
       nil -> false
-      role ->
-        Enum.any?(role.capabilities, fn capability ->
+      %Xiam.Rbac.Role{} = role ->
+        Enum.any?(role.capabilities, fn %Xiam.Rbac.Capability{} = capability ->
           capability.name == "admin_access"
         end)
     end
