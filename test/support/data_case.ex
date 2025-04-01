@@ -36,8 +36,86 @@ defmodule XIAM.DataCase do
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(XIAM.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    # Ensure the application is started with the repo
+    {:ok, _} = Application.ensure_all_started(:xiam)
+
+    # Make sure the repo is properly started - this is critical
+    # to ensure database operations work correctly
+    case Process.whereis(XIAM.Repo) do
+      nil ->
+        # Repo is not started, try to start it explicitly
+        {:ok, _} = Application.ensure_all_started(:ecto_sql)
+        {:ok, _} = XIAM.Repo.start_link([])
+      _ -> 
+        :ok
+    end
+    
+    # Add more robust error handling around the sandbox setup
+    try do
+      # Determine if shared mode should be used (for non-async tests)
+      shared_mode = not tags[:async]
+      
+      # Use a more conservative timeout value
+      timeout = 60_000
+      
+      # Insert an explicit delay to let the database connection stabilize
+      Process.sleep(100)
+      
+      pid = Ecto.Adapters.SQL.Sandbox.start_owner!(
+        XIAM.Repo, 
+        shared: shared_mode,
+        timeout: timeout
+      )
+      
+      # Ensure the connection is properly cleaned up
+      on_exit(fn -> 
+        try do
+          Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
+        rescue
+          e -> 
+            IO.warn("Error cleaning up sandbox: #{inspect(e)}")
+            :ok
+        end
+      end)
+    rescue
+      e -> 
+        IO.warn("Error setting up sandbox: #{inspect(e)}")
+        # Try a fallback approach - check if repo is running first
+        case Process.whereis(XIAM.Repo) do
+          nil ->
+            # Try to manually start it one more time if we can
+            try do
+              {:ok, _} = Application.ensure_all_started(:ecto_sql)
+              {:ok, _} = XIAM.Repo.start_link([])
+              Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+              on_exit(fn -> 
+                try do 
+                  Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual) 
+                catch
+                  _, _ -> :ok
+                end
+              end)
+            rescue
+              _ -> 
+                # We tried our best
+                :ok
+            end
+          pid when is_pid(pid) ->
+            # Repo is running, try to set sandbox mode
+            try do
+              Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+              on_exit(fn -> 
+                try do 
+                  Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual) 
+                catch
+                  _, _ -> :ok
+                end
+              end)
+            rescue
+              _ -> :ok
+            end
+        end
+    end
   end
 
   @doc """

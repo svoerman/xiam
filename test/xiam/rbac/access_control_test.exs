@@ -2,42 +2,65 @@ defmodule Xiam.Rbac.AccessControlTest do
   use XIAM.DataCase
 
   alias Xiam.Rbac.AccessControl
-  alias Xiam.Rbac.{EntityAccess, Product, Capability, Role}
+  alias Xiam.Rbac.Role
   alias XIAM.Users.User
   alias XIAM.Repo
 
   describe "entity_access" do
     setup do
-      # Create a test user
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
+      # Generate unique identifiers for this test run
+      timestamp = System.system_time(:second)
+      email = "access_test_#{timestamp}@example.com"
+      role_name = "Test_Role_#{timestamp}"
+      product_name = "Test_Product_#{timestamp}"
+      capability_name = "test_capability_#{timestamp}"
+      
+      # Clear any test data that might interfere
+      import Ecto.Query
+      Repo.delete_all(from u in User, where: like(u.email, "%access_test%"))
+      Repo.delete_all(from r in Role, where: like(r.name, "%Test_Role%"))
+      Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Product%"))
+      
+      # Create a test user with unique email
       {:ok, user} = %User{}
         |> User.pow_changeset(%{
-          email: "access_test@example.com",
+          email: email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })
         |> Repo.insert()
 
-      # Create a role
+      # Create a role with unique name
       {:ok, role} = %Role{
-        name: "Test Role",
+        name: role_name,
         description: "Role for testing"
       }
       |> Repo.insert()
 
-      # Create a product
-      {:ok, product} = %Product{
-        product_name: "Test Product",
+      # Create a product using the AccessControl context with unique name
+      {:ok, product} = AccessControl.create_product(%{
+        product_name: product_name,
         description: "Product for testing"
-      }
-      |> Repo.insert()
+      })
 
-      # Create a capability
-      {:ok, capability} = %Capability{
-        name: "test_capability",
+      # Create a capability using the AccessControl context with unique name
+      {:ok, capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Capability for testing",
         product_id: product.id
-      }
-      |> Repo.insert()
+      })
 
       {:ok, user: user, role: role, product: product, capability: capability}
     end
@@ -58,15 +81,15 @@ defmodule Xiam.Rbac.AccessControlTest do
     end
 
     test "get_user_access/1 retrieves access for a user", %{user: user, role: role} do
-      # Insert multiple access entries
-      Repo.insert!(%EntityAccess{
+      # Insert multiple access entries using context functions
+      {:ok, _access1} = AccessControl.set_user_access(%{
         user_id: user.id,
         entity_type: "test_entity",
         entity_id: 123,
         role_id: role.id
       })
 
-      Repo.insert!(%EntityAccess{
+      {:ok, _access2} = AccessControl.set_user_access(%{
         user_id: user.id,
         entity_type: "test_entity",
         entity_id: 456,
@@ -79,8 +102,8 @@ defmodule Xiam.Rbac.AccessControlTest do
     end
 
     test "list_entity_access/0 returns all entity access entries", %{user: user, role: role} do
-      # Insert access entry
-      Repo.insert!(%EntityAccess{
+      # Insert access entry using context function
+      {:ok, _access} = AccessControl.set_user_access(%{
         user_id: user.id,
         entity_type: "test_entity",
         entity_id: 123,
@@ -92,8 +115,8 @@ defmodule Xiam.Rbac.AccessControlTest do
     end
 
     test "has_access?/3 correctly checks user access", %{user: user, role: role} do
-      # Insert access entry
-      Repo.insert!(%EntityAccess{
+      # Insert access entry using context function
+      {:ok, _access} = AccessControl.set_user_access(%{
         user_id: user.id,
         entity_type: "test_entity",
         entity_id: 123,
@@ -106,8 +129,8 @@ defmodule Xiam.Rbac.AccessControlTest do
     end
 
     test "delete_entity_access/1 removes access", %{user: user, role: role} do
-      # Insert access entry
-      access = Repo.insert!(%EntityAccess{
+      # Insert access entry using context function
+      {:ok, access} = AccessControl.set_user_access(%{
         user_id: user.id,
         entity_type: "test_entity",
         entity_id: 123,
@@ -120,45 +143,81 @@ defmodule Xiam.Rbac.AccessControlTest do
   end
 
   describe "products" do
-    test "create_product/1 creates a new product" do
+    setup do
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
+      # Generate timestamp for unique test data
+      timestamp = System.system_time(:second)
+      
+      # Clean up existing test products
+      import Ecto.Query
+      Repo.delete_all(from p in Xiam.Rbac.Product, 
+                      where: like(p.product_name, "%Test_Product_%") or
+                             like(p.product_name, "%New_Product_%") or
+                             like(p.product_name, "%List_Test_%") or
+                             like(p.product_name, "%Get_Test_%") or
+                             like(p.product_name, "%Update_Test_%") or
+                             like(p.product_name, "%Delete_Test_%"))
+      
+      {:ok, timestamp: timestamp}
+    end
+    
+    test "create_product/1 creates a new product", %{timestamp: timestamp} do
+      product_name = "New_Product_#{timestamp}"
       attrs = %{
-        product_name: "New Product",
+        product_name: product_name,
         description: "A new test product"
       }
 
       assert {:ok, product} = AccessControl.create_product(attrs)
-      assert product.product_name == "New Product"
+      assert product.product_name == product_name
       assert product.description == "A new test product"
     end
 
-    test "list_products/0 returns all products" do
+    test "list_products/0 returns all products", %{timestamp: timestamp} do
+      product_name = "List_Test_Product_#{timestamp}"
+      
       # Create a product
-      Repo.insert!(%Product{
-        product_name: "List Test Product",
+      {:ok, _product} = AccessControl.create_product(%{
+        product_name: product_name,
         description: "Product for testing list"
       })
 
       products = AccessControl.list_products()
       assert length(products) >= 1
-      assert Enum.any?(products, fn p -> p.product_name == "List Test Product" end)
+      assert Enum.any?(products, fn p -> p.product_name == product_name end)
     end
 
-    test "get_product/1 returns a specific product" do
+    test "get_product/1 returns a specific product", %{timestamp: timestamp} do
+      product_name = "Get_Test_Product_#{timestamp}"
+      
       # Create a product
-      product = Repo.insert!(%Product{
-        product_name: "Get Test Product",
+      {:ok, product} = AccessControl.create_product(%{
+        product_name: product_name,
         description: "Product for testing get"
       })
 
       retrieved_product = AccessControl.get_product(product.id)
       assert retrieved_product.id == product.id
-      assert retrieved_product.product_name == "Get Test Product"
+      assert retrieved_product.product_name == product_name
     end
 
-    test "update_product/2 updates a product" do
+    test "update_product/2 updates a product", %{timestamp: timestamp} do
+      product_name = "Update_Test_Product_#{timestamp}"
+      
       # Create a product
-      product = Repo.insert!(%Product{
-        product_name: "Update Test Product",
+      {:ok, product} = AccessControl.create_product(%{
+        product_name: product_name,
         description: "Original description"
       })
 
@@ -168,10 +227,12 @@ defmodule Xiam.Rbac.AccessControlTest do
       assert updated_product.description == "Updated description"
     end
 
-    test "delete_product/1 deletes a product" do
+    test "delete_product/1 deletes a product", %{timestamp: timestamp} do
+      product_name = "Delete_Test_Product_#{timestamp}"
+      
       # Create a product
-      product = Repo.insert!(%Product{
-        product_name: "Delete Test Product",
+      {:ok, product} = AccessControl.create_product(%{
+        product_name: product_name,
         description: "Product for testing delete"
       })
 
@@ -182,59 +243,88 @@ defmodule Xiam.Rbac.AccessControlTest do
 
   describe "capabilities" do
     setup do
-      # Create a product for capabilities to reference
-      {:ok, product} = %Product{
-        product_name: "Capability Test Product",
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
+      # Generate timestamp for unique test data
+      timestamp = System.system_time(:second)
+      
+      # Clean up existing test capabilities and products
+      import Ecto.Query
+      Repo.delete_all(from c in Xiam.Rbac.Capability, 
+                      where: like(c.name, "%test_capability_%"))
+      
+      Repo.delete_all(from p in Xiam.Rbac.Product, 
+                      where: like(p.product_name, "%Capability_Test_%"))
+      
+      # Create a product for capabilities to reference with unique name
+      {:ok, product} = AccessControl.create_product(%{
+        product_name: "Capability_Test_Product_#{timestamp}",
         description: "Product for capability tests"
-      }
-      |> Repo.insert()
+      })
 
-      {:ok, product: product}
+      {:ok, product: product, timestamp: timestamp}
     end
 
-    test "create_capability/1 creates a new capability", %{product: product} do
+    test "create_capability/1 creates a new capability", %{product: product, timestamp: timestamp} do
+      capability_name = "new_capability_#{timestamp}"
       attrs = %{
-        name: "new_capability",
+        name: capability_name,
         description: "A new test capability",
         product_id: product.id
       }
 
       assert {:ok, capability} = AccessControl.create_capability(attrs)
-      assert capability.name == "new_capability"
+      assert capability.name == capability_name
       assert capability.description == "A new test capability"
       assert capability.product_id == product.id
     end
 
-    test "list_capabilities/0 returns all capabilities", %{product: product} do
+    test "list_capabilities/0 returns all capabilities", %{product: product, timestamp: timestamp} do
+      capability_name = "list_test_capability_#{timestamp}"
+      
       # Create a capability
-      Repo.insert!(%Capability{
-        name: "list_test_capability",
+      {:ok, _capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Capability for testing list",
         product_id: product.id
       })
 
       capabilities = AccessControl.list_capabilities()
       assert length(capabilities) >= 1
-      assert Enum.any?(capabilities, fn c -> c.name == "list_test_capability" end)
+      assert Enum.any?(capabilities, fn c -> c.name == capability_name end)
     end
 
-    test "get_capability/1 returns a specific capability", %{product: product} do
+    test "get_capability/1 returns a specific capability", %{product: product, timestamp: timestamp} do
+      capability_name = "get_test_capability_#{timestamp}"
+      
       # Create a capability
-      capability = Repo.insert!(%Capability{
-        name: "get_test_capability",
+      {:ok, capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Capability for testing get",
         product_id: product.id
       })
 
       retrieved_capability = AccessControl.get_capability(capability.id)
       assert retrieved_capability.id == capability.id
-      assert retrieved_capability.name == "get_test_capability"
+      assert retrieved_capability.name == capability_name
     end
 
-    test "update_capability/2 updates a capability", %{product: product} do
+    test "update_capability/2 updates a capability", %{product: product, timestamp: timestamp} do
+      capability_name = "update_test_capability_#{timestamp}"
+      
       # Create a capability
-      capability = Repo.insert!(%Capability{
-        name: "update_test_capability",
+      {:ok, capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Original description",
         product_id: product.id
       })
@@ -245,10 +335,12 @@ defmodule Xiam.Rbac.AccessControlTest do
       assert updated_capability.description == "Updated description"
     end
 
-    test "delete_capability/1 deletes a capability", %{product: product} do
+    test "delete_capability/1 deletes a capability", %{product: product, timestamp: timestamp} do
+      capability_name = "delete_test_capability_#{timestamp}"
+      
       # Create a capability
-      capability = Repo.insert!(%Capability{
-        name: "delete_test_capability",
+      {:ok, capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Capability for testing delete",
         product_id: product.id
       })
@@ -257,17 +349,19 @@ defmodule Xiam.Rbac.AccessControlTest do
       assert AccessControl.get_capability(capability.id) == nil
     end
 
-    test "get_product_capabilities/1 returns capabilities for a product", %{product: product} do
+    test "get_product_capabilities/1 returns capabilities for a product", %{product: product, timestamp: timestamp} do
+      capability_name = "product_test_capability_#{timestamp}"
+      
       # Create a capability
-      Repo.insert!(%Capability{
-        name: "product_test_capability",
+      {:ok, _capability} = AccessControl.create_capability(%{
+        name: capability_name,
         description: "Capability for testing product capabilities",
         product_id: product.id
       })
 
       capabilities = AccessControl.get_product_capabilities(product.id)
       assert length(capabilities) >= 1
-      assert Enum.any?(capabilities, fn c -> c.name == "product_test_capability" end)
+      assert Enum.any?(capabilities, fn c -> c.name == capability_name end)
     end
   end
 end

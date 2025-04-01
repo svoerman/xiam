@@ -7,25 +7,49 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
   alias XIAM.Auth.JWT
 
   setup %{conn: conn} do
+    # Explicitly ensure repo is available
+    case Process.whereis(XIAM.Repo) do
+      nil ->
+        # Repo is not started, try to start it explicitly
+        {:ok, _} = Application.ensure_all_started(:ecto_sql)
+        {:ok, _} = XIAM.Repo.start_link([])
+        # Set sandbox mode
+        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      _ -> 
+        :ok
+    end
+    
+    # Generate a unique timestamp for this test run
+    timestamp = System.system_time(:second)
+    
+    # Clean up existing test data
+    import Ecto.Query
+    Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Consent_Product_%"))
+    Repo.delete_all(from r in Xiam.Rbac.Role, where: like(r.name, "%Consent_Admin_%"))
+    Repo.delete_all(from u in User, where: like(u.email, "%api_consent_test%"))
+    
     # Create a test user with admin capability
+    email = "api_consent_test_#{timestamp}@example.com"
     {:ok, user} = %User{}
       |> User.pow_changeset(%{
-        email: "api_consent_test@example.com",
+        email: email,
         password: "Password123!",
         password_confirmation: "Password123!"
       })
       |> Repo.insert()
 
     # Create a role with necessary capabilities
+    role_name = "Consent_Admin_#{timestamp}"
     {:ok, role} = Xiam.Rbac.Role.changeset(%Xiam.Rbac.Role{}, %{
-      name: "Consent Admin",
+      name: role_name,
       description: "Role for testing consent API"
     })
     |> Repo.insert()
 
     # Create a product to associate capabilities with
+    product_name = "Test_Consent_Product_#{timestamp}"
     {:ok, product} = Xiam.Rbac.Product.changeset(%Xiam.Rbac.Product{}, %{
-      product_name: "Test Product",
+      product_name: product_name,
       description: "Test product for API tests"
     }) |> Repo.insert()
     

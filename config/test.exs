@@ -35,3 +35,11 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+  
+# Configure Oban for testing - completely disable it to avoid ownership errors
+config :oban,
+  testing: :manual,
+  plugins: false,
+  queues: false,
+  peer: false,
+  repo: XIAM.Repo

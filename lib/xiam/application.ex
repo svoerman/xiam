@@ -24,9 +24,20 @@ defmodule XIAM.Application do
       {DNSCluster, query: Application.get_env(:xiam, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: XIAM.PubSub},
       # Start the Finch HTTP client for sending emails
-      {Finch, name: XIAM.Finch},
-      # Start Oban for background job processing
-      {Oban, Application.get_env(:xiam, Oban)},
+      {Finch, name: XIAM.Finch}
+    ]
+    
+    # Don't start Oban in test environment or conditionally start it
+    children = 
+      case Application.get_env(:xiam, :oban_testing) do
+        # Skip Oban in test mode
+        true -> children
+        # Include Oban in regular operation
+        _ -> children ++ [{Oban, Application.get_env(:xiam, Oban)}]
+      end
+      
+    # Add remaining services
+    children = children ++ [
       # Start libcluster for node clustering
       {Cluster.Supervisor, [topologies, [name: XIAM.ClusterSupervisor]]},
       # Start to serve requests, typically the last entry

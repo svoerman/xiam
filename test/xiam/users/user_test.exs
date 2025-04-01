@@ -45,9 +45,17 @@ defmodule XIAM.Users.UserTest do
 
   describe "mfa functionality" do
     setup do
+      # Generate a timestamp for unique test data
+      timestamp = System.system_time(:second)
+      
+      # Clean up existing test data
+      import Ecto.Query
+      Repo.delete_all(from u in User, where: like(u.email, "%mfa_test%"))
+      
+      email = "mfa_test_#{timestamp}@example.com"
       {:ok, user} = %User{}
         |> User.pow_changeset(%{
-          email: "mfa_test@example.com",
+          email: email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })
@@ -88,32 +96,45 @@ defmodule XIAM.Users.UserTest do
 
   describe "user capabilities" do
     setup do
-      # Create a test user
+      # Generate a timestamp for unique test data
+      timestamp = System.system_time(:second)
+      
+      # Clean up existing test data
+      import Ecto.Query
+      Repo.delete_all(from u in User, where: like(u.email, "%role_test%"))
+      Repo.delete_all(from r in Role, where: like(r.name, "%Test_Role_%"))
+      Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Capability_Product_%"))
+      
+      # Create a test user with unique email
+      email = "role_test_#{timestamp}@example.com"
       {:ok, user} = %User{}
         |> User.pow_changeset(%{
-          email: "role_test@example.com",
+          email: email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })
         |> Repo.insert()
 
-      # Create a role with capabilities
+      # Create a role with capabilities and unique name
+      role_name = "Test_Role_#{timestamp}"
       {:ok, role} = %Role{
-        name: "Test Role",
+        name: role_name,
         description: "Role for testing capabilities"
       }
       |> Repo.insert()
 
-      # Create a product for capabilities
+      # Create a product for capabilities with unique name
+      product_name = "Test_Capability_Product_#{timestamp}"
       {:ok, product} = %Xiam.Rbac.Product{
-        product_name: "Test Product",
+        product_name: product_name,
         description: "Product for testing capabilities"
       }
       |> Repo.insert()
       
-      # Create a capability
+      # Create a capability with unique name
+      capability_name = "test_capability_#{timestamp}"
       {:ok, capability} = %Capability{
-        name: "test_capability",
+        name: capability_name,
         description: "Capability for testing",
         product_id: product.id
       }
@@ -147,10 +168,13 @@ defmodule XIAM.Users.UserTest do
       assert User.has_capability?(user, "non_existent_capability") == false
     end
 
-    test "has_capability?/2 returns false for user without role" do
+    test "has_capability?/2 returns false for user without role", %{capability: capability} do
+      timestamp = System.system_time(:second)
+      email = "no_role_#{timestamp}@example.com"
+      
       {:ok, user_without_role} = %User{}
         |> User.pow_changeset(%{
-          email: "no_role@example.com",
+          email: email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })
@@ -163,9 +187,17 @@ defmodule XIAM.Users.UserTest do
   
   describe "GDPR compliance" do
     setup do
+      # Generate a timestamp for unique test data
+      timestamp = System.system_time(:second)
+      
+      # Clean up existing test data
+      import Ecto.Query
+      Repo.delete_all(from u in User, where: like(u.email, "%gdpr%"))
+      
+      email = "gdpr_#{timestamp}@example.com"
       {:ok, user} = %User{}
         |> User.pow_changeset(%{
-          email: "gdpr@example.com",
+          email: email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })

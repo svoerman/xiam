@@ -11,6 +11,13 @@ defmodule XIAM.Users.User do
     field :mfa_enabled, :boolean, default: false
     field :mfa_secret, :binary
     field :mfa_backup_codes, {:array, :string}
+    
+    # Data retention fields
+    field :last_sign_in_at, :utc_datetime
+    field :anonymized, :boolean, default: false
+    field :admin, :boolean, default: false
+    field :deletion_requested, :boolean, default: false
+    field :name, :string
 
     # Role relationship
     belongs_to :role, Xiam.Rbac.Role

@@ -32,7 +32,13 @@ defmodule XIAMWeb.ConnCase do
   end
 
   setup tags do
+    # Use the improved sandbox setup from DataCase
     XIAM.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+    
+    # Build a connection but don't set any default headers
+    # Individual tests can set the appropriate headers
+    conn = Phoenix.ConnTest.build_conn()
+    
+    {:ok, conn: conn}
   end
 end

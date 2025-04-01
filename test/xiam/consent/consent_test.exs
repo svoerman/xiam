@@ -14,6 +14,18 @@ defmodule XIAM.ConsentTest do
 
   describe "consent records" do
     setup do
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+
       # Create a test user
       {:ok, user} = %User{}
         |> User.pow_changeset(%{
@@ -165,6 +177,22 @@ defmodule XIAM.ConsentTest do
   end
 
   describe "consent_types" do
+    setup do
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
+      :ok
+    end
+
     test "list_consent_types/0 returns all defined consent types" do
       types = Consent.list_consent_types()
       assert is_list(types)

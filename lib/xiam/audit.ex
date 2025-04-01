@@ -158,4 +158,41 @@ defmodule XIAM.Audit do
   def log_system_action(action, metadata \\ %{}) do
     log_action(action, :system, "system", nil, metadata)
   end
+  
+  @doc """
+  Logs an action with a specific timestamp (for testing purposes).
+  """
+  def log_action_with_timestamp(action, actor, resource_type, resource_id \\ nil, metadata \\ %{}, timestamp \\ nil) do
+    actor_id = case actor do
+      %{id: id} -> id
+      _ -> nil
+    end
+
+    actor_type = case actor do
+      %XIAM.Users.User{} -> "user"
+      %{type: type} -> type
+      _ -> "system"
+    end
+    
+    attrs = %{
+      action: action,
+      actor_id: actor_id,
+      actor_type: actor_type,
+      resource_type: resource_type,
+      resource_id: "#{resource_id}",
+      metadata: metadata,
+      ip_address: "127.0.0.1",
+      user_agent: "Test Browser"
+    }
+    
+    # Set the inserted_at timestamp for testing
+    if timestamp do
+      %AuditLog{}
+      |> AuditLog.changeset(attrs)
+      |> Ecto.Changeset.put_change(:inserted_at, timestamp)
+      |> Repo.insert()
+    else
+      create_audit_log(attrs)
+    end
+  end
 end

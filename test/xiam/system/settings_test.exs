@@ -7,6 +7,18 @@ defmodule XIAM.System.SettingsTest do
 
   describe "settings management" do
     setup do
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
       # Create the ETS table if it doesn't exist
       if :ets.info(:xiam_settings_cache) == :undefined do
         :ets.new(:xiam_settings_cache, [:named_table, :set, :public, read_concurrency: true])
@@ -117,6 +129,18 @@ defmodule XIAM.System.SettingsTest do
 
   describe "settings cache" do
     setup do
+      # Explicitly ensure repo is available
+      case Process.whereis(XIAM.Repo) do
+        nil ->
+          # Repo is not started, try to start it explicitly
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = XIAM.Repo.start_link([])
+          # Set sandbox mode
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        _ -> 
+          :ok
+      end
+      
       # Create the ETS table if it doesn't exist
       if :ets.info(:xiam_settings_cache) == :undefined do
         :ets.new(:xiam_settings_cache, [:named_table, :set, :public, read_concurrency: true])
