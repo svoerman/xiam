@@ -61,15 +61,21 @@ defmodule XIAM.Users.User do
 
   @doc """
   Checks if a user has a specific capability.
+  Accepts capability name as either a string or atom.
   """
-  def has_capability?(%__MODULE__{} = user, capability_name) when is_binary(capability_name) do
+  def has_capability?(%__MODULE__{} = user, capability_name) do
     user = XIAM.Repo.preload(user, :role)
+    
+    # Convert capability name to string if it's an atom
+    capability_name = if is_atom(capability_name), do: Atom.to_string(capability_name), else: capability_name
 
     case user.role do
       nil -> false
       role -> Xiam.Rbac.Role.has_capability?(role, capability_name)
     end
   end
+  
+  def has_capability?(nil, _capability_name), do: false
 
   @doc """
   Generates a new TOTP secret for the user.

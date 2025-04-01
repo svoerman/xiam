@@ -37,6 +37,9 @@ defmodule XIAM.Audit.AuditLog do
       {:actor_id, actor_id}, query when is_binary(actor_id) or is_integer(actor_id) ->
         where(query, [a], a.actor_id == ^actor_id)
       
+      {:user_id, user_id}, query when is_binary(user_id) or is_integer(user_id) ->
+        where(query, [a], a.actor_id == ^user_id)
+      
       {:resource_type, resource_type}, query when is_binary(resource_type) ->
         where(query, [a], a.resource_type == ^resource_type)
       

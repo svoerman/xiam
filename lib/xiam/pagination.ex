@@ -39,9 +39,10 @@ defmodule XIAM.Pagination do
     # Get the paginated items
     items = XIAM.Repo.all(paginated_query)
     
-    # Build the pagination result
+    # Build the pagination result with both entries and items fields for compatibility
     %{
       items: items,
+      entries: items,
       page: page,
       page_size: page_size,
       total_count: total_count,

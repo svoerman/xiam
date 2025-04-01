@@ -132,6 +132,9 @@ defmodule XIAM.System.Settings do
       iex> update_setting(setting, %{value: "false"})
       {:ok, %Setting{}}
 
+      iex> update_setting("theme", "dark")
+      {:ok, %Setting{}}
+
   """
   def update_setting(%Setting{} = setting, attrs, actor \\ nil, conn \\ nil) do
     result =
@@ -142,7 +145,9 @@ defmodule XIAM.System.Settings do
     case result do
       {:ok, updated_setting} ->
         # Update cache
-        :ets.insert(@ets_table, {updated_setting.key, parsed_value(updated_setting)})
+        if :ets.info(@ets_table) != :undefined do
+          :ets.insert(@ets_table, {updated_setting.key, parsed_value(updated_setting)})
+        end
 
         # Audit log
         Audit.log_action(
@@ -158,6 +163,13 @@ defmodule XIAM.System.Settings do
 
       _ ->
         result
+    end
+  end
+  
+  def update_setting_by_key(key, value) when is_binary(key) do
+    case get_setting_by_key(key) do
+      nil -> {:error, :not_found}
+      setting -> update_setting(setting, %{value: value})
     end
   end
 
@@ -176,7 +188,9 @@ defmodule XIAM.System.Settings do
     case result do
       {:ok, deleted_setting} ->
         # Remove from cache
-        :ets.delete(@ets_table, deleted_setting.key)
+        if :ets.info(@ets_table) != :undefined do
+          :ets.delete(@ets_table, deleted_setting.key)
+        end
 
         # Audit log
         Audit.log_action(
@@ -208,21 +222,29 @@ defmodule XIAM.System.Settings do
 
   """
   def get_value(key) when is_binary(key) do
-    case :ets.lookup(@ets_table, key) do
-      [{^key, value}] ->
-        value
+    if :ets.info(@ets_table) != :undefined do
+      case :ets.lookup(@ets_table, key) do
+        [{^key, value}] ->
+          value
 
-      [] ->
-        # Cache miss, try to load from DB
-        case get_setting_by_key(key) do
-          nil ->
-            nil
+        [] ->
+          # Cache miss, try to load from DB
+          case get_setting_by_key(key) do
+            nil ->
+              nil
 
-          setting ->
-            value = parsed_value(setting)
-            :ets.insert(@ets_table, {key, value})
-            value
-        end
+            setting ->
+              value = parsed_value(setting)
+              :ets.insert(@ets_table, {key, value})
+              value
+          end
+      end
+    else
+      # ETS table not initialized, get directly from DB
+      case get_setting_by_key(key) do
+        nil -> nil
+        setting -> parsed_value(setting)
+      end
     end
   end
 
@@ -242,6 +264,69 @@ defmodule XIAM.System.Settings do
     case get_value(key) do
       nil -> default
       value -> value
+    end
+  end
+  
+  @doc """
+  Gets a setting value directly from the cache.
+  If the key is not in the cache, loads it from the database and caches it.
+  
+  ## Examples
+  
+      iex> get_cached_setting("mfa_required")
+      true
+      
+      iex> get_cached_setting("nonexistent")
+      nil
+  """
+  def get_cached_setting(key) when is_binary(key) do
+    get_value(key)
+  end
+  
+  @doc """
+  Gets a setting value from the cache with a default value if not found.
+  
+  ## Examples
+  
+      iex> get_cached_setting("mfa_required", false)
+      true
+      
+      iex> get_cached_setting("nonexistent", "default")
+      "default"
+  """
+  def get_cached_setting(key, default) when is_binary(key) do
+    get_value(key, default)
+  end
+  
+  @doc """
+  Clears all cached settings.
+  """
+  def clear_cache do
+    if :ets.info(@ets_table) != :undefined do
+      :ets.delete_all_objects(@ets_table)
+    end
+    :ok
+  end
+  
+  @doc """
+  Upserts (creates or updates) a setting.
+  
+  ## Examples
+  
+      iex> upsert_setting(%{key: "theme", value: "dark"})
+      {:ok, %Setting{}}
+  
+  """
+  def upsert_setting(attrs) when is_map(attrs) do
+    key = Map.get(attrs, :key) || Map.get(attrs, "key")
+    
+    if key do
+      case get_setting_by_key(key) do
+        nil -> create_setting(attrs)
+        setting -> update_setting(setting, attrs)
+      end
+    else
+      {:error, "Key is required"}
     end
   end
 

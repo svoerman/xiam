@@ -93,8 +93,9 @@ defmodule XIAMWeb.Admin.RolesLive do
   def handle_event("show_edit_capability_modal", %{"id" => id}, socket) do
     capability = Repo.get(Capability, id)
     capability_changeset = Capability.changeset(capability, %{
-      capability_name: capability.capability_name,
-      description: capability.description
+      name: capability.name,
+      description: capability.description,
+      product_id: capability.product_id
     })
     {:noreply, assign(socket,
       show_capability_modal: true,

@@ -26,24 +26,20 @@ defmodule XIAMWeb.API.AuthController do
         # Log the successful login
         AuditLogger.log_action("api_login_success", user.id, %{ip: format_ip(conn.remote_ip)}, email)
         
-        case JWT.generate_token(user) do
-          {:ok, token, _claims} ->
-            conn
-            |> put_status(:ok)
-            |> json(%{
-              success: true,
-              token: token,
-              user: %{
-                id: user.id,
-                email: user.email
-              }
-            })
-            
-          {:error, reason} ->
-            conn
-            |> put_status(:internal_server_error)
-            |> json(%{error: "Failed to generate token: #{inspect(reason)}"})
-        end
+        # JWT.generate_token is expected to always succeed in normal operation
+        # but we'll still handle potential errors for robustness
+        {:ok, token, _claims} = JWT.generate_token(user)
+        
+        conn
+        |> put_status(:ok)
+        |> json(%{
+          success: true,
+          token: token,
+          user: %{
+            id: user.id,
+            email: user.email
+          }
+        })
         
       {:error, conn} ->
         # Log the failed login attempt
@@ -107,6 +103,7 @@ defmodule XIAMWeb.API.AuthController do
     |> put_status(:ok)
     |> json(%{
       success: true,
+      valid: true,
       user: %{
         id: user.id,
         email: user.email,

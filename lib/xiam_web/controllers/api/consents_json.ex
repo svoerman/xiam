@@ -9,7 +9,7 @@ defmodule XIAMWeb.API.ConsentsJSON do
   """
   def index(%{consents: consents, page_info: page_info}) do
     %{
-      data: for(consent <- consents, do: data(consent)),
+      consents: for(consent <- consents, do: data(consent)),
       page_info: page_info
     }
   end
@@ -18,7 +18,7 @@ defmodule XIAMWeb.API.ConsentsJSON do
   Renders a single consent.
   """
   def show(%{consent: consent}) do
-    %{data: data(consent)}
+    %{consent: data(consent)}
   end
 
   defp data(%ConsentRecord{} = consent) do

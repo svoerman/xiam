@@ -259,8 +259,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                             <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
                           </div>
                           <.button 
-                            variant="outline" 
-                            size="sm" 
+                            class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
                             phx-click="show_edit_modal" 
                             phx-value-section="oauth" 
                             phx-value-key={key}
@@ -296,8 +295,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
                             <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
                           </div>
                           <.button 
-                            variant="outline" 
-                            size="sm" 
+                            class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
                             phx-click="show_edit_modal" 
                             phx-value-section="oauth" 
                             phx-value-key={key}
@@ -323,16 +321,15 @@ defmodule XIAMWeb.Admin.SettingsLive do
                           <h3 class="font-medium"><%= format_key(key) %></h3>
                           <p class="text-sm text-muted-foreground"><%= format_value(key, value) %></p>
                         </div>
-                        <.button 
-                          variant="outline" 
-                          size="sm" 
+                        <button 
+                          class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           phx-click="show_edit_modal" 
                           phx-value-section="mfa" 
                           phx-value-key={key}
                         >
                           <.icon name="hero-pencil-square" class="h-4 w-4" />
                           <span class="ml-1">Edit</span>
-                        </.button>
+                        </button>
                       </div>
                     <% end %>
                   </div>
@@ -350,16 +347,15 @@ defmodule XIAMWeb.Admin.SettingsLive do
                           <h3 class="font-medium"><%= format_key(key) %></h3>
                           <p class="text-sm text-muted-foreground"><%= format_value(key, value) %></p>
                         </div>
-                        <.button 
-                          variant="outline" 
-                          size="sm" 
+                        <button 
+                          class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                           phx-click="show_edit_modal" 
                           phx-value-section="security" 
                           phx-value-key={key}
                         >
                           <.icon name="hero-pencil-square" class="h-4 w-4" />
                           <span class="ml-1">Edit</span>
-                        </.button>
+                        </button>
                       </div>
                     <% end %>
                   </div>
@@ -409,12 +405,19 @@ defmodule XIAMWeb.Admin.SettingsLive do
               </div>
 
               <div class="flex justify-end mt-6">
-                <.button variant="outline" type="button" phx-click="close_modal" class="mr-3">
+                <button 
+                  type="button" 
+                  phx-click="close_modal"
+                  class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 mr-3 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
                   Cancel
-                </.button>
-                <.button type="submit">
+                </button>
+                <button 
+                  type="submit"
+                  class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
                   Save
-                </.button>
+                </button>
               </div>
             </.form>
           </div>

@@ -19,10 +19,10 @@ defmodule XIAMWeb.API.ControllerHelpers do
   """
   def pagination_info(page) do
     %{
-      page: page.page_number,
+      page: page.page || page.page_number,
       per_page: page.page_size,
-      total_pages: page.total_pages,
-      total_entries: page.total_entries
+      total_pages: page.total_pages || page.total_count,
+      total_entries: page.total_count
     }
   end
 
@@ -40,10 +40,17 @@ defmodule XIAMWeb.API.ControllerHelpers do
   Adds common request metadata to params (IP, user agent).
   """
   def add_request_metadata(conn, params) do
+    # Format IP address properly for both tuples and other formats
+    ip_string = format_ip_address(conn.remote_ip)
+    
     params
-    |> Map.put("ip_address", to_string(conn.remote_ip))
+    |> Map.put("ip_address", ip_string)
     |> Map.put("user_agent", get_user_agent(conn))
   end
+  
+  # Format IP address tuple to string
+  defp format_ip_address(ip) when is_tuple(ip), do: ip |> Tuple.to_list() |> Enum.join(".")
+  defp format_ip_address(ip), do: to_string(ip)
 
   @doc """
   Safely parses an integer with fallback.

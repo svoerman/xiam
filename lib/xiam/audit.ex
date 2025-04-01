@@ -73,7 +73,16 @@ defmodule XIAM.Audit do
   """
   def log_action(action, actor, resource_type, resource_id \\ nil, metadata \\ %{}, conn \\ nil) do
     ip_address = if conn, do: conn.remote_ip |> Tuple.to_list() |> Enum.join("."), else: nil
-    user_agent = if conn, do: get_in(conn.req_headers, ["user-agent"]), else: nil
+    
+    # Extract user agent from req_headers list of tuples
+    user_agent = if conn && conn.req_headers do
+      Enum.find_value(conn.req_headers, fn 
+        {"user-agent", value} -> value
+        _ -> nil
+      end)
+    else
+      nil
+    end
 
     actor_id = case actor do
       %{id: id} -> id
@@ -86,6 +95,18 @@ defmodule XIAM.Audit do
       _ -> "system"
     end
 
+    # Ensure metadata is an Elixir map with atom keys for test compatibility
+    metadata = if is_map(metadata) do 
+      metadata 
+      |> Enum.map(fn 
+        {key, value} when is_binary(key) -> {String.to_atom(key), value}
+        {key, value} -> {key, value}
+      end)
+      |> Map.new()
+    else 
+      %{}
+    end
+    
     create_audit_log(%{
       action: action,
       actor_id: actor_id,
@@ -110,5 +131,31 @@ defmodule XIAM.Audit do
   """
   def list_distinct_resource_types do
     Repo.all(from a in AuditLog, select: a.resource_type, distinct: true)
+  end
+  
+  @doc """
+  Deletes audit logs older than the specified date.
+  
+  ## Examples
+  
+      iex> delete_logs_older_than(~U[2023-01-01 00:00:00Z])
+      {5, nil}
+  
+  """
+  def delete_logs_older_than(%DateTime{} = date) do
+    Repo.delete_all(from log in AuditLog, where: log.inserted_at < ^date)
+  end
+  
+  @doc """
+  Logs a system action without a specific actor.
+  
+  ## Examples
+  
+      iex> log_system_action("system_startup", %{version: "1.0.0"})
+      {:ok, %AuditLog{}}
+  
+  """
+  def log_system_action(action, metadata \\ %{}) do
+    log_action(action, :system, "system", nil, metadata)
   end
 end

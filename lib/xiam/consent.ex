@@ -78,6 +78,13 @@ defmodule XIAM.Consent do
 
   """
   def create_consent_record(attrs \\ %{}, actor \\ nil, conn \\ nil) do
+    # Add user_id from actor if not provided in attrs
+    attrs = if actor && Map.get(actor, :id) && !Map.has_key?(attrs, :user_id) && !Map.has_key?(attrs, "user_id") do
+      Map.put(attrs, "user_id", actor.id)
+    else
+      attrs
+    end
+    
     result =
       %ConsentRecord{}
       |> ConsentRecord.changeset(attrs)
