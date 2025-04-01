@@ -3,6 +3,7 @@ defmodule XIAMWeb.API.ConsentsController do
   alias XIAM.Consent
   alias XIAM.Consent.ConsentRecord
   alias XIAMWeb.Plugs.APIAuthorizePlug
+  alias XIAMWeb.API.ControllerHelpers
 
   action_fallback XIAMWeb.FallbackController
 
@@ -17,11 +18,17 @@ defmodule XIAMWeb.API.ConsentsController do
   """
   def index(conn, params) do
     current_user = conn.assigns.current_user
-    
-    # Check if user has admin rights to view all consents
     has_admin_rights = APIAuthorizePlug.has_capability?(current_user, :admin_consents)
     
-    filters = %{}
+    # Define allowed filters and their parsers
+    allowed_filters = [
+      {"consent_type", :consent_type, :string},
+      {"consent_given", :consent_given, :boolean},
+      {"active_only", :active_only, :boolean}
+    ]
+    
+    # Build filters from params
+    filters = ControllerHelpers.build_filters(params, allowed_filters)
     
     # Non-admin users can only see their own consents
     filters = unless has_admin_rights do
@@ -34,39 +41,11 @@ defmodule XIAMWeb.API.ConsentsController do
       end
     end
     
-    # Add consent_type filter if provided
-    filters = case params do
-      %{"consent_type" => consent_type} -> Map.put(filters, :consent_type, consent_type)
-      _ -> filters
-    end
-    
-    # Add consent_given filter if provided
-    filters = case params do
-      %{"consent_given" => "true"} -> Map.put(filters, :consent_given, true)
-      %{"consent_given" => "false"} -> Map.put(filters, :consent_given, false)
-      _ -> filters
-    end
-
-    # Add active_only filter if provided
-    filters = case params do
-      %{"active_only" => "true"} -> Map.put(filters, :active_only, true)
-      _ -> filters
-    end
-    
-    # Get page parameters
-    page = Map.get(params, "page", "1") |> String.to_integer()
-    per_page = Map.get(params, "per_page", "20") |> String.to_integer()
-    page_params = %{page: page, per_page: per_page}
-    
     # Get paginated consent records
+    page_params = ControllerHelpers.pagination_params(params)
     page = Consent.list_consent_records(filters, page_params)
     
-    render(conn, :index, consents: page.entries, page_info: %{
-      page: page.page_number,
-      per_page: page.page_size,
-      total_pages: page.total_pages,
-      total_entries: page.total_entries
-    })
+    render(conn, :index, consents: page.entries, page_info: ControllerHelpers.pagination_info(page))
   end
 
   @doc """
@@ -74,11 +53,7 @@ defmodule XIAMWeb.API.ConsentsController do
   """
   def create(conn, %{"consent" => consent_params}) do
     current_user = conn.assigns.current_user
-    
-    # Add IP address and user agent information
-    consent_params = consent_params
-      |> Map.put("ip_address", to_string(conn.remote_ip))
-      |> Map.put("user_agent", get_user_agent(conn))
+    consent_params = ControllerHelpers.add_request_metadata(conn, consent_params)
     
     with {:ok, %ConsentRecord{} = consent} <- Consent.create_consent_record(consent_params, current_user, conn) do
       render(conn, :show, consent: consent)
@@ -91,11 +66,7 @@ defmodule XIAMWeb.API.ConsentsController do
   def update(conn, %{"id" => id, "consent" => consent_params}) do
     current_user = conn.assigns.current_user
     consent = Consent.get_consent_record!(id)
-    
-    # Add IP address and user agent information
-    consent_params = consent_params
-      |> Map.put("ip_address", to_string(conn.remote_ip))
-      |> Map.put("user_agent", get_user_agent(conn))
+    consent_params = ControllerHelpers.add_request_metadata(conn, consent_params)
     
     with {:ok, %ConsentRecord{} = updated_consent} <- Consent.update_consent_record(consent, consent_params, current_user, conn) do
       render(conn, :show, consent: updated_consent)
@@ -112,13 +83,5 @@ defmodule XIAMWeb.API.ConsentsController do
     with {:ok, %ConsentRecord{}} <- Consent.revoke_consent(consent, current_user, conn) do
       send_resp(conn, :no_content, "")
     end
-  end
-
-  # Get the user agent from request headers
-  defp get_user_agent(conn) do
-    Enum.find_value(conn.req_headers, fn
-      {"user-agent", value} -> value
-      _ -> nil
-    end)
   end
 end

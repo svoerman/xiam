@@ -241,31 +241,36 @@ defmodule XIAMWeb.Admin.SettingsLive do
                 <div class="mb-8">
                   <div class="flex justify-between items-center mb-2">
                     <h3 class="text-md font-medium text-foreground">GitHub</h3>
-                    <div class={"px-2 py-1 rounded text-xs font-medium #{if @settings["oauth"]["github_enabled"] == "true", do: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300", else: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"}"}>
+                    <span class={
+                      @settings["oauth"]["github_enabled"] == "true" 
+                      && "inline-flex items-center rounded-full border border-transparent bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success"
+                      || "inline-flex items-center rounded-full border border-transparent bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive"
+                    }>
                       <%= if @settings["oauth"]["github_enabled"] == "true", do: "Enabled", else: "Disabled" %>
-                    </div>
+                    </span>
                   </div>
 
-                  <div class="overflow-hidden rounded-md border border-border">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        <%= for key <- ["github_enabled", "github_client_id", "github_client_secret"] do %>
-                          <tr>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <div class="text-sm font-medium text-foreground"><%= format_key(key) %></div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <div class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button phx-click="show_edit_modal" phx-value-section="oauth" phx-value-key={key} class="text-primary hover:text-primary/80 transition-colors">
-                                Edit
-                              </button>
-                            </td>
-                          </tr>
-                        <% end %>
-                      </tbody>
-                    </table>
+                  <div class="bg-card rounded-lg border border-border">
+                    <div class="divide-y divide-border">
+                      <%= for key <- ["github_enabled", "github_client_id", "github_client_secret"] do %>
+                        <div class="p-4 flex items-center justify-between">
+                          <div>
+                            <h3 class="font-medium"><%= format_key(key) %></h3>
+                            <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
+                          </div>
+                          <.button 
+                            variant="outline" 
+                            size="sm" 
+                            phx-click="show_edit_modal" 
+                            phx-value-section="oauth" 
+                            phx-value-key={key}
+                          >
+                            <.icon name="hero-pencil-square" class="h-4 w-4" />
+                            <span class="ml-1">Edit</span>
+                          </.button>
+                        </div>
+                      <% end %>
+                    </div>
                   </div>
                 </div>
 
@@ -273,31 +278,36 @@ defmodule XIAMWeb.Admin.SettingsLive do
                 <div>
                   <div class="flex justify-between items-center mb-2">
                     <h3 class="text-md font-medium text-foreground">Google</h3>
-                    <div class={"px-2 py-1 rounded text-xs font-medium #{if @settings["oauth"]["google_enabled"] == "true", do: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300", else: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"}"}>
+                    <span class={
+                      @settings["oauth"]["google_enabled"] == "true" 
+                      && "inline-flex items-center rounded-full border border-transparent bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success"
+                      || "inline-flex items-center rounded-full border border-transparent bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive"
+                    }>
                       <%= if @settings["oauth"]["google_enabled"] == "true", do: "Enabled", else: "Disabled" %>
-                    </div>
+                    </span>
                   </div>
 
-                  <div class="overflow-hidden rounded-md border border-border">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <tbody class="bg-white divide-y divide-gray-200">
-                        <%= for key <- ["google_enabled", "google_client_id", "google_client_secret"] do %>
-                          <tr>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <div class="text-sm font-medium text-foreground"><%= format_key(key) %></div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                              <div class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <button phx-click="show_edit_modal" phx-value-section="oauth" phx-value-key={key} class="text-primary hover:text-primary/80 transition-colors">
-                                Edit
-                              </button>
-                            </td>
-                          </tr>
-                        <% end %>
-                      </tbody>
-                    </table>
+                  <div class="bg-card rounded-lg border border-border">
+                    <div class="divide-y divide-border">
+                      <%= for key <- ["google_enabled", "google_client_id", "google_client_secret"] do %>
+                        <div class="p-4 flex items-center justify-between">
+                          <div>
+                            <h3 class="font-medium"><%= format_key(key) %></h3>
+                            <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
+                          </div>
+                          <.button 
+                            variant="outline" 
+                            size="sm" 
+                            phx-click="show_edit_modal" 
+                            phx-value-section="oauth" 
+                            phx-value-key={key}
+                          >
+                            <.icon name="hero-pencil-square" class="h-4 w-4" />
+                            <span class="ml-1">Edit</span>
+                          </.button>
+                        </div>
+                      <% end %>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -305,52 +315,54 @@ defmodule XIAMWeb.Admin.SettingsLive do
             <% "mfa" -> %>
               <div>
                 <h2 class="text-lg font-medium text-foreground mb-4">Multi-Factor Authentication Settings</h2>
-                <div class="overflow-hidden rounded-md border border-gray-200">
-                  <table class="min-w-full divide-y divide-border">
-                    <tbody class="bg-background divide-y divide-border">
-                      <%= for {key, value} <- @settings["mfa"] do %>
-                        <tr>
-                          <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-foreground"><%= format_key(key) %></div>
-                          </td>
-                          <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-muted-foreground"><%= format_value(key, value) %></div>
-                          </td>
-                          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button phx-click="show_edit_modal" phx-value-section="mfa" phx-value-key={key} class="text-blue-600 hover:text-blue-900">
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      <% end %>
-                    </tbody>
-                  </table>
+                <div class="bg-card rounded-lg border border-border">
+                  <div class="divide-y divide-border">
+                    <%= for {key, value} <- @settings["mfa"] do %>
+                      <div class="p-4 flex items-center justify-between">
+                        <div>
+                          <h3 class="font-medium"><%= format_key(key) %></h3>
+                          <p class="text-sm text-muted-foreground"><%= format_value(key, value) %></p>
+                        </div>
+                        <.button 
+                          variant="outline" 
+                          size="sm" 
+                          phx-click="show_edit_modal" 
+                          phx-value-section="mfa" 
+                          phx-value-key={key}
+                        >
+                          <.icon name="hero-pencil-square" class="h-4 w-4" />
+                          <span class="ml-1">Edit</span>
+                        </.button>
+                      </div>
+                    <% end %>
+                  </div>
                 </div>
               </div>
 
             <% "security" -> %>
               <div>
                 <h2 class="text-lg font-medium text-foreground mb-4">Security Settings</h2>
-                <div class="overflow-hidden rounded-md border border-gray-200">
-                  <table class="min-w-full divide-y divide-border">
-                    <tbody class="bg-background divide-y divide-border">
-                      <%= for {key, value} <- @settings["security"] do %>
-                        <tr>
-                          <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-foreground"><%= format_key(key) %></div>
-                          </td>
-                          <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-muted-foreground"><%= format_value(key, value) %></div>
-                          </td>
-                          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button phx-click="show_edit_modal" phx-value-section="security" phx-value-key={key} class="text-blue-600 hover:text-blue-900">
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      <% end %>
-                    </tbody>
-                  </table>
+                <div class="bg-card rounded-lg border border-border">
+                  <div class="divide-y divide-border">
+                    <%= for {key, value} <- @settings["security"] do %>
+                      <div class="p-4 flex items-center justify-between">
+                        <div>
+                          <h3 class="font-medium"><%= format_key(key) %></h3>
+                          <p class="text-sm text-muted-foreground"><%= format_value(key, value) %></p>
+                        </div>
+                        <.button 
+                          variant="outline" 
+                          size="sm" 
+                          phx-click="show_edit_modal" 
+                          phx-value-section="security" 
+                          phx-value-key={key}
+                        >
+                          <.icon name="hero-pencil-square" class="h-4 w-4" />
+                          <span class="ml-1">Edit</span>
+                        </.button>
+                      </div>
+                    <% end %>
+                  </div>
                 </div>
               </div>
           <% end %>
@@ -397,12 +409,12 @@ defmodule XIAMWeb.Admin.SettingsLive do
               </div>
 
               <div class="flex justify-end mt-6">
-                <button type="button" phx-click="close_modal" class="mr-3 px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <.button variant="outline" type="button" phx-click="close_modal" class="mr-3">
                   Cancel
-                </button>
-                <button type="submit" class="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                </.button>
+                <.button type="submit">
                   Save
-                </button>
+                </.button>
               </div>
             </.form>
           </div>

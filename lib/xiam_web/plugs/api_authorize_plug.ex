@@ -4,52 +4,50 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlug do
   Checks if the authenticated user has the required capability to access the endpoint.
   """
   
-  import Plug.Conn
-  import Phoenix.Controller
+  alias XIAMWeb.Plugs.AuthHelpers
   
   @doc """
-  Initialize the plug with the required capability.
+  Initialize the plug with the required capability or options map.
   """
-  def init(capability) when is_binary(capability) or is_atom(capability), do: capability
-  def init(_), do: raise(ArgumentError, "capability must be a string or atom")
+  def init(opts) when is_list(opts) do
+    # Support for options list with capability key
+    case Keyword.get(opts, :capability) do
+      nil -> raise ArgumentError, "capability must be specified in options"
+      capability -> %{capability: capability}
+    end
+  end
+  
+  def init(capability) when is_binary(capability) or is_atom(capability) do
+    %{capability: capability}
+  end
+  
+  def init(_), do: raise(ArgumentError, "capability must be a string, atom, or options keyword list")
   
   @doc """
   Checks if the user has the required capability.
   If not, returns 403 Forbidden.
   """
-  def call(conn, required_capability) do
+  def call(conn, %{capability: required_capability}) do
     required_capability = if is_atom(required_capability), do: Atom.to_string(required_capability), else: required_capability
     
     case conn.assigns[:current_user] do
       nil ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Authentication required"})
-        |> halt()
+        AuthHelpers.unauthorized_response(conn, "Authentication required")
         
       user ->
         if has_capability?(user, required_capability) do
           conn
         else
-          conn
-          |> put_status(:forbidden)
-          |> json(%{error: "Insufficient permissions"})
-          |> halt()
+          AuthHelpers.forbidden_response(conn, "Insufficient permissions")
         end
     end
   end
   
   @doc """
   Checks if a user has a specific capability based on their role.
-  This function is public so it can be called from controllers.
+  Delegates to AuthHelpers for centralized authorization logic.
   """
   def has_capability?(user, required_capability) do
-    case user.role do
-      nil -> false
-      role ->
-        Enum.any?(role.capabilities, fn capability -> 
-          capability.name == required_capability
-        end)
-    end
+    AuthHelpers.has_capability?(user, required_capability)
   end
 end

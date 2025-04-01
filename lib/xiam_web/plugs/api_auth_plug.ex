@@ -5,10 +5,8 @@ defmodule XIAMWeb.Plugs.APIAuthPlug do
   """
   
   import Plug.Conn
-  import Phoenix.Controller
   
-  alias XIAM.Auth.JWT
-  alias XIAM.Repo
+  alias XIAMWeb.Plugs.AuthHelpers
   
   @doc """
   Initialize the plug options.
@@ -21,55 +19,31 @@ defmodule XIAMWeb.Plugs.APIAuthPlug do
   If token is invalid or missing, returns 401 Unauthorized.
   """
   def call(conn, _opts) do
-    with {:ok, token} <- extract_token(conn),
-         {:ok, claims} <- JWT.verify_token(token),
-         {:ok, user} <- JWT.get_user_from_claims(claims) do
-      # Preload the role and capabilities for authorization checks
-      user = user |> Repo.preload(role: :capabilities)
-      
+    with {:ok, token} <- AuthHelpers.extract_token(conn),
+         {:ok, user, claims} <- AuthHelpers.verify_jwt_token(token) do
       conn
       |> assign(:current_user, user)
       |> assign(:jwt_claims, claims)
     else
       {:error, :token_not_found} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Authorization header missing or invalid"})
-        |> halt()
+        AuthHelpers.unauthorized_response(conn, "Authorization header missing or invalid")
         
       {:error, :invalid_token_format} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Invalid token format"})
-        |> halt()
+        AuthHelpers.unauthorized_response(conn, "Invalid token format")
         
       {:error, :user_not_found} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "User not found"})
-        |> halt()
+        AuthHelpers.unauthorized_response(conn, "User not found")
         
       _error ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Invalid token"})
-        |> halt()
+        AuthHelpers.unauthorized_response(conn, "Invalid token")
     end
   end
   
-  # Extracts the JWT token from the Authorization header.
-  # Expected format: "Bearer <token>"
-  #
-  # Returns:
-  # - {:ok, token} if token is found and correctly formatted
-  # - {:error, :token_not_found} if token is missing
-  # - {:error, :invalid_token_format} if token format is invalid
-  defp extract_token(conn) do
-    case get_req_header(conn, "authorization") do
-      ["Bearer " <> token] -> {:ok, token}
-      ["bearer " <> token] -> {:ok, token}
-      [] -> {:error, :token_not_found}
-      _ -> {:error, :invalid_token_format}
-    end
+  @doc """
+  Checks if a user has a specific capability.
+  Delegate to AuthHelpers to maintain consistent authorization logic.
+  """
+  def has_capability?(user, capability) do
+    AuthHelpers.has_capability?(user, capability)
   end
 end
