@@ -11,15 +11,17 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlug do
   """
   def init(opts) when is_list(opts) do
     # Support for options list with capability key
-    case Keyword.get(opts, :capability) do
-      nil -> raise ArgumentError, "capability must be specified in options"
-      capability -> %{capability: capability}
-    end
+    capability = Keyword.get(opts, :capability)
+    %{capability: capability}
   end
   
   def init(capability) when is_binary(capability) or is_atom(capability) do
     %{capability: capability}
   end
+  
+  # Support for auth-only mode (no capability check, just authenticated)
+  def init(nil), do: %{capability: nil}
+  def init([]), do: %{capability: nil}
   
   def init(_), do: raise(ArgumentError, "capability must be a string, atom, or options keyword list")
   
@@ -28,17 +30,23 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlug do
   If not, returns 403 Forbidden.
   """
   def call(conn, %{capability: required_capability}) do
-    required_capability = if is_atom(required_capability), do: Atom.to_string(required_capability), else: required_capability
-    
     case conn.assigns[:current_user] do
       nil ->
         AuthHelpers.unauthorized_response(conn, "Authentication required")
         
       user ->
-        if has_capability?(user, required_capability) do
+        # If no capability is required, just check authentication
+        if required_capability == nil do
           conn
         else
-          AuthHelpers.forbidden_response(conn, "Insufficient permissions")
+          # Convert atom to string if needed
+          capability = if is_atom(required_capability), do: Atom.to_string(required_capability), else: required_capability
+          
+          if has_capability?(user, capability) do
+            conn
+          else
+            AuthHelpers.forbidden_response(conn, "Insufficient permissions")
+          end
         end
     end
   end

@@ -76,9 +76,13 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlugTest do
       assert result == %{capability: "test_capability"}
     end
 
+    test "init/1 handles empty list as auth-only mode" do
+      result = APIAuthorizePlug.init([])
+      assert result == %{capability: nil}
+    end
+    
     test "init/1 raises error for invalid input" do
       assert_raise ArgumentError, fn -> APIAuthorizePlug.init(123) end
-      assert_raise ArgumentError, fn -> APIAuthorizePlug.init([]) end
     end
   end
 
@@ -87,6 +91,14 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlugTest do
       # Call the plug with a capability the user has
       conn = APIAuthorizePlug.call(conn, %{capability: "test_capability"})
 
+      # Verify the connection is not halted
+      refute conn.halted
+    end
+    
+    test "allows authenticated requests in auth-only mode", %{conn: conn} do
+      # Call the plug with no capability requirement
+      conn = APIAuthorizePlug.call(conn, %{capability: nil})
+      
       # Verify the connection is not halted
       refute conn.halted
     end

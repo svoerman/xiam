@@ -151,11 +151,24 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
   end
 
   # Format datetime for display
-  defp format_datetime(datetime) do
+  defp format_datetime(nil), do: ""
+  
+  # Handle DateTime (has timezone)
+  defp format_datetime(%DateTime{} = datetime) do
     datetime
     |> DateTime.truncate(:second)
     |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
   end
+  
+  # Handle NaiveDateTime (no timezone)
+  defp format_datetime(%NaiveDateTime{} = datetime) do
+    datetime
+    |> NaiveDateTime.truncate(:second)
+    |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+  end
+  
+  # Fallback for other types
+  defp format_datetime(_), do: ""
 
   # Format user info
   defp format_user(nil), do: "Unknown"
@@ -434,7 +447,10 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
 
               <div class="mb-4">
                 <div class="text-sm font-medium text-muted-foreground mb-1">Consent Details</div>
-                <div class="break-words text-foreground"><%= @selected_record.consent_text || "N/A" %></div>
+                <div class="break-words text-foreground">
+                  <strong>Type:</strong> <%= @selected_record.consent_type %><br>
+                  <strong>Status:</strong> <%= if @selected_record.consent_given, do: "Granted", else: "Denied" %>
+                </div>
               </div>
             </div>
 
