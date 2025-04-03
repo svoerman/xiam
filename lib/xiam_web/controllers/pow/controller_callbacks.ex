@@ -12,7 +12,7 @@ defmodule XIAMWeb.Pow.ControllerCallbacks do
 
     if is_admin?(user) do
       Logger.info("Admin user logged in: #{user.email}")
-      
+
       {:ok, conn
       |> Phoenix.Controller.put_flash(:info, "Welcome to the admin panel!")
       |> Phoenix.Controller.redirect(to: "/admin")}
@@ -26,8 +26,8 @@ defmodule XIAMWeb.Pow.ControllerCallbacks do
   end
 
   defp is_admin?(user) do
-    user.role != nil && 
-    user.role.name == "Administrator" && 
+    user.role != nil &&
+    user.role.name == "Administrator" &&
     Enum.any?(user.role.capabilities || [], &(&1.name == "admin_access"))
   end
 end
