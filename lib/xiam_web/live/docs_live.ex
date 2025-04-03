@@ -233,6 +233,86 @@ defmodule XIAMWeb.DocsLive do
         </.card_content>
       </.card>
 
+      <%!-- Admin Dashboard Section --%>
+      <.card>
+        <.card_header>
+          <.card_title id="admin-dashboard">Admin Dashboard</.card_title>
+          <.card_description>
+            The XIAM Admin Dashboard provides comprehensive tools for managing your CIAM system.
+          </.card_description>
+        </.card_header>
+        <.card_content class="space-y-6 text-base">
+          <p class="text-lg leading-relaxed">
+            The XIAM Admin Dashboard is your central hub for managing all aspects of your identity and access management system. Organized into nine distinct sections, it provides a comprehensive suite of tools designed to give you complete control over your CIAM implementation.
+          </p>
+
+          <div class="space-y-8">
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">User Management</h3>
+              <p class="text-muted-foreground">
+                The User Management section serves as your primary interface for handling user accounts and their associated settings. Here, you can oversee all aspects of user administration, from basic account management to advanced security configurations. This includes managing user roles, enabling or disabling multi-factor authentication, and monitoring user activity patterns.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">Roles & Capabilities</h3>
+              <p class="text-muted-foreground">
+                In the Roles & Capabilities section, you'll find powerful tools for defining and managing your application's access control structure. This is where you create and configure roles, define specific capabilities, and establish the relationships between them. The intuitive interface allows you to quickly set up complex permission hierarchies while maintaining clear visibility of your access control structure.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">Entity Access</h3>
+              <p class="text-muted-foreground">
+                The Entity Access section provides fine-grained control over resource-level permissions. This powerful feature enables you to implement detailed access rules for specific entities within your application. Whether you need to restrict access to particular data sets or create complex permission scenarios, this section gives you the tools to implement precise access control policies.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">Products & Capabilities</h3>
+              <p class="text-muted-foreground">
+                Manage your application's products and their associated capabilities in this dedicated section. Here, you can define product boundaries, establish capability mappings, and configure access control settings specific to each product. This organizational structure helps maintain clear separation between different parts of your application while ensuring consistent access control management.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">GDPR Compliance</h3>
+              <p class="text-muted-foreground">
+                The GDPR Compliance section provides essential tools for managing user data in accordance with privacy regulations. This includes comprehensive data portability features, consent management tools, and data anonymization capabilities. The section also includes tracking and reporting features to help you maintain compliance with data protection requirements.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">System Settings</h3>
+              <p class="text-muted-foreground">
+                Configure your system's core settings in this centralized section. From authentication parameters to OAuth provider configurations, this is where you manage the fundamental aspects of your XIAM implementation. The interface provides clear organization of settings while maintaining flexibility for complex configurations.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">Audit Logs</h3>
+              <p class="text-muted-foreground">
+                The Audit Logs section offers comprehensive visibility into system activities and user actions. With advanced filtering and search capabilities, you can quickly locate specific events or analyze patterns of activity. The export functionality allows you to maintain detailed records for compliance and security purposes.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">System Status</h3>
+              <p class="text-muted-foreground">
+                Monitor your system's health and performance in real-time through the System Status section. This dashboard provides immediate visibility into cluster node status, background job processing, and overall system metrics. The intuitive interface helps you quickly identify and address any potential issues.
+              </p>
+            </div>
+
+            <div class="bg-muted/50 p-6 rounded-lg">
+              <h3 class="text-xl font-semibold mb-3">Consent Records</h3>
+              <p class="text-muted-foreground">
+                Manage user consent records efficiently in this dedicated section. From configuring consent types to tracking consent history, this tool helps you maintain compliance with data protection regulations. The interface provides clear visibility of consent status and includes reporting features for compliance documentation.
+              </p>
+            </div>
+          </div>
+        </.card_content>
+      </.card>
+
     </div>
     """
   end
