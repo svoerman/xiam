@@ -87,9 +87,10 @@ defmodule XIAM.MixProject do
       {:cors_plug, "~> 3.0"},
       {:plug_cowboy, "~> 2.7", [hex: :plug_cowboy, repo: "hexpm", optional: false]},
       {:mock, "~> 0.3.7", only: :test},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
 
       # API documentation
-      
+
       # Test coverage
       {:excoveralls, "~> 0.18", only: :test}
     ]

@@ -12,7 +12,7 @@ defmodule XIAM.GDPR.DataPortability do
   """
   def export_user_data(user_id) when is_integer(user_id) do
     user = Repo.get!(User, user_id) |> Repo.preload([:role, :user_identities])
-    
+
     # Basic user data (excluding sensitive fields)
     user_data = %{
       id: user.id,
@@ -22,7 +22,7 @@ defmodule XIAM.GDPR.DataPortability do
       mfa_enabled: user.mfa_enabled,
       role: user.role && %{id: user.role.id, name: user.role.name}
     }
-    
+
     # Get consent records
     consents = Consent.get_user_consents(user_id)
     consent_data = Enum.map(consents, fn consent ->
@@ -33,7 +33,7 @@ defmodule XIAM.GDPR.DataPortability do
         revoked_at: consent.revoked_at
       }
     end)
-    
+
     # Get social identities (from PowAssent)
     identities_data = Enum.map(user.user_identities, fn identity ->
       %{
@@ -43,7 +43,7 @@ defmodule XIAM.GDPR.DataPortability do
         updated_at: identity.updated_at
       }
     end)
-    
+
     # Combine all data into a single structure
     %{
       user: user_data,
@@ -51,7 +51,7 @@ defmodule XIAM.GDPR.DataPortability do
       identities: identities_data
     }
   end
-  
+
   @doc """
   Exports user data as a JSON file and returns the path to the file.
   The file is created in the tmp directory with a unique name.
@@ -59,15 +59,19 @@ defmodule XIAM.GDPR.DataPortability do
   def export_user_data_to_file(user_id) do
     data = export_user_data(user_id)
     json = Jason.encode!(data, pretty: true)
-    
-    file_name = "user_data_export_#{user_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.json"
-    path = Path.join(System.tmp_dir!(), file_name)
-    
+
+    # Generate a filename based on user ID and timestamp
+    base_file_name = "user_data_export_#{user_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.json"
+    # Sanitize the filename to prevent potential directory traversal issues
+    safe_file_name = String.replace(base_file_name, ["/", "\\"], "_")
+
+    path = Path.join(System.tmp_dir!(), safe_file_name)
+
     File.write!(path, json)
-    
+
     # Log this action for audit purposes
-    XIAM.Jobs.AuditLogger.log_action("data_export", user_id, %{file_name: file_name}, "N/A")
-    
+    XIAM.Jobs.AuditLogger.log_action("data_export", user_id, %{file_name: safe_file_name}, "N/A")
+
     {:ok, path}
   end
 end

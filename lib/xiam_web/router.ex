@@ -19,6 +19,7 @@ defmodule XIAMWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug :put_secure_browser_headers
   end
 
   pipeline :skip_csrf_protection do
