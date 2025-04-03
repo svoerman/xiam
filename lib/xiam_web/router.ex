@@ -20,6 +20,7 @@ defmodule XIAMWeb.Router do
   pipeline :api do
     plug :accepts, ["json"]
     plug :put_secure_browser_headers
+    # PlugAttack needs different integration method
   end
 
   pipeline :skip_csrf_protection do

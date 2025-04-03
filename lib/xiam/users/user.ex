@@ -11,7 +11,7 @@ defmodule XIAM.Users.User do
     field :mfa_enabled, :boolean, default: false
     field :mfa_secret, :binary
     field :mfa_backup_codes, {:array, :string}
-    
+
     # Data retention fields
     field :last_sign_in_at, :utc_datetime
     field :anonymized, :boolean, default: false
@@ -41,10 +41,21 @@ defmodule XIAM.Users.User do
   def role_changeset(user_or_changeset, attrs) do
     user_or_changeset
     |> cast(attrs, [:role_id])
+    |> validate_role_exists()
     |> foreign_key_constraint(:role_id)
   end
 
   # Private functions
+
+  defp validate_role_exists(changeset) do
+    role_id = get_change(changeset, :role_id)
+
+    if role_id && is_nil(XIAM.Repo.get(Xiam.Rbac.Role, role_id)) do
+      add_error(changeset, :role_id, "does not exist")
+    else
+      changeset
+    end
+  end
 
   defp validate_mfa_fields(changeset) do
     changeset
@@ -69,19 +80,18 @@ defmodule XIAM.Users.User do
   @doc """
   Checks if a user has a specific capability.
   Accepts capability name as either a string or atom.
+  Assumes the user's role has already been preloaded by the caller.
   """
   def has_capability?(%__MODULE__{} = user, capability_name) do
-    user = XIAM.Repo.preload(user, :role)
-    
-    # Convert capability name to string if it's an atom
     capability_name = if is_atom(capability_name), do: Atom.to_string(capability_name), else: capability_name
 
     case user.role do
       nil -> false
+      # Delegate to Role.has_capability?, assuming role has capabilities preloaded
       role -> Xiam.Rbac.Role.has_capability?(role, capability_name)
     end
   end
-  
+
   def has_capability?(nil, _capability_name), do: false
 
   @doc """

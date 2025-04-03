@@ -36,6 +36,11 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
+# Configure JWT settings for testing
+config :xiam,
+  jwt_signing_key: "t3st_s3cr3t_k3y_d1ff3r3nt_fr0m_d3v_and_pr0d",
+  jwt_token_expiry: 3600 # Short expiry for tests (1 hour)
+
 # Add coverage configuration
 config :xiam, :test_coverage,
   ignore_modules: [
@@ -45,14 +50,14 @@ config :xiam, :test_coverage,
   ]
 
 # Configure coverage tools
-config :excoveralls, 
+config :excoveralls,
   clear_cover: true,
   skip_files: [
     "test/support/",
     "_build/",
     "deps/"
   ]
-  
+
 # Configure Oban for testing - completely disable it to avoid ownership errors
 config :oban,
   testing: :manual,

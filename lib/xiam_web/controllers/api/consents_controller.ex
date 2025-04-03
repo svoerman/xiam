@@ -4,14 +4,16 @@ defmodule XIAMWeb.API.ConsentsController do
   alias XIAM.Consent.ConsentRecord
   alias XIAMWeb.Plugs.APIAuthorizePlug
   alias XIAMWeb.API.ControllerHelpers
+  alias XIAMWeb.Plugs.AuthHelpers # Needed for manual capability check
 
   action_fallback XIAMWeb.FallbackController
 
-  # Only require manage_consents capability for admin actions
-  # Regular users can create/manage their own consents without special permissions
-  plug APIAuthorizePlug, [capability: :manage_consents] when action in [:delete]
-  # Allow authenticated users to view their own consents
-  plug APIAuthorizePlug when action in [:index, :create, :update]
+  # Apply authorization plugs with specific capabilities
+  # Allow any authenticated user to attempt these actions,
+  # ownership/admin checks happen within the action.
+  plug APIAuthorizePlug, nil when action in [:index, :create, :update]
+  # Deletion requires a specific capability checked by the plug
+  plug APIAuthorizePlug, :delete_consent when action in [:delete]
 
   @doc """
   List consent records with optional filtering.
@@ -19,19 +21,20 @@ defmodule XIAMWeb.API.ConsentsController do
   """
   def index(conn, params) do
     current_user = conn.assigns.current_user
-    has_admin_rights = APIAuthorizePlug.has_capability?(current_user, :admin_consents)
-    
+    # Use AuthHelpers for consistency
+    has_admin_rights = AuthHelpers.has_capability?(current_user, :admin_consents)
+
     # Define allowed filters and their parsers
     allowed_filters = [
       {"consent_type", :consent_type, :string},
       {"consent_given", :consent_given, :boolean},
       {"active_only", :active_only, :boolean}
     ]
-    
+
     # Build filters from params
     filters = ControllerHelpers.build_filters(params, allowed_filters)
-    
-    # Non-admin users can only see their own consents
+
+    # Apply user scoping unless admin
     filters = unless has_admin_rights do
       Map.put(filters, :user_id, current_user.id)
     else
@@ -41,32 +44,25 @@ defmodule XIAMWeb.API.ConsentsController do
         _ -> filters
       end
     end
-    
-    # Get paginated consent records
+
+    # Get paginated consent records using original context function
     page_params = ControllerHelpers.pagination_params(params)
     page = Consent.list_consent_records(filters, page_params)
-    
+
     render(conn, :index, consents: page.entries, page_info: ControllerHelpers.pagination_info(page))
   end
 
   @doc """
   Create a new consent record.
   """
-  # Handle both formats: with or without "consent" wrapper
   def create(conn, %{"consent" => consent_params}) do
     do_create(conn, consent_params)
   end
-  
-  # Catch-all clause for any other parameter format
-  def create(conn, params) do
-    # Debug the incoming parameters
-    IO.inspect(params, label: "Received params in create")
-    
-    # Determine if we have consent fields at the top level
+
+def create(conn, params) do
     if is_map(params) && (Map.has_key?(params, "consent_type") || Map.has_key?(params, "consent_given")) do
       do_create(conn, params)
     else
-      # Return helpful error with the actual params received
       conn
       |> put_status(:bad_request)
       |> json(%{
@@ -76,62 +72,41 @@ defmodule XIAMWeb.API.ConsentsController do
       })
     end
   end
-  
-  # Private function that handles the actual consent creation
-  defp do_create(conn, consent_params) do
+
+defp do_create(conn, consent_params) do
     current_user = conn.assigns.current_user
-    
-    # Check if user is trying to create a consent for another user
-    has_admin_rights = APIAuthorizePlug.has_capability?(current_user, :admin_consents) || 
-                     APIAuthorizePlug.has_capability?(current_user, :manage_consents)
+
+    # Re-introduce ownership check: Users can only create for self unless admin
+    has_admin_rights = AuthHelpers.has_capability?(current_user, :admin_consents) ||
+                     AuthHelpers.has_capability?(current_user, :manage_consents)
+    # Call local helper function
     specified_user_id = get_user_id_from_params(consent_params)
-    
+
     if specified_user_id && specified_user_id != current_user.id && !has_admin_rights do
-      conn
-      |> put_status(:forbidden)
-      |> json(%{error: "You can only create consent records for yourself"})
+      AuthHelpers.forbidden_response(conn, "You can only create consent records for yourself")
     else
-      # Ensure consent is created for current user by explicitly setting the user_id
-      consent_params = consent_params 
-                      |> Map.put("user_id", current_user.id)
-      
-      # Add request metadata (IP address, user agent)
-      consent_params = ControllerHelpers.add_request_metadata(conn, consent_params)
-      
-      with {:ok, %ConsentRecord{} = consent} <- Consent.create_consent_record(consent_params, current_user, conn) do
+      # Ensure consent is created for current user if not specified or if admin creating for someone
+      user_id_to_set = specified_user_id || current_user.id
+      # Add metadata: Call helper directly, passing conn first
+      consent_params_with_metadata = ControllerHelpers.add_request_metadata(conn, consent_params)
+      consent_params_final = Map.put(consent_params_with_metadata, "user_id", user_id_to_set)
+
+      # Use original context function
+      with {:ok, %ConsentRecord{} = consent} <- Consent.create_consent_record(consent_params_final) do
         render(conn, :show, consent: consent)
       end
-    end
-  end
-  
-  # Helper function to safely extract user_id from params
-  defp get_user_id_from_params(params) do
-    user_id = params["user_id"] || params[:user_id]
-    case user_id do
-      nil -> nil
-      id when is_binary(id) -> 
-        case Integer.parse(id) do
-          {parsed_id, _} -> parsed_id
-          :error -> nil
-        end
-      id when is_integer(id) -> id
-      _ -> nil
     end
   end
 
   @doc """
   Update a consent record.
   """
-  # Handle params with "consent" wrapper
   def update(conn, %{"id" => id, "consent" => consent_params}) do
     do_update(conn, id, consent_params)
   end
-  
-  # Handle direct params (without "consent" wrapper)
-  def update(conn, %{"id" => id} = params) do
-    # Remove the ID from params to get just the consent parameters
+
+def update(conn, %{"id" => id} = params) do
     consent_params = Map.drop(params, ["id"])
-    # Only proceed if there are consent params left
     if map_size(consent_params) > 0 do
       do_update(conn, id, consent_params)
     else
@@ -140,24 +115,22 @@ defmodule XIAMWeb.API.ConsentsController do
       |> json(%{error: "Missing consent parameters"})
     end
   end
-  
-  # Private function that handles the actual update
-  defp do_update(conn, id, consent_params) do
+
+defp do_update(conn, id, consent_params) do
     current_user = conn.assigns.current_user
+    # Fetch consent record first to check ownership (use bang version)
     consent = Consent.get_consent_record!(id)
-    
-    # Ensure users can only modify their own consents unless they have admin rights
-    has_admin_rights = APIAuthorizePlug.has_capability?(current_user, :admin_consents) || 
-                     APIAuthorizePlug.has_capability?(current_user, :manage_consents)
-    
+    # Re-introduce ownership check
+    has_admin_rights = AuthHelpers.has_capability?(current_user, :admin_consents) ||
+                        AuthHelpers.has_capability?(current_user, :manage_consents)
+
     if consent.user_id != current_user.id && !has_admin_rights do
-      conn
-      |> put_status(:forbidden)
-      |> json(%{error: "You can only modify your own consent records"})
+      AuthHelpers.forbidden_response(conn, "You can only modify your own consent records")
     else
       consent_params = ControllerHelpers.add_request_metadata(conn, consent_params)
-      
-      with {:ok, %ConsentRecord{} = updated_consent} <- Consent.update_consent_record(consent, consent_params, current_user, conn) do
+
+      # Use original context function
+      with {:ok, %ConsentRecord{} = updated_consent} <- Consent.update_consent_record(consent, consent_params) do
         render(conn, :show, consent: updated_consent)
       end
     end
@@ -165,13 +138,33 @@ defmodule XIAMWeb.API.ConsentsController do
 
   @doc """
   Delete (revoke) a consent record.
+  Requires :delete_consent capability (checked by plug).
+  Ownership check might still be needed depending on capability granularity.
   """
   def delete(conn, %{"id" => id}) do
-    current_user = conn.assigns.current_user
+    # Assuming for now :delete_consent is admin-level.
+    # Use bang version to fetch or raise
     consent = Consent.get_consent_record!(id)
-    
-    with {:ok, %ConsentRecord{}} <- Consent.revoke_consent(consent, current_user, conn) do
+    # Use original context function
+    with {:ok, %ConsentRecord{}} <- Consent.revoke_consent(consent) do
       send_resp(conn, :no_content, "")
     end
+  end
+
+  # Helper function to safely extract user_id from params
+  defp get_user_id_from_params(params) when is_map(params) do
+    user_id = params["user_id"] || params[:user_id]
+    case user_id do
+      nil -> nil
+      id when is_binary(id) ->
+        case Integer.parse(id) do
+          {parsed_id, _} -> parsed_id
+          :error -> nil
+        end
+      id when is_integer(id) -> id
+      _ -> nil
+    end
+  rescue
+    _ -> nil # Return nil on any error during extraction
   end
 end

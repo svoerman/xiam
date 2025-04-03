@@ -1,6 +1,10 @@
 defmodule XIAMWeb.API.SystemController do
   use XIAMWeb, :controller
   alias XIAM.System.Health
+  alias XIAMWeb.Plugs.APIAuthorizePlug
+
+  # Apply authorization plug for the status action
+  plug APIAuthorizePlug, :view_system_status when action in [:status]
 
   @doc """
   Get the system health status.
@@ -27,16 +31,16 @@ defmodule XIAMWeb.API.SystemController do
     # This action is protected by the APIAuthPlug and APIAuthorizePlug
     # so only authenticated users with proper capabilities can access it
     health_data = Health.check_health()
-    
+
     # Convert memory values to MB for better readability
-    memory_data = Map.new(health_data.memory, fn {k, v} -> 
+    memory_data = Map.new(health_data.memory, fn {k, v} ->
       case is_integer(v) do
         true -> {k, Float.round(v / 1_048_576, 2)}
         false -> {k, v} # Keep original value if not a number
       end
     end)
     health_data = Map.put(health_data, :memory, memory_data)
-    
+
     json(conn, health_data)
   end
 end

@@ -51,7 +51,14 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+  # Fetch JWT signing secret from environment
+  jwt_signing_key =
+    System.get_env("JWT_SIGNING_SECRET") ||
+      raise "environment variable JWT_SIGNING_SECRET is missing"
+
   config :xiam, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  config :xiam, :jwt_signing_key, jwt_signing_key
 
   config :xiam, XIAMWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
@@ -65,7 +72,16 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base,
     # Force SSL for increased security, includes HSTS
-    force_ssl: [hsts: true]
+    force_ssl: [hsts: true],
+    # Configure session options for production
+    session: [
+      secure: true, # Ensure cookie is only sent over HTTPS
+      same_site: "Lax" # Inherit other settings like key, max_age, http_only from config.exs unless overridden
+    ],
+    plug_session: [
+      secure: true,
+      same_site: "Lax"
+    ]
 
   # ## SSL Support
   #

@@ -92,7 +92,11 @@ defmodule XIAM.MixProject do
       # API documentation
 
       # Test coverage
-      {:excoveralls, "~> 0.18", only: :test}
+      {:excoveralls, "~> 0.18", only: :test},
+
+      # Security
+      {:plug_attack, "~> 0.4.3"},
+      {:uuid, "~> 1.1"}
     ]
   end
 

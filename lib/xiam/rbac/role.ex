@@ -93,9 +93,9 @@ defmodule Xiam.Rbac.Role do
 
   @doc """
   Checks if a role has a specific capability.
+  Assumes the role's capabilities have already been preloaded by the caller.
   """
   def has_capability?(%__MODULE__{} = role, capability_name) when is_binary(capability_name) do
-    role = XIAM.Repo.preload(role, :capabilities)
     Enum.any?(role.capabilities, fn capability ->
       capability.name == capability_name
     end)

@@ -5,12 +5,20 @@ defmodule XIAMWeb.API.UsersController do
   """
 
   use XIAMWeb, :controller
+  alias XIAMWeb.Plugs.APIAuthorizePlug
 
   alias XIAM.Users.User
   alias Xiam.Rbac.Role
   alias XIAM.Repo
   alias XIAM.Jobs.AuditLogger
   import Ecto.Query
+
+  # Apply authorization plug with capabilities for specific actions
+  plug APIAuthorizePlug, :list_users when action in [:index]
+  plug APIAuthorizePlug, :view_user when action in [:show]
+  plug APIAuthorizePlug, :create_user when action in [:create]
+  plug APIAuthorizePlug, :update_user when action in [:update]
+  plug APIAuthorizePlug, :delete_user when action in [:delete]
 
   @doc """
   Lists all users with optional pagination and filtering.

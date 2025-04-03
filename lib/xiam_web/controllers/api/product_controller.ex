@@ -1,6 +1,11 @@
 defmodule XIAMWeb.API.ProductController do
   use XIAMWeb, :controller
   alias Xiam.Rbac.AccessControl
+  alias XIAMWeb.Plugs.APIAuthorizePlug
+
+  # Apply authorization plugs with specific capabilities
+  plug APIAuthorizePlug, :list_products when action in [:index]
+  plug APIAuthorizePlug, :create_product when action in [:create]
 
   def index(conn, _params) do
     products = AccessControl.list_products()

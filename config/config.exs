@@ -39,7 +39,20 @@ config :xiam, XIAMWeb.Endpoint,
     same_site: "Lax",
     secure: false,
     http_only: true
-  ]
+  ],
+  # Configure secure browser headers, including Content-Security-Policy (CSP)
+  secure_browser_headers: %{
+    # Recommended starting point - review and adjust based on application needs
+    "content-security-policy" => "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' wss: ws:; object-src 'none'; frame-ancestors 'none';",
+    # Other headers (defaults are usually good, but can be customized here too)
+    # "strict-transport-security" => "max-age=31536000",
+    # "x-content-type-options" => "nosniff",
+    # "x-download-options" => "noopen",
+    # "x-frame-options" => "SAMEORIGIN",
+    # "x-permitted-cross-domain-policies" => "none",
+    # "x-xss-protection" => "1; mode=block",
+    # "referrer-policy" => "no-referrer"
+  }
 
 # Configures the mailer
 #
@@ -135,6 +148,20 @@ config :xiam, :pow_assent,
       client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),
       strategy: Assent.Strategy.Google
     ]
+  ]
+
+# Configure PlugAttack rate limiting
+config :plug_attack,
+  backend: PlugAttack.Storage.Ets,
+  rule_sets: [
+    # Throttle API login attempts
+    %{
+      match: fn conn -> conn.method == "POST" and conn.request_path == "/api/auth/login" end,
+      limit: 5,
+      period: 60_000, # milliseconds (1 minute)
+      identifier: fn conn -> {PlugAttack.Identifier.ip_address(conn), :api_login} end
+    }
+    # Add more rules here for other endpoints if needed
   ]
 
 # Import environment specific config. This must remain at the bottom

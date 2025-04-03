@@ -5,6 +5,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
   alias XIAM.Consent.ConsentRecord
   alias XIAM.Repo
   alias XIAM.Auth.JWT
+  alias XIAM.Rbac.ProductContext # Alias for product context (Corrected casing)
 
   setup %{conn: conn} do
     # Explicitly ensure repo is available
@@ -15,19 +16,21 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
         {:ok, _} = XIAM.Repo.start_link([])
         # Set sandbox mode
         Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      _ -> 
+      _ ->
         :ok
     end
-    
+
     # Generate a unique timestamp for this test run
     timestamp = System.system_time(:second)
-    
+
     # Clean up existing test data
     import Ecto.Query
     Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Consent_Product_%"))
     Repo.delete_all(from r in Xiam.Rbac.Role, where: like(r.name, "%Consent_Admin_%"))
     Repo.delete_all(from u in User, where: like(u.email, "%api_consent_test%"))
-    
+    # Clean up capabilities too
+    Repo.delete_all(from c in Xiam.Rbac.Capability, where: like(c.name, "%_consents%"))
+
     # Create a test user with admin capability
     email = "api_consent_test_#{timestamp}@example.com"
     {:ok, user} = %User{}
@@ -48,33 +51,32 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
 
     # Create a product to associate capabilities with
     product_name = "Test_Consent_Product_#{timestamp}"
-    {:ok, product} = Xiam.Rbac.Product.changeset(%Xiam.Rbac.Product{}, %{
+    {:ok, product} = ProductContext.create_product(%{
       product_name: product_name,
       description: "Test product for API tests"
-    }) |> Repo.insert()
-    
-    # Add capabilities to the role (with correct product association)
-    capabilities = [
-      %Xiam.Rbac.Capability{name: "manage_consents", description: "Can manage consents", product_id: product.id},
-      %Xiam.Rbac.Capability{name: "read_consents", description: "Can read consents", product_id: product.id},
-      %Xiam.Rbac.Capability{name: "admin_consents", description: "Admin capabilities for consents", product_id: product.id}
+    })
+
+    # Add capabilities (including delete_consent), associating with product
+    capabilities_to_create = [
+      %{product_id: product.id, name: "manage_consents", description: "Can manage consents"},
+      %{product_id: product.id, name: "list_consents", description: "Can list consents"},
+      %{product_id: product.id, name: "create_consent", description: "Can create consents"},
+      %{product_id: product.id, name: "update_consent", description: "Can update consents"},
+      %{product_id: product.id, name: "delete_consent", description: "Can delete consents"},
+      %{product_id: product.id, name: "admin_consents", description: "Admin capabilities for consents"}
     ]
-    
-    # Insert capabilities
-    capability_ids = Enum.map(capabilities, fn cap -> 
-      {:ok, cap} = Repo.insert(cap)
-      cap.id
+
+    capabilities = Enum.map(capabilities_to_create, fn cap_attrs ->
+      {:ok, cap} = Xiam.Rbac.create_capability(cap_attrs)
+      cap
     end)
-    
-    # Get the capabilities
-    capabilities = Enum.map(capability_ids, &Xiam.Rbac.Capability.get_capability!/1)
-    
-    # Associate capabilities with role
-    role
-    |> Repo.preload(:capabilities)
-    |> Ecto.Changeset.change()
-    |> Ecto.Changeset.put_assoc(:capabilities, capabilities)
-    |> Repo.update!()
+
+    # Associate capabilities with role using put_assoc
+    {:ok, role} = role
+      |> Repo.preload(:capabilities) # Preload existing if needed, though likely empty
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.put_assoc(:capabilities, capabilities)
+      |> Repo.update()
 
     # Assign role to user
     {:ok, user} = user
@@ -129,6 +131,9 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
           data_source: "API test"
         }
       }
+
+      # Manually set remote_ip for the test connection
+      conn = %{conn | remote_ip: {127, 0, 0, 1}}
 
       conn = post(conn, ~p"/api/consents", consent_params)
 

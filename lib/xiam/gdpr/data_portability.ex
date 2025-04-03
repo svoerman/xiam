@@ -5,6 +5,7 @@ defmodule XIAM.GDPR.DataPortability do
   alias XIAM.Users.User
   alias XIAM.GDPR.Consent
   alias XIAM.Repo
+  alias UUID
 
   @doc """
   Exports all data related to a user in JSON format.
@@ -60,17 +61,20 @@ defmodule XIAM.GDPR.DataPortability do
     data = export_user_data(user_id)
     json = Jason.encode!(data, pretty: true)
 
-    # Generate a filename based on user ID and timestamp
-    base_file_name = "user_data_export_#{user_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.json"
-    # Sanitize the filename to prevent potential directory traversal issues
-    safe_file_name = String.replace(base_file_name, ["/", "\\"], "_")
-
+    # Generate a secure, unpredictable filename using UUID
+    uuid = UUID.uuid4()
+    safe_file_name = "user_data_export_#{uuid}.json"
     path = Path.join(System.tmp_dir!(), safe_file_name)
 
     File.write!(path, json)
 
-    # Log this action for audit purposes
-    XIAM.Jobs.AuditLogger.log_action("data_export", user_id, %{file_name: safe_file_name}, "N/A")
+    # Log this action for audit purposes, including original user_id and generated filename
+    XIAM.Jobs.AuditLogger.log_action(
+      "data_export",
+      user_id,
+      %{file_name: safe_file_name, export_uuid: uuid},
+      "N/A"
+    )
 
     {:ok, path}
   end

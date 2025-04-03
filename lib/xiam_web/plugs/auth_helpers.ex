@@ -6,7 +6,7 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
 
   import Plug.Conn
   import Phoenix.Controller
-  
+
   alias XIAM.Auth.JWT
   alias XIAM.Repo
   alias XIAM.Users.User
@@ -14,7 +14,7 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
   @doc """
   Extracts the JWT token from the Authorization header.
   Expected format: "Bearer <token>"
-  
+
   Returns:
   - {:ok, token} if token is found and correctly formatted
   - {:error, :token_not_found} if token is missing
@@ -31,7 +31,7 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
 
   @doc """
   Verifies a JWT token and returns the associated user.
-  
+
   Returns:
   - {:ok, user} if token is valid and user is found
   - {:error, reason} if token verification fails or user not found
@@ -47,7 +47,7 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
 
   @doc """
   Checks if a user has a specific capability.
-  
+
   Returns:
   - true if user has the capability
   - false if user does not have the capability or user is nil
@@ -59,24 +59,32 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
 
   @doc """
   Checks if a user has admin privileges.
-  
+
   Returns:
   - true if user has admin privileges
   - false if user does not have admin privileges or user is nil
   """
   def has_admin_privileges?(nil), do: false
   def has_admin_privileges?(%User{} = user) do
-    user = user |> Repo.preload(role: :capabilities)
+    # Check the direct admin flag first for efficiency
+    if user.admin do
+      true
+    else
+      # If not directly admin, check role capabilities (preloading if necessary)
+      user =
+        if Ecto.assoc_loaded?(user.role) and Ecto.assoc_loaded?(user.role.capabilities) do
+          user
+        else
+          user |> Repo.preload(role: :capabilities)
+        end
 
-    # User has admin privileges if:
-    # 1. They have a role with admin capability
-    # 2. They have been specifically granted admin access
-    case user.role do
-      nil -> false
-      %Xiam.Rbac.Role{} = role ->
-        Enum.any?(role.capabilities, fn %Xiam.Rbac.Capability{} = capability ->
-          capability.name == "admin_access"
-        end)
+      case user.role do
+        nil -> false
+        %Xiam.Rbac.Role{} = role ->
+          Enum.any?(role.capabilities, fn %Xiam.Rbac.Capability{} = capability ->
+            capability.name == "admin_access"
+          end)
+      end
     end
   end
 

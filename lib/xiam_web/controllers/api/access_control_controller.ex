@@ -2,6 +2,16 @@ defmodule XIAMWeb.API.AccessControlController do
   use XIAMWeb, :controller
   alias Xiam.Rbac.AccessControl
   alias XIAM.Repo
+  alias XIAMWeb.Plugs.APIAuthorizePlug
+
+  # Apply authorization plugs with specific capabilities
+  plug APIAuthorizePlug, :manage_access when action in [:set_user_access]
+  plug APIAuthorizePlug, :view_access when action in [:get_user_access]
+  # create_product and list_products seem to be handled by ProductController now, remove if redundant
+  # plug APIAuthorizePlug, :manage_products when action in [:create_product]
+  # plug APIAuthorizePlug, :view_products when action in [:list_products]
+  plug APIAuthorizePlug, :manage_capabilities when action in [:create_capability]
+  plug APIAuthorizePlug, :view_capabilities when action in [:get_product_capabilities]
 
   def set_user_access(conn, %{"user_id" => user_id, "entity_type" => entity_type, "entity_id" => entity_id, "role" => role}) do
     # Get role ID from role name

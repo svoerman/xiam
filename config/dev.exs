@@ -84,7 +84,12 @@ config :phoenix_live_view,
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
-# Configure Joken for JWT token signing
+# Configure JWT settings for development
+config :xiam,
+  jwt_signing_key: "d3v_s3cr3t_k3y_th@t_1s_d1ff3r3nt_fr0m_pr0d",
+  jwt_token_expiry: 3600 * 24 * 7 # Allow longer expiry in dev (7 days)
+
+# Configure Joken for JWT token signing (NOTE: This is currently unused by XIAM.Auth.JWT)
 config :joken, default_signer: [
   signer_alg: "HS256",
   key_octet: "8n7jD++V6KLSs4qGRX1S/AlCATiv0fP9cziGirflKQ8ckN2ywEIRSICkYVH+k/Me"
