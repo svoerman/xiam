@@ -3,12 +3,12 @@ defmodule XIAMWeb.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     # Remove JSON accept header and use HTML instead for this test
-    conn = 
+    conn =
       conn
       |> delete_req_header("accept")
       |> put_req_header("accept", "text/html")
       |> get(~p"/")
-      
-    assert html_response(conn, 200) =~ "XIAM Admin"
+
+    assert html_response(conn, 200) =~ "Customer Identity and Access Management Platform"
   end
 end

@@ -34,7 +34,7 @@ defmodule XIAMWeb.DocsLive do
     ~H"""
     <div class="container mx-auto px-4 py-8 bg-background text-foreground space-y-8">
       <%!-- Page Header with Back Link --%>
-      <div class="mb-6"> <%# Removed border-b, adjusted mb if needed %>
+      <div class="mb-6"> <% # Removed border-b, adjusted mb if needed %>
         <%!-- Back Link styled like admin_header --%>
         <a
           href="#"

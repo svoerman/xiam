@@ -89,6 +89,11 @@ defmodule XIAMWeb.Admin.GDPRLive do
     {:noreply, assign(socket, theme: new_theme)}
   end
 
+  def handle_event("validate_consent", _params, socket) do
+    # Just return the socket unchanged since we don't need validation logic
+    {:noreply, socket}
+  end
+
   def handle_event("export_user_data", _, socket) do
     user = socket.assigns.selected_user
 
@@ -310,8 +315,9 @@ defmodule XIAMWeb.Admin.GDPRLive do
       <div id="modal-container" class="modal-container">
         <!-- Export Data Modal -->
         <%= if @show_export_modal do %>
-          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50" phx-click="close_modal">
-            <div class="bg-card rounded-lg shadow-lg max-w-4xl w-full mx-auto p-6 border border-border">
+          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="absolute inset-0" phx-click="close_modal"></div>
+            <div class="bg-card rounded-lg shadow-lg max-w-4xl w-full mx-auto p-6 border border-border relative z-10" phx-window-keydown="close_modal" phx-key="escape">
               <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-medium">User Data Export</h3>
                 <button phx-click="close_modal" class="text-muted-foreground hover:text-foreground rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-ring">
@@ -353,8 +359,9 @@ defmodule XIAMWeb.Admin.GDPRLive do
 
         <!-- Consent Management Modal -->
         <%= if @show_consent_modal do %>
-          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50" phx-click="close_modal">
-            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border">
+          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="absolute inset-0" phx-click="close_modal"></div>
+            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border relative z-10" phx-window-keydown="close_modal" phx-key="escape">
               <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-medium">Manage User Consent</h3>
                 <button phx-click="close_modal" class="text-muted-foreground hover:text-foreground rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-ring">
@@ -436,8 +443,9 @@ defmodule XIAMWeb.Admin.GDPRLive do
 
         <!-- Anonymize User Modal -->
         <%= if @show_anonymize_modal do %>
-          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50" phx-click="close_modal">
-            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border">
+          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="absolute inset-0" phx-click="close_modal"></div>
+            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border relative z-10" phx-window-keydown="close_modal" phx-key="escape">
               <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-medium text-warning">Anonymize User Data</h3>
                 <button phx-click="close_modal" class="text-muted-foreground hover:text-foreground rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-ring">
@@ -495,8 +503,9 @@ defmodule XIAMWeb.Admin.GDPRLive do
 
         <!-- Delete User Modal -->
         <%= if @show_delete_modal do %>
-          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50" phx-click="close_modal">
-            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border">
+          <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="absolute inset-0" phx-click="close_modal"></div>
+            <div class="bg-card rounded-lg shadow-lg max-w-md w-full mx-auto p-6 border border-border relative z-10" phx-window-keydown="close_modal" phx-key="escape">
               <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-medium text-destructive">Delete User</h3>
                 <button phx-click="close_modal" class="text-muted-foreground hover:text-foreground rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-ring">
