@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/svoerman/xiam/main/priv/static/images/logo_for_dark_bg.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/svoerman/xiam/main/priv/static/images/logo_for_light_bg.png">
-    <img alt="XIAM Logo" src="https://raw.githubusercontent.com/svoerman/xiam/main/priv/static/images/logo_for_light_bg.png" width="256">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo_for_dark_bg.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/logo_for_light_bg.png">
+    <img alt="XIAM Logo" src="docs/images/logo_for_light_bg.png" width="256">
   </picture>
 </p>
 
