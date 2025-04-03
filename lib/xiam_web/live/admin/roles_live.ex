@@ -108,9 +108,12 @@ defmodule XIAMWeb.Admin.RolesLive do
   def handle_event("close_modal", _, socket) do
     {:noreply, assign(socket,
       show_modal: false,
+      show_capability_modal: false,
       form_mode: nil,
       selected_role: nil,
-      role_changeset: nil
+      role_changeset: nil,
+      selected_capability: nil,
+      capability_changeset: nil
     )}
   end
 

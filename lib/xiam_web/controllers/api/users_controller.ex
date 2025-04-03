@@ -130,7 +130,7 @@ defmodule XIAMWeb.API.UsersController do
 
     current_user = conn.assigns.current_user
 
-    # Create user with Pow
+    # Create user with Pow (revert to create/2)
     case Pow.Ecto.Context.create(User, user_params) do
       {:ok, user} ->
         # Log the user creation
@@ -184,7 +184,7 @@ defmodule XIAMWeb.API.UsersController do
         # Handle role_id specially
         {role_id, user_params} = Map.pop(user_params, "role_id")
 
-        # Update basic user fields with Pow
+        # Update basic user fields with Pow (revert to update/3)
         case Pow.Ecto.Context.update(User, user, user_params) do
           {:ok, updated_user} ->
             # Update role if provided and valid
