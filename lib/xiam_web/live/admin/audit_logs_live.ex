@@ -41,12 +41,13 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
   
   @impl true
   def handle_event("filter", %{"filter" => filter_params}, socket) do
+    # Normalize empty strings to nil
     filter = %{
-      action: filter_params["action"],
-      user_id: filter_params["user_id"],
-      date_from: filter_params["date_from"],
-      date_to: filter_params["date_to"],
-      search: filter_params["search"]
+      action: normalize_param(filter_params["action"]),
+      user_id: normalize_param(filter_params["user_id"]),
+      date_from: normalize_param(filter_params["date_from"]),
+      date_to: normalize_param(filter_params["date_to"]),
+      search: normalize_param(filter_params["search"])
     }
     
     {:noreply, socket
@@ -57,6 +58,7 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
   def handle_event("clear_filters", _, socket) do
     filter = %{
       action: nil,
+      actor_id: nil,
       user_id: nil,
       date_from: nil,
       date_to: nil,
@@ -150,13 +152,24 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
   
   # Format datetime for display
   defp format_datetime(datetime) do
-    datetime
-    |> DateTime.truncate(:second)
-    |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+    # Handle both NaiveDateTime and DateTime
+    case datetime do
+      %NaiveDateTime{} ->
+        Calendar.strftime(datetime, "%Y-%m-%d %H:%M:%S")
+      %DateTime{} ->
+        datetime
+        |> DateTime.truncate(:second)
+        |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+      _ ->
+        "Invalid datetime"
+    end
   end
 
     # Theme is now handled by the app layout
   
+  # Helper to normalize parameters
+  defp normalize_param(""), do: nil
+  defp normalize_param(param), do: param
   @impl true
   def render(assigns) do
     ~H"""
@@ -193,7 +206,7 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
                 <select name="filter[user_id]" class="block w-full p-2 bg-background border border-input rounded-md shadow-sm text-foreground focus:ring-2 focus:ring-primary/25 focus:border-primary">
                   <option value="">All Users</option>
                   <%= for {email, id} <- available_users() do %>
-                    <option value={id} selected={@filter.user_id == "#{id}"}>
+                    <option value={id} selected={Map.get(@filter, :user_id) == "#{id}"}>
                       <%= email %>
                     </option>
                   <% end %>
@@ -276,7 +289,7 @@ defmodule XIAMWeb.Admin.AuditLogsLive do
                     </span>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                    <%= if log.user_email, do: log.user_email, else: "System" %>
+                    <%= if log.actor, do: log.actor.email, else: "System" %>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <%= log.ip_address || "-" %>

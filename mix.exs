@@ -9,7 +9,25 @@ defmodule XIAM.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      # Add the test coverage configuration
+      test_coverage: [
+        tool: ExCoveralls,
+        output_dir: "cover/",
+        ignore_modules: [
+          ~r/XIAMWeb\..*Test/,
+          ~r/XIAM\..*Test/,
+          ~r/.*_meck_original/,
+          XIAM.ObanTestHelper
+        ]
+      ],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ]
     ]
   end
 
@@ -71,6 +89,9 @@ defmodule XIAM.MixProject do
       {:mock, "~> 0.3.7", only: :test},
 
       # API documentation
+      
+      # Test coverage
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 
@@ -85,7 +106,10 @@ defmodule XIAM.MixProject do
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      # Customize the test runner to manage coverage better
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "coveralls"],
+      # Add a separate alias for full coverage report
+      "test.coverage": ["ecto.create --quiet", "ecto.migrate --quiet", "coveralls.html"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind xiam", "esbuild xiam"],
       "assets.deploy": [

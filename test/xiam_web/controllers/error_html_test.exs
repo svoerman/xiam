@@ -11,4 +11,12 @@ defmodule XIAMWeb.ErrorHTMLTest do
   test "renders 500.html" do
     assert render_to_string(XIAMWeb.ErrorHTML, "500", "html", []) == "Internal Server Error"
   end
+  
+  test "renders 403.html" do
+    assert render_to_string(XIAMWeb.ErrorHTML, "403", "html", []) == "Forbidden"
+  end
+
+  test "handles other status codes" do
+    assert render_to_string(XIAMWeb.ErrorHTML, "422", "html", []) == "Unprocessable Entity"
+  end
 end

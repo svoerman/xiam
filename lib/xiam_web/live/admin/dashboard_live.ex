@@ -5,6 +5,13 @@ defmodule XIAMWeb.Admin.DashboardLive do
   def mount(_params, _session, socket) do
     {:ok, assign(socket, page_title: "Admin Dashboard")}
   end
+  
+  # Add a helper function to expose page title for testing
+  def page_title(assigns) do
+    ~H"""
+    <span data-test-id="page-title"><%= @page_title %></span>
+    """
+  end
 
   @impl true
   def handle_event("toggle_theme", _, socket) do
@@ -15,11 +22,14 @@ defmodule XIAMWeb.Admin.DashboardLive do
   def render(assigns) do
     ~H"""
     <div class="container mx-auto px-4 py-8">
-      <.admin_header
-        title="XIAM Admin Dashboard"
-        subtitle="Manage your CIAM system including users, roles, and permissions"
-        show_back_link={false}
-      />
+      <div class="admin-header">
+        <.admin_header
+          title="XIAM Admin Dashboard"
+          subtitle="Manage your CIAM system including users, roles, and permissions"
+          show_back_link={false}
+        />
+      </div>
+      <.page_title page_title={@page_title} />
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Users Management Card -->

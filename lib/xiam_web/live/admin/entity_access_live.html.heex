@@ -77,6 +77,10 @@
   
   <:content>
     <.form :let={f} for={@access_changeset} phx-submit="save_access" id="access-form" class="space-y-6" phx-window-keydown="close_modal" phx-key="escape">
+      <!-- Hidden ID field for edits -->
+      <%= if @form_mode == :edit_access do %>
+        <input type="hidden" name="entity_access[id]" value={f[:id].value} />
+      <% end %>
       <div class="space-y-2">
         <label for={f[:user_id].id} class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
           User ID
@@ -89,7 +93,7 @@
           autofocus
           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
-        <.error :for={msg <- f[:user_id].errors}><%= msg %></.error>
+        <.error :for={{msg, _opts} <- f[:user_id].errors}><%= msg %></.error>
       </div>
 
       <div class="space-y-2">
@@ -103,7 +107,7 @@
           required
           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
-        <.error :for={msg <- f[:entity_type].errors}><%= msg %></.error>
+        <.error :for={{msg, _opts} <- f[:entity_type].errors}><%= msg %></.error>
       </div>
 
       <div class="space-y-2">
@@ -117,7 +121,7 @@
           required
           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
-        <.error :for={msg <- f[:entity_id].errors}><%= msg %></.error>
+        <.error :for={{msg, _opts} <- f[:entity_id].errors}><%= msg %></.error>
       </div>
 
       <div class="space-y-2">
@@ -137,7 +141,7 @@
             </option>
           <% end %>
         </select>
-        <.error :for={msg <- f[:role_id].errors}><%= msg %></.error>
+        <.error :for={{msg, _opts} <- f[:role_id].errors}><%= msg %></.error>
       </div>
     </.form>
   </:content>

@@ -27,8 +27,24 @@ defmodule Xiam.Rbac.AccessControlTest do
       product_name = "Test_Product_#{timestamp}"
       capability_name = "test_capability_#{timestamp}"
       
-      # Clear any test data that might interfere
+      # Register a teardown function to clean up test data
+      on_exit(fn -> 
+        import Ecto.Query
+        # First delete entity access records
+        Repo.delete_all(from ea in Xiam.Rbac.EntityAccess, 
+                        join: u in User, on: ea.user_id == u.id,
+                        where: like(u.email, "%access_test%"))
+      end)
+      
+      # Clear any test data that might interfere - in the correct order to respect foreign keys
       import Ecto.Query
+      # First delete entity access records that depend on users and roles
+      Repo.delete_all(from ea in Xiam.Rbac.EntityAccess, 
+                      join: u in User, on: ea.user_id == u.id,
+                      join: r in Role, on: ea.role_id == r.id,
+                      where: like(u.email, "%access_test%") or like(r.name, "%Test_Role%"))
+      
+      # Then delete other records
       Repo.delete_all(from u in User, where: like(u.email, "%access_test%"))
       Repo.delete_all(from r in Role, where: like(r.name, "%Test_Role%"))
       Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Product%"))
@@ -137,7 +153,10 @@ defmodule Xiam.Rbac.AccessControlTest do
         role_id: role.id
       })
 
+      # Properly delete in correct order
       assert {:ok, _} = AccessControl.delete_entity_access(access)
+      
+      # Verify access is gone
       assert AccessControl.has_access?(user.id, "test_entity", 123) == false
     end
   end

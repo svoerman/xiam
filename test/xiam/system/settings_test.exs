@@ -152,29 +152,33 @@ defmodule XIAM.System.SettingsTest do
     end
 
     test "get_cached_setting/2 returns cached setting" do
-      # Insert a test setting
-      %Setting{key: "cache_test_key", value: "cache_value", description: "Cache test"}
+      # Generate a unique key name using timestamp
+      timestamp = System.system_time(:second)
+      key = "cache_test_key_#{timestamp}"
+      
+      # Insert a test setting with the unique key
+      %Setting{key: key, value: "cache_value", description: "Cache test"}
       |> Repo.insert!()
 
       # Load the setting into cache
       Settings.init_cache()
 
       # Get from cache
-      value = Settings.get_cached_setting("cache_test_key")
+      value = Settings.get_cached_setting(key)
       assert value == "cache_value"
 
       # Update the setting in the database but not in cache
-      Repo.get_by(Setting, key: "cache_test_key")
+      Repo.get_by(Setting, key: key)
       |> Ecto.Changeset.change(value: "new_db_value")
       |> Repo.update!()
 
       # Cache should still have the old value
-      value = Settings.get_cached_setting("cache_test_key")
+      value = Settings.get_cached_setting(key)
       assert value == "cache_value"
 
       # After refresh, cache should have new value
       Settings.refresh_cache()
-      value = Settings.get_cached_setting("cache_test_key")
+      value = Settings.get_cached_setting(key)
       assert value == "new_db_value"
     end
 

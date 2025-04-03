@@ -1,5 +1,4 @@
-# Load our Oban test helper first to ensure mocks are defined before tests run
-Code.require_file("support/oban_test_helper.ex", __DIR__)
+# Oban test helper is loaded automatically - don't require it explicitly
 
 # Make sure the application is started before tests
 Application.ensure_all_started(:postgrex)

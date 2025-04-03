@@ -99,8 +99,15 @@ defmodule XIAM.Users.UserTest do
       # Generate a timestamp for unique test data
       timestamp = System.system_time(:second)
       
-      # Clean up existing test data
+      # Clean up existing test data in the correct order to respect foreign keys
       import Ecto.Query
+      
+      # First delete entity access records that depend on users and roles
+      Repo.delete_all(from ea in Xiam.Rbac.EntityAccess,
+                      join: u in User, on: ea.user_id == u.id,
+                      where: like(u.email, "%role_test%"))
+                      
+      # Then delete other records
       Repo.delete_all(from u in User, where: like(u.email, "%role_test%"))
       Repo.delete_all(from r in Role, where: like(r.name, "%Test_Role_%"))
       Repo.delete_all(from p in Xiam.Rbac.Product, where: like(p.product_name, "%Test_Capability_Product_%"))
@@ -154,6 +161,15 @@ defmodule XIAM.Users.UserTest do
       {:ok, user_with_role} = user
         |> User.role_changeset(%{role_id: role.id})
         |> Repo.update()
+        
+      # Register a teardown function that cleans up entity access data
+      on_exit(fn ->
+        import Ecto.Query
+        # First delete entity access records that depend on users
+        Repo.delete_all(from ea in Xiam.Rbac.EntityAccess,
+                        join: u in User, on: ea.user_id == u.id,
+                        where: like(u.email, "%role_test%"))
+      end)
 
       {:ok, user: user_with_role, role: role, capability: capability}
     end
@@ -168,7 +184,7 @@ defmodule XIAM.Users.UserTest do
       assert User.has_capability?(user, "non_existent_capability") == false
     end
 
-    test "has_capability?/2 returns false for user without role", %{capability: capability} do
+    test "has_capability?/2 returns false for user without role", %{capability: _capability} do
       timestamp = System.system_time(:second)
       email = "no_role_#{timestamp}@example.com"
       

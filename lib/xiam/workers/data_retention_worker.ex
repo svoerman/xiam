@@ -22,21 +22,16 @@ defmodule XIAM.Workers.DataRetentionWorker do
   Schedules a data retention job.
   """
   def schedule() do
-    # In test environment, just track the job without using Oban
-    if Mix.env() == :test do
+    job_args = %{id: "data_retention"}
+    
+    # In test environment, just log it
+    if Application.get_env(:xiam, :oban_testing) do
       require Logger
-      Logger.info("TEST MODE: Scheduled data_retention job")
-      
-      # Track the job that would have been created
-      if Code.ensure_loaded?(XIAM.ObanTestHelper) do
-        XIAM.ObanTestHelper.track_job(__MODULE__, %{id: "data_retention"})
-      end
-      
-      # Return success without touching Oban
-      {:ok, %{test_mode: true}}
+      Logger.debug("TEST MODE: Scheduled data_retention job")
+      {:ok, %{test_mode: true}} 
     else
       # In regular environments, use Oban
-      %{id: "data_retention"}
+      job_args
       |> __MODULE__.new()
       |> Oban.insert()
     end

@@ -28,11 +28,26 @@ defmodule Xiam.Rbac.AccessControl do
 
   @doc """
   Sets user access to a specific entity.
+  If the ID is provided, it updates an existing record; otherwise, it creates a new one.
   """
   def set_user_access(attrs) do
-    %EntityAccess{}
-    |> EntityAccess.changeset(attrs)
-    |> Repo.insert_or_update()
+    case Map.get(attrs, "id") do
+      nil ->
+        # Create new record
+        %EntityAccess{}
+        |> EntityAccess.changeset(attrs)
+        |> Repo.insert()
+      
+      id ->
+        # Update existing record
+        case Repo.get(EntityAccess, id) do
+          nil -> {:error, :not_found}
+          existing ->
+            existing
+            |> EntityAccess.changeset(attrs)
+            |> Repo.update()
+        end
+    end
   end
 
   @doc """

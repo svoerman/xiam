@@ -27,21 +27,16 @@ defmodule XIAM.Workers.HealthCheckWorker do
   Schedules a health check job.
   """
   def schedule() do
-    # In test environment, just track the job without using Oban
-    if Mix.env() == :test do
+    job_args = %{id: "health_check"}
+    
+    # In test environment, just log it
+    if Application.get_env(:xiam, :oban_testing) do
       require Logger
-      Logger.info("TEST MODE: Scheduled health_check job")
-      
-      # Track the job that would have been created
-      if Code.ensure_loaded?(XIAM.ObanTestHelper) do
-        XIAM.ObanTestHelper.track_job(__MODULE__, %{id: "health_check"})
-      end
-      
-      # Return success without touching Oban
+      Logger.debug("TEST MODE: Scheduled health_check job")
       {:ok, %{test_mode: true}}
     else
       # In regular environments, use Oban
-      %{id: "health_check"}
+      job_args
       |> __MODULE__.new()
       |> Oban.insert()
     end
@@ -99,7 +94,7 @@ defmodule XIAM.Workers.HealthCheckWorker do
     # Log any detected issues
     if length(issues) > 0 do
       require Logger
-      Logger.warning("Health check detected issues: #{inspect(issues)}")
+      Logger.warning("Health check detected issues: #{inspect(issues)}", [])
     end
     
     issues

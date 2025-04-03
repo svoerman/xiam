@@ -35,6 +35,23 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+# Add coverage configuration
+config :xiam, :test_coverage,
+  ignore_modules: [
+    XIAM.ObanTestHelper,
+    ~r/.*_meck_original$/,
+    ~r/.*Test$/
+  ]
+
+# Configure coverage tools
+config :excoveralls, 
+  clear_cover: true,
+  skip_files: [
+    "test/support/",
+    "_build/",
+    "deps/"
+  ]
   
 # Configure Oban for testing - completely disable it to avoid ownership errors
 config :oban,
@@ -43,3 +60,6 @@ config :oban,
   queues: false,
   peer: false,
   repo: XIAM.Repo
+
+# Flag to indicate test environment for the application
+config :xiam, oban_testing: true

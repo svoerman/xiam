@@ -1,13 +1,21 @@
 defmodule XIAMWeb.API.AccessControlController do
   use XIAMWeb, :controller
   alias Xiam.Rbac.AccessControl
+  alias XIAM.Repo
 
   def set_user_access(conn, %{"user_id" => user_id, "entity_type" => entity_type, "entity_id" => entity_id, "role" => role}) do
+    # Get role ID from role name
+    role_id = Repo.get_by(Xiam.Rbac.Role, name: role)
+    |> case do
+      nil -> nil
+      role -> role.id
+    end
+
     case AccessControl.set_user_access(%{
       user_id: user_id,
       entity_type: entity_type,
       entity_id: entity_id,
-      role: role
+      role_id: role_id
     }) do
       {:ok, access} ->
         # Format the access entry for JSON response
@@ -24,9 +32,15 @@ defmodule XIAMWeb.API.AccessControlController do
         |> json(%{data: formatted_access})
 
       {:error, changeset} ->
+        errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
+
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{errors: changeset})
+        |> json(%{errors: errors})
     end
   end
 
@@ -57,9 +71,15 @@ defmodule XIAMWeb.API.AccessControlController do
         |> json(%{data: product})
 
       {:error, changeset} ->
+        errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
+
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{errors: changeset})
+        |> json(%{errors: errors})
     end
   end
 
@@ -71,7 +91,7 @@ defmodule XIAMWeb.API.AccessControlController do
   def create_capability(conn, %{"product_id" => product_id, "capability_name" => capability_name, "description" => description}) do
     case AccessControl.create_capability(%{
       product_id: product_id,
-      capability_name: capability_name,
+      name: capability_name,
       description: description
     }) do
       {:ok, capability} ->
@@ -80,9 +100,15 @@ defmodule XIAMWeb.API.AccessControlController do
         |> json(%{data: capability})
 
       {:error, changeset} ->
+        errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
+
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{errors: changeset})
+        |> json(%{errors: errors})
     end
   end
 

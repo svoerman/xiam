@@ -15,7 +15,7 @@ defmodule Xiam.Rbac.EntityAccess do
   @doc false
   def changeset(entity_access, attrs) do
     entity_access
-    |> cast(attrs, [:user_id, :entity_type, :entity_id, :role_id])
+    |> cast(attrs, [:id, :user_id, :entity_type, :entity_id, :role_id])
     |> validate_required([:user_id, :entity_type, :entity_id, :role_id])
     |> unique_constraint([:user_id, :entity_type, :entity_id])
     |> foreign_key_constraint(:role_id)

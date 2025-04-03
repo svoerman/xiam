@@ -2,6 +2,8 @@ defmodule Xiam.Rbac.Capability do
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query, warn: false
+  
+  @derive {Jason.Encoder, only: [:id, :name, :description, :product_id, :inserted_at, :updated_at]}
 
   schema "capabilities" do
     field :name, :string

@@ -88,7 +88,9 @@ defmodule XIAMWeb.Router do
     pipe_through :api
 
     post "/auth/login", AuthController, :login
-    get "/health", SystemController, :health
+    get "/health", HealthController, :index
+    get "/health/detailed", HealthController, :health
+    get "/system/health", SystemController, :health # Keep for backward compatibility
   end
 
   # Protected API routes requiring JWT authentication

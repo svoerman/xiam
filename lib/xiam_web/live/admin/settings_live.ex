@@ -72,7 +72,7 @@ defmodule XIAMWeb.Admin.SettingsLive do
 
     # Save setting to the database using our Settings module
     setting_key = db_setting_key(section, key)
-    case Settings.update_setting(setting_key, value) do
+    case Settings.update_setting_by_key(setting_key, value) do
       {:ok, _updated_setting} ->
         # Log the action in audit logs
         Audit.log_action("update_setting", %{key: setting_key, value: value}, current_user)

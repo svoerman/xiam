@@ -118,9 +118,7 @@ defmodule XIAMWeb.Admin.StatusLive do
   end
   
   defp get_oban_stats do
-    # Get the Oban config safely without using Access behavior
-    _oban_config = Oban.config()
-    # Get queues from Oban - in a safer way
+    # Get queues from Oban config via Application environment
     queues = case Keyword.get(Application.get_env(:xiam, Oban, []), :queues) do
       queues when is_map(queues) -> Map.to_list(queues)
       queues when is_list(queues) -> queues

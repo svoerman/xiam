@@ -8,25 +8,29 @@ defmodule XIAMWeb.Plugs.AuthHelpersTest do
   alias XIAM.Repo
 
   setup do
+    # Generate unique email with a timestamp
+    timestamp = System.system_time(:second)
+    unique_email = "auth_helper_test_#{timestamp}@example.com"
+    
     # Create a test user with admin capability
     {:ok, user} = %User{}
       |> User.pow_changeset(%{
-        email: "auth_helper_test@example.com",
+        email: unique_email,
         password: "Password123!",
         password_confirmation: "Password123!"
       })
       |> Repo.insert()
 
-    # Create a role with capabilities
+    # Create a role with capabilities using a unique name
     {:ok, role} = %Role{
-      name: "Auth Test Role",
+      name: "Auth Test Role #{timestamp}",
       description: "Role for testing auth helpers"
     }
     |> Repo.insert()
 
-    # Create a product for capabilities
+    # Create a product for capabilities with unique name
     {:ok, product} = %Xiam.Rbac.Product{
-      product_name: "Auth Test Product",
+      product_name: "Auth Test Product #{timestamp}",
       description: "Product for testing auth"
     }
     |> Repo.insert()
@@ -134,17 +138,20 @@ defmodule XIAMWeb.Plugs.AuthHelpersTest do
       assert AuthHelpers.has_admin_privileges?(nil) == false
 
       # Create a user without admin privileges
+      non_admin_timestamp = System.system_time(:second)
+      non_admin_email = "non_admin_#{non_admin_timestamp}@example.com"
+      
       {:ok, non_admin_user} = %User{}
         |> User.pow_changeset(%{
-          email: "non_admin@example.com",
+          email: non_admin_email,
           password: "Password123!",
           password_confirmation: "Password123!"
         })
         |> Repo.insert()
 
-      # Create a role without admin capability
+      # Create a role without admin capability (with unique name)
       {:ok, non_admin_role} = %Role{
-        name: "Non-Admin Role",
+        name: "Non-Admin Role #{non_admin_timestamp}",
         description: "Role without admin access"
       }
       |> Repo.insert()

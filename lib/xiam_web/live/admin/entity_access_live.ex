@@ -47,6 +47,7 @@ defmodule XIAMWeb.Admin.EntityAccessLive do
         {:noreply, socket |> put_flash(:error, "Access entry not found")}
       access ->
         access_changeset = EntityAccess.changeset(access, %{
+          id: access.id,
           user_id: access.user_id,
           entity_type: access.entity_type,
           entity_id: access.entity_id,

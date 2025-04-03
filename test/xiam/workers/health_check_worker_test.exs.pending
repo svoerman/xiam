@@ -1,0 +1,161 @@
+defmodule XIAM.Workers.HealthCheckWorkerTest do
+  use XIAM.DataCase
+  
+  import Mock
+  
+  alias XIAM.Workers.HealthCheckWorker
+  alias XIAM.System.Health
+  
+  describe "HealthCheckWorker" do
+    test "schedule/0 creates an Oban job" do
+      assert {:ok, %Oban.Job{}} = HealthCheckWorker.schedule()
+    end
+    
+    test "perform/1 runs health checks and returns :ok" do
+      # Create mock health data
+      health_data = %{
+        database: %{status: :ok, connected: true, user_count: 5, version: "PostgreSQL 13.4"},
+        application: %{status: :ok, version: "0.1.0", uptime: 3600, environment: :test},
+        memory: %{
+          status: :ok, 
+          total: 1_000_000,
+          processes: 500_000,
+          atom: 50_000,
+          binary: 100_000,
+          code: 200_000,
+          ets: 150_000
+        },
+        disk: %{
+          status: :ok,
+          size: "100G",
+          used: "50G",
+          available: "50G",
+          used_percent: "50%"
+        },
+        cluster: %{
+          status: :ok,
+          current_node: Node.self(),
+          nodes: [Node.self()],
+          connected_nodes: [],
+          node_count: 1
+        },
+        system_info: %{
+          otp_release: "24",
+          system_architecture: "x86_64-apple-darwin21.2.0",
+          wordsize_external: 8,
+          wordsize_internal: 8,
+          smp_support: true,
+          process_count: 100,
+          process_limit: 262144,
+          schedulers: 8,
+          schedulers_online: 8
+        },
+        timestamp: DateTime.utc_now()
+      }
+      
+      # Mock the Health module to return our test data
+      with_mock Health, [:passthrough], [check_health: fn -> health_data end] do
+        # Run the worker
+        assert HealthCheckWorker.perform(%Oban.Job{}) == :ok
+        
+        # Verify the health check was stored in the database
+        # First get the table info to make sure it exists
+        health_check_table_exists = Repo.query!(
+          "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'system_health_checks')"
+        ).rows |> List.first() |> List.first()
+        
+        if health_check_table_exists do
+          # Count health checks
+          count = Repo.aggregate("system_health_checks", :count, :id)
+          assert count >= 1
+        end
+      end
+    end
+
+    test "log_health_issues/1 detects database issues" do
+      # Create health data with database issue
+      health_data = %{
+        database: %{status: :error, connected: false, error: "Connection refused"},
+        application: %{status: :ok, version: "0.1.0", uptime: 3600, environment: :test},
+        memory: %{
+          status: :ok, 
+          total: 1_000_000,
+          processes: 500_000,
+          atom: 50_000,
+          binary: 100_000,
+          code: 200_000,
+          ets: 150_000
+        },
+        disk: %{
+          status: :ok,
+          size: "100G",
+          used: "50G",
+          available: "50G",
+          used_percent: "50%"
+        },
+        cluster: %{
+          status: :ok,
+          current_node: Node.self(),
+          nodes: [Node.self()],
+          connected_nodes: [],
+          node_count: 1
+        },
+        system_info: %{
+          process_count: 100
+        },
+        timestamp: DateTime.utc_now()
+      }
+      
+      # Call the private function to test it
+      log_health_issues = :erlang.make_fun(HealthCheckWorker, :log_health_issues, 1)
+      issues = log_health_issues.(health_data)
+      
+      # Verify database issue was detected
+      assert length(issues) > 0
+      assert Enum.any?(issues, fn issue -> issue.component == "database" && issue.status == :error end)
+    end
+    
+    test "log_health_issues/1 detects disk space issues" do
+      # Create health data with disk space warning
+      health_data = %{
+        database: %{status: :ok, connected: true, user_count: 5, version: "PostgreSQL 13.4"},
+        application: %{status: :ok, version: "0.1.0", uptime: 3600, environment: :test},
+        memory: %{
+          status: :ok, 
+          total: 1_000_000,
+          processes: 500_000,
+          atom: 50_000,
+          binary: 100_000,
+          code: 200_000,
+          ets: 150_000
+        },
+        disk: %{
+          status: :ok,
+          size: "100G",
+          used: "95G",
+          available: "5G",
+          used_percent: "95%"
+        },
+        cluster: %{
+          status: :ok,
+          current_node: Node.self(),
+          nodes: [Node.self()],
+          connected_nodes: [],
+          node_count: 1
+        },
+        system_info: %{
+          process_count: 100
+        },
+        timestamp: DateTime.utc_now()
+      }
+      
+      # Call the private function to test it
+      log_health_issues = :erlang.make_fun(HealthCheckWorker, :log_health_issues, 1)
+      issues = log_health_issues.(health_data)
+      
+      # Verify disk issue was detected
+      assert length(issues) > 0
+      assert Enum.any?(issues, fn issue -> issue.component == "disk" && issue.status == :warning end)
+    end
+  end
+end
