@@ -48,6 +48,7 @@ defmodule XIAMWeb.Router do
 
     get "/", PageController, :home
     live "/shadcn", ShadcnDemoLive, :index
+    live "/docs", DocsLive, :index
   end
 
   # Admin routes

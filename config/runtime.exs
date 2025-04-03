@@ -60,6 +60,14 @@ if config_env() == :prod do
 
   config :xiam, :jwt_signing_key, jwt_signing_key
 
+  # Configure Pow specific settings for production
+  config :xiam, :pow,
+    password_min_length: 12,
+    max_failures_per_period: 5,
+    failure_reset_timeout: 15 * 60 * 1000, # 15 minutes in milliseconds
+    # Use ETS cache backend for better production suitability (stateful cache)
+    cache_store_backend: Pow.Store.Backend.EtsCache
+
   config :xiam, XIAMWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

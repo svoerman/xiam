@@ -2,11 +2,11 @@
   <div class="flex items-center justify-between border-b border-border py-3 text-sm">
     <div class="flex items-center gap-4">
       <a href="/">
-        <img src={~p"/images/logo.svg"} width="36" />
+        <!-- Light mode logo -->
+        <img src={~p"/images/logo_for_light_bg.png"} width="96" class="block dark:hidden" alt="XIAM Logo" />
+        <!-- Dark mode logo -->
+        <img src={~p"/images/logo_for_dark_bg.png"} width="96" class="hidden dark:block" alt="XIAM Logo" />
       </a>
-      <p class="text-foreground font-medium leading-6">
-        XIAM Admin
-      </p>
     </div>
     <div class="flex items-center gap-4">
       <button

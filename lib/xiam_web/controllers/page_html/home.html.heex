@@ -7,7 +7,10 @@
   
   <div class="flex flex-col items-center justify-center space-y-12 text-center py-8">
     <div class="space-y-6 max-w-3xl">
-      <h1 class="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">XIAM</h1>
+      <div class="flex justify-center">
+        <img src={~p"/images/logo_for_light_bg.png"} width="512" class="block dark:hidden" alt="XIAM Logo" />
+        <img src={~p"/images/logo_for_dark_bg.png"} width="512" class="hidden dark:block" alt="XIAM Logo" />
+      </div>
       <p class="text-muted-foreground text-xl max-w-[700px] mx-auto">
         Customer Identity and Access Management Platform
       </p>
