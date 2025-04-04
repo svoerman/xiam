@@ -88,6 +88,7 @@ defmodule XIAM.MixProject do
       {:plug_cowboy, "~> 2.7", [hex: :plug_cowboy, repo: "hexpm", optional: false]},
       {:mock, "~> 0.3.7", only: :test},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      {:qr_code, "~> 3.2.0"},
 
       # API documentation
 

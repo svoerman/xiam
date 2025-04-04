@@ -30,33 +30,38 @@ defmodule XIAMWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  # API routes with JWT authentication
+  pipeline :api_jwt do
+    plug :accepts, ["json"]
+    plug CORSPlug, origin: ["*"]
+    plug XIAMWeb.Plugs.APIAuthPlug
+  end
+
+  # Pow authentication routes
   scope "/" do
     pipe_through :skip_csrf_protection
-
     pow_assent_authorization_post_callback_routes()
   end
 
   scope "/" do
     pipe_through :browser
-
     pow_routes()
     pow_assent_routes()
   end
 
+  # Main routes
   scope "/", XIAMWeb do
     pipe_through :browser
 
+    # Home page
     get "/", PageController, :home
 
-    resources "/session", SessionController, only: [:create]
-    get "/session/new", SessionController, :new
-    get "/session/delete", SessionController, :delete
-
+    # Documentation routes
     get "/api/docs", SwaggerController, :index
-    # Direct access to Swagger JSON
     get "/swagger/api-spec.json", SwaggerController, :api_json
     get "/api/docs/swagger.json", SwaggerController, :api_json
 
+    # LiveView routes
     live "/shadcn", ShadcnDemoLive, :index
     live "/docs", DocsLive, :index
   end
@@ -77,23 +82,6 @@ defmodule XIAMWeb.Router do
     live "/audit-logs", AuditLogsLive, :index
     live "/status", StatusLive, :index
     live "/consents", ConsentRecordsLive, :index
-  end
-
-  # API routes with JWT authentication
-  pipeline :api_jwt do
-    plug :accepts, ["json"]
-    plug CORSPlug, origin: ["*"]
-    plug XIAMWeb.Plugs.APIAuthPlug
-  end
-
-  # Documentation routes
-  scope "/", XIAMWeb do
-    pipe_through :browser
-
-    # API Documentation UI
-    get "/api/docs", SwaggerController, :index
-    # Direct access to Swagger JSON
-    get "/swagger/api-spec.json", SwaggerController, :api_json
   end
 
   # Unprotected API routes
@@ -141,10 +129,8 @@ defmodule XIAMWeb.Router do
 
   # Enable Swoosh mailbox preview in development
   if Application.compile_env(:xiam, :dev_routes) do
-
     scope "/dev" do
       pipe_through :browser
-
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end

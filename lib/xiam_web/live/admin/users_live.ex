@@ -265,10 +265,10 @@ defmodule XIAMWeb.Admin.UsersLive do
               <div class="mb-4">
                 <h4 class="font-medium mb-2 text-foreground">1. Scan this QR code with your authenticator app</h4>
                 <div class="bg-muted p-4 rounded-md flex justify-center">
-                  <!-- In a real app, we would generate a QR code image here -->
                   <div class="border border-border p-4 rounded-md bg-background">
-                    QR Code for: <%= @qr_code_uri %>
+                    <%= render_qr_code(assigns) %>
                   </div>
+                  <div class="hidden"><%= @qr_code_uri %></div>
                 </div>
               </div>
 
@@ -301,6 +301,18 @@ defmodule XIAMWeb.Admin.UsersLive do
         </div>
       <% end %>
     </div>
+    </div>
+    """
+  end
+
+  def render_qr_code(assigns) do
+    ~H"""
+    <div class="flex justify-center">
+      <%= if @qr_code_uri do %>
+        <% qr = QRCode.create(@qr_code_uri) %>
+        <% {:ok, svg} = QRCode.Render.render(qr, :svg, %QRCode.Render.SvgSettings{scale: 8}) %>
+        <img src={"data:image/svg+xml;base64,#{Base.encode64(svg)}"} alt="QR Code" />
+      <% end %>
     </div>
     """
   end
