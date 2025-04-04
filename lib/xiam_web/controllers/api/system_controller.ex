@@ -4,7 +4,7 @@ defmodule XIAMWeb.API.SystemController do
   alias XIAMWeb.Plugs.APIAuthorizePlug
 
   # Apply authorization plug for the status action
-  plug APIAuthorizePlug, :view_system_status when action in [:status]
+  plug APIAuthorizePlug, "view_system_status" when action in [:status]
 
   @doc """
   Get the system health status.

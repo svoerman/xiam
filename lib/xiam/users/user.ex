@@ -85,14 +85,47 @@ defmodule XIAM.Users.User do
   def has_capability?(%__MODULE__{} = user, capability_name) do
     capability_name = if is_atom(capability_name), do: Atom.to_string(capability_name), else: capability_name
 
-    case user.role do
-      nil -> false
+    # First check if role is loaded
+    user = if Ecto.assoc_loaded?(user.role) do
+      user
+    else
+      XIAM.Repo.preload(user, role: :capabilities)
+    end
+
+    # Return false if user has no role
+    if is_nil(user.role) do
+      false
+    else
+      # Ensure role's capabilities are loaded
+      role = if Ecto.assoc_loaded?(user.role.capabilities) do
+        user.role
+      else
+        XIAM.Repo.preload(user.role, :capabilities)
+      end
+
       # Delegate to Role.has_capability?, assuming role has capabilities preloaded
-      role -> Xiam.Rbac.Role.has_capability?(role, capability_name)
+      Xiam.Rbac.Role.has_capability?(role, capability_name)
     end
   end
 
   def has_capability?(nil, _capability_name), do: false
+
+  def has_capability?(%{role: role}, capability_name) do
+    # Return false if user has no role
+    if is_nil(role) do
+      false
+    else
+      # Ensure role's capabilities are loaded
+      role = if Ecto.assoc_loaded?(role.capabilities) do
+        role
+      else
+        XIAM.Repo.preload(role, :capabilities)
+      end
+
+      # Delegate to Role.has_capability?, assuming role has capabilities preloaded
+      Xiam.Rbac.Role.has_capability?(role, capability_name)
+    end
+  end
 
   @doc """
   Generates a new TOTP secret for the user.

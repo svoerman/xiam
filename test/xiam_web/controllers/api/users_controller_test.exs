@@ -44,25 +44,25 @@ defmodule XIAMWeb.API.UsersControllerTest do
     admin_email = "users_api_test_admin_#{timestamp}@example.com"
     {:ok, admin_unlinked} = %User{}
       |> User.pow_changeset(%{
-        email: admin_email,
-        password: "Password123!",
-        password_confirmation: "Password123!",
-        admin: true # Keep admin flag
+        "email" => admin_email,
+        "password" => "Password123!",
+        "password_confirmation" => "Password123!",
+        "admin" => true # Keep admin flag
       })
       |> Repo.insert()
 
     # --- Assign Role to Admin User ---
     {:ok, admin} = admin_unlinked
-      |> User.role_changeset(%{role_id: role.id})
+      |> User.role_changeset(%{"role_id" => role.id})
       |> Repo.update()
 
     # Create a regular test user (no role initially)
     user_email = "users_api_test_user_#{timestamp}@example.com"
     {:ok, user} = %User{}
       |> User.pow_changeset(%{
-        email: user_email,
-        password: "Password123!",
-        password_confirmation: "Password123!"
+        "email" => user_email,
+        "password" => "Password123!",
+        "password_confirmation" => "Password123!"
       })
       |> Repo.insert()
 
@@ -110,7 +110,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
     test "filters users by role", %{conn: conn, role: role, user: user} do
       # Assign the test role to the test user
       {:ok, _updated_user} = user
-        |> User.role_changeset(%{role_id: role.id})
+        |> User.role_changeset(%{"role_id" => role.id})
         |> Repo.update()
 
       # Set up mock for audit logging
@@ -158,7 +158,176 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
   end
 
+  describe "create/2" do
+    test "creates a new user with valid data", %{conn: conn, timestamp: timestamp} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Prepare user data
+        user_params = %{
+          "email" => "new_user_#{timestamp}@example.com",
+          "password" => "Password123!",
+          "password_confirmation" => "Password123!"
+        }
+
+        # Send create request
+        conn = post(conn, ~p"/api/users", %{"user" => user_params})
+
+        # Check response
+        json_response = json_response(conn, 201)
+        assert json_response["success"] == true
+        assert json_response["data"]["email"] == "new_user_#{timestamp}@example.com"
+        assert json_response["message"] == "User created successfully"
+
+        # Verify user was created in database
+        user_id = json_response["data"]["id"]
+        created_user = Repo.get(User, user_id)
+        assert created_user != nil
+        assert created_user.email == "new_user_#{timestamp}@example.com"
+      end
+    end
+
+    test "fails with invalid data", %{conn: conn} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Invalid user data (missing password confirmation)
+        user_params = %{
+          "email" => "invalid@example.com",
+          "password" => "Password123!"
+          # Missing password_confirmation
+        }
+
+        # Send create request
+        conn = post(conn, ~p"/api/users", %{"user" => user_params})
+
+        # Check response
+        json_response = json_response(conn, 422)
+        assert json_response["error"] == "Failed to create user"
+        assert json_response["details"]["password_confirmation"] != nil
+      end
+    end
+
+    test "creates a user with a role", %{conn: conn, role: role, timestamp: timestamp} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Prepare user data with role
+        user_params = %{
+          "email" => "role_user_#{timestamp}@example.com",
+          "password" => "Password123!",
+          "password_confirmation" => "Password123!",
+          "role_id" => role.id
+        }
+
+        # Send create request
+        conn = post(conn, ~p"/api/users", %{"user" => user_params})
+
+        # Check response
+        json_response = json_response(conn, 201)
+        assert json_response["success"] == true
+
+        # Verify user was created with the role
+        user_id = json_response["data"]["id"]
+        created_user = Repo.get(User, user_id) |> Repo.preload(:role)
+        assert created_user.role_id == role.id
+      end
+    end
+  end
+
+  describe "update/2" do
+    test "updates a user's email", %{conn: conn, user: user, timestamp: timestamp} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Prepare update data
+        update_params = %{
+          "email" => "updated_#{timestamp}@example.com"
+        }
+
+        # Send update request
+        conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+
+        # Check response
+        json_response = json_response(conn, 200)
+        assert json_response["success"] == true
+        assert json_response["message"] == "User updated successfully"
+        assert json_response["data"]["email"] == "updated_#{timestamp}@example.com"
+
+        # Verify user was updated in database
+        updated_user = Repo.get(User, user.id)
+        assert updated_user.email == "updated_#{timestamp}@example.com"
+      end
+    end
+
+    test "updates a user's role", %{conn: conn, user: user, role: role} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Prepare update data
+        update_params = %{
+          "role_id" => role.id
+        }
+
+        # Send update request
+        conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+
+        # Check response
+        json_response = json_response(conn, 200)
+        assert json_response["success"] == true
+        assert json_response["message"] == "User updated successfully"
+
+        # Verify user's role was updated in database
+        updated_user = Repo.get(User, user.id) |> Repo.preload(:role)
+        assert updated_user.role_id == role.id
+      end
+    end
+
+    test "updates a user's password", %{conn: conn, user: user} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Prepare update data
+        update_params = %{
+          "password" => "NewPassword123!",
+          "password_confirmation" => "NewPassword123!"
+        }
+
+        # Send update request
+        conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+
+        # Check response
+        json_response = json_response(conn, 200)
+        assert json_response["success"] == true
+        assert json_response["message"] == "User updated successfully"
+
+        # Verify password was updated (indirectly by checking it's different)
+        updated_user = Repo.get(User, user.id)
+        assert updated_user.password_hash != user.password_hash
+      end
+    end
+  end
+
   describe "delete/2" do
+    test "deletes a user", %{conn: conn, timestamp: timestamp} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Create a user to delete
+        {:ok, user_to_delete} = %User{}
+          |> User.pow_changeset(%{
+            email: "delete_me_#{timestamp}@example.com",
+            password: "Password123!",
+            password_confirmation: "Password123!"
+          })
+          |> Repo.insert()
+
+        # Send delete request
+        conn = delete(conn, ~p"/api/users/#{user_to_delete.id}")
+
+        # Check response
+        json_response = json_response(conn, 200)
+        assert json_response["success"] == true
+        assert json_response["message"] == "User deleted successfully"
+
+        # Verify user was deleted
+        assert Repo.get(User, user_to_delete.id) == nil
+      end
+    end
+
     test "prevents self-deletion", %{conn: conn, admin: admin} do
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -171,6 +340,18 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
         # Verify the user is not deleted
         assert Repo.get(User, admin.id) != nil
+      end
+    end
+
+    test "returns 404 for non-existent user", %{conn: conn} do
+      # Set up mock for audit logging
+      with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
+        # Try to delete non-existent user
+        conn = delete(conn, ~p"/api/users/999999")
+
+        # Check response
+        json_response = json_response(conn, 404)
+        assert json_response["error"] == "User not found"
       end
     end
   end

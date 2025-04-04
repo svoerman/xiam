@@ -53,8 +53,21 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
   - false if user does not have the capability or user is nil
   """
   def has_capability?(nil, _capability), do: false
-  def has_capability?(%User{} = user, capability) do
-    User.has_capability?(user, capability)
+  def has_capability?(user, capability) do
+    # Return false if user has no role
+    if is_nil(user.role) do
+      false
+    else
+      # Ensure role and capabilities are loaded
+      user = if Ecto.assoc_loaded?(user.role) do
+        user
+      else
+        Repo.preload(user, role: :capabilities)
+      end
+
+      # Delegate to User module for actual capability check
+      User.has_capability?(user, capability)
+    end
   end
 
   @doc """

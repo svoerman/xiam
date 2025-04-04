@@ -47,6 +47,16 @@ defmodule XIAMWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    resources "/session", SessionController, only: [:create]
+    get "/session/new", SessionController, :new
+    get "/session/delete", SessionController, :delete
+
+    get "/api/docs", SwaggerController, :index
+    # Direct access to Swagger JSON
+    get "/swagger/api-spec.json", SwaggerController, :api_json
+    get "/api/docs/swagger.json", SwaggerController, :api_json
+
     live "/shadcn", ShadcnDemoLive, :index
     live "/docs", DocsLive, :index
   end

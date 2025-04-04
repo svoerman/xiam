@@ -7,6 +7,7 @@ defmodule Xiam.Rbac do
   alias XIAM.Repo
   alias Xiam.Rbac.Role
   alias Xiam.Rbac.Capability
+  alias Xiam.Rbac.Product
 
   @doc """
   Returns the list of roles.
@@ -104,5 +105,56 @@ defmodule Xiam.Rbac do
   """
   def change_capability(%Capability{} = capability, attrs \\ %{}) do
     Capability.changeset(capability, attrs)
+  end
+
+  @doc """
+  Creates a product.
+  """
+  def create_product(attrs \\ %{}) do
+    %Product{}
+    |> Product.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Returns the list of products.
+  """
+  def list_products do
+    Product
+    |> preload(:capabilities)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single product.
+  """
+  def get_product(id) do
+    Product
+    |> preload(:capabilities)
+    |> Repo.get(id)
+  end
+
+  @doc """
+  Adds a capability to a role.
+  """
+  def add_capability_to_role(role_id, capability_id) do
+    role = get_role(role_id)
+    capability = get_capability(capability_id)
+
+    if role && capability do
+      # Ensure capabilities are loaded
+      role = if Ecto.assoc_loaded?(role.capabilities) do
+        role
+      else
+        Repo.preload(role, :capabilities)
+      end
+
+      role
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.put_assoc(:capabilities, [capability | role.capabilities])
+      |> Repo.update()
+    else
+      {:error, :not_found}
+    end
   end
 end

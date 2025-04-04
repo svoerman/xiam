@@ -4,6 +4,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
   alias XIAM.Users.User
   alias XIAM.Repo
   alias XIAM.Auth.JWT
+  alias XIAM.Rbac.ProductContext
 
   setup %{conn: conn} do
     # Explicitly ensure repo is available
@@ -14,18 +15,64 @@ defmodule XIAMWeb.API.AuthControllerTest do
         {:ok, _} = XIAM.Repo.start_link([])
         # Set sandbox mode
         Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      _ -> 
+      _ ->
         :ok
     end
+
+    # Generate a unique timestamp for this test run
+    timestamp = System.system_time(:second)
 
     # Create a test user
     {:ok, user} = %User{}
       |> User.pow_changeset(%{
-        email: "api_auth_test@example.com",
+        email: "api_auth_test_#{timestamp}@example.com",
         password: "Password123!",
         password_confirmation: "Password123!"
       })
       |> Repo.insert()
+
+    # Create a role with basic auth capabilities
+    role_name = "Auth_User_#{timestamp}"
+    {:ok, role} = Xiam.Rbac.Role.changeset(%Xiam.Rbac.Role{}, %{
+      name: role_name,
+      description: "Role for testing auth API"
+    })
+    |> Repo.insert()
+
+    # Create a product to associate capabilities with
+    product_name = "Test_Auth_Product_#{timestamp}"
+    {:ok, product} = ProductContext.create_product(%{
+      product_name: product_name,
+      description: "Test product for auth API tests"
+    })
+
+    # Add basic auth capabilities
+    capabilities_to_create = [
+      %{product_id: product.id, name: "verify_token", description: "Can verify tokens"},
+      %{product_id: product.id, name: "refresh_token", description: "Can refresh tokens"},
+      %{product_id: product.id, name: "logout", description: "Can logout"},
+      %{product_id: product.id, name: "auth", description: "Basic auth capabilities"}
+    ]
+
+    capabilities = Enum.map(capabilities_to_create, fn cap_attrs ->
+      {:ok, cap} = Xiam.Rbac.create_capability(cap_attrs)
+      cap
+    end)
+
+    # Associate capabilities with role
+    {:ok, role} = role
+      |> Repo.preload(:capabilities)
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.put_assoc(:capabilities, capabilities)
+      |> Repo.update()
+
+    # Assign role to user
+    {:ok, user} = user
+      |> User.role_changeset(%{role_id: role.id})
+      |> Repo.update()
+
+    # Reload user with role and capabilities
+    user = user |> Repo.preload(role: :capabilities)
 
     conn = conn
       |> put_req_header("accept", "application/json")

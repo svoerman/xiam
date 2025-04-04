@@ -93,9 +93,35 @@ defmodule Xiam.Rbac.Role do
 
   @doc """
   Checks if a role has a specific capability.
-  Assumes the role's capabilities have already been preloaded by the caller.
+  Ensures capabilities are loaded before checking.
+  Returns false if role is nil.
   """
-  def has_capability?(%__MODULE__{} = role, capability_name) when is_binary(capability_name) do
+  def has_capability?(nil, _capability_name), do: false
+  def has_capability?(%__MODULE__{} = role, capability_names) when is_list(capability_names) do
+    # Ensure capabilities are loaded
+    role = if Ecto.assoc_loaded?(role.capabilities) do
+      role
+    else
+      XIAM.Repo.preload(role, :capabilities)
+    end
+
+    # Check if role has any of the required capabilities
+    Enum.any?(capability_names, fn capability_name ->
+      capability_name = if is_atom(capability_name), do: Atom.to_string(capability_name), else: capability_name
+      Enum.any?(role.capabilities, fn capability -> capability.name == capability_name end)
+    end)
+  end
+  def has_capability?(%__MODULE__{} = role, capability_name) when is_binary(capability_name) or is_atom(capability_name) do
+    # Convert atom to string if needed
+    capability_name = if is_atom(capability_name), do: Atom.to_string(capability_name), else: capability_name
+
+    # Ensure capabilities are loaded
+    role = if Ecto.assoc_loaded?(role.capabilities) do
+      role
+    else
+      XIAM.Repo.preload(role, :capabilities)
+    end
+
     Enum.any?(role.capabilities, fn capability ->
       capability.name == capability_name
     end)

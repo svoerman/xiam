@@ -8,7 +8,6 @@ defmodule XIAMWeb.API.UsersController do
   alias XIAMWeb.Plugs.APIAuthorizePlug
 
   alias XIAM.Users.User
-  alias Xiam.Rbac.Role
   alias XIAM.Repo
   alias XIAM.Jobs.AuditLogger
   import Ecto.Query
@@ -19,6 +18,11 @@ defmodule XIAMWeb.API.UsersController do
   plug APIAuthorizePlug, :create_user when action in [:create]
   plug APIAuthorizePlug, :update_user when action in [:update]
   plug APIAuthorizePlug, :delete_user when action in [:delete]
+
+  @pow_config [
+    user: XIAM.Users.User,
+    repo: XIAM.Repo
+  ]
 
   @doc """
   Lists all users with optional pagination and filtering.
@@ -120,19 +124,29 @@ defmodule XIAMWeb.API.UsersController do
   Requires the "create_user" capability.
   """
   def create(conn, %{"user" => user_params}) do
-    # Ensure role_id is valid if provided
-    user_params = if user_params["role_id"] do
-      role = Repo.get(Role, user_params["role_id"])
-      if role, do: user_params, else: Map.delete(user_params, "role_id")
-    else
-      user_params
-    end
-
     current_user = conn.assigns.current_user
 
-    # Create user with Pow (revert to create/2)
-    case Pow.Ecto.Context.create(User, user_params) do
+    # Extract role_id before creating user
+    {role_id, user_params} = Map.pop(user_params, "role_id")
+
+    # Convert map keys to atoms for Pow Context
+    user_params_map = user_params
+      |> Enum.map(fn {k, v} -> {String.to_atom(k), v} end)
+      |> Enum.into(%{})
+
+    # Create user with Pow with explicit config
+    case Pow.Ecto.Context.create(user_params_map, @pow_config) do
       {:ok, user} ->
+        # Update role if provided
+        user = if role_id do
+          case User.role_changeset(user, %{"role_id" => role_id}) |> Repo.update() do
+            {:ok, user_with_role} -> user_with_role
+            {:error, _} -> user
+          end
+        else
+          user
+        end
+
         # Log the user creation
         AuditLogger.log_action("api_user_create", current_user.id, %{
           new_user_id: user.id,
@@ -174,22 +188,33 @@ defmodule XIAMWeb.API.UsersController do
         |> json(%{error: "User not found"})
 
       user ->
-        # Remove password fields if they're empty
-        user_params = if user_params["password"] == "" do
-          Map.drop(user_params, ["password", "password_confirmation"])
-        else
-          user_params
-        end
-
         # Handle role_id specially
         {role_id, user_params} = Map.pop(user_params, "role_id")
 
-        # Update basic user fields with Pow (revert to update/3)
-        case Pow.Ecto.Context.update(User, user, user_params) do
+        # Handle different types of updates
+        result = cond do
+          # Password update
+          Map.has_key?(user_params, "password") ->
+            update_password(user, user_params)
+
+          # Email update
+          Map.has_key?(user_params, "email") ->
+            update_email(user, user_params)
+
+          # Role update only
+          role_id ->
+            {:ok, user}
+
+          # No valid update parameters
+          true ->
+            {:error, "No valid update parameters provided"}
+        end
+
+        case result do
           {:ok, updated_user} ->
-            # Update role if provided and valid
+            # Update role if provided
             updated_user = if role_id do
-              case User.role_changeset(updated_user, %{role_id: role_id}) |> Repo.update() do
+              case User.role_changeset(updated_user, %{"role_id" => role_id}) |> Repo.update() do
                 {:ok, user_with_role} -> user_with_role
                 {:error, _} -> updated_user
               end
@@ -200,7 +225,7 @@ defmodule XIAMWeb.API.UsersController do
             # Log the user update
             AuditLogger.log_action("api_user_update", current_user.id, %{
               target_user_id: updated_user.id,
-              changes: Map.drop(user_params, ["password", "password_confirmation"])
+              target_user_email: updated_user.email
             }, current_user.email)
 
             conn
@@ -214,15 +239,52 @@ defmodule XIAMWeb.API.UsersController do
               message: "User updated successfully"
             })
 
-          {:error, changeset} ->
+          {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
             conn
             |> put_status(:unprocessable_entity)
             |> json(%{
               error: "Failed to update user",
               details: error_details(changeset)
             })
+
+          {:error, message} when is_binary(message) ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{
+              error: "Failed to update user",
+              message: message
+            })
         end
     end
+  end
+
+  # Private functions for handling different types of updates
+
+  defp update_password(user, params) do
+    # For password updates, we need to verify the new password format
+    # but we can bypass the current password check since this is an admin API
+    params = Map.merge(params, %{
+      "current_password" => "BYPASS_FOR_API",
+      "password_hash" => user.password_hash
+    })
+
+    changeset = User.pow_password_changeset(user, params)
+    if changeset.valid? do
+      Repo.update(changeset)
+    else
+      {:error, changeset}
+    end
+  end
+
+  defp update_email(user, params) do
+    # For email updates, we can update directly since this is an admin API
+    changeset = user
+      |> Ecto.Changeset.change(%{email: params["email"]})
+      |> Ecto.Changeset.validate_required([:email])
+      |> Ecto.Changeset.validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must be a valid email address")
+      |> Ecto.Changeset.unique_constraint(:email)
+
+    Repo.update(changeset)
   end
 
   @doc """

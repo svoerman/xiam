@@ -1,39 +1,46 @@
 defmodule XIAMWeb.Components.UI.ThemeToggle do
   @moduledoc """
   Theme toggle component for switching between light and dark modes.
-  
+
   This component provides a button that toggles between light and dark themes
   using the shadcn UI theming system.
-  
+
   ## Examples
-  
+
       <.theme_toggle />
   """
   use Phoenix.Component
 
   @doc """
   Renders a theme toggle button.
-  
+
   ## Attributes
-  
+
   * `class` - Additional classes to add to the toggle
-  
+  * `id` - Optional ID for the toggle (unique ID is generated if not provided)
+
   ## Examples
-  
+
       <.theme_toggle />
       <.theme_toggle class="absolute top-4 right-4" />
+      <.theme_toggle id="custom-theme-toggle" />
   """
   attr :class, :string, default: ""
-  
+  attr :id, :string, default: nil
+
   def theme_toggle(assigns) do
+    assigns = assign_new(assigns, :unique_id, fn ->
+      "theme-toggle-#{:erlang.unique_integer([:positive])}"
+    end)
+
     ~H"""
-    <div class={["theme-toggle", @class]} id="theme-toggle" phx-hook="ThemeToggle">
+    <div class={["theme-toggle", @class]} id={@id || @unique_id} phx-hook="ThemeToggle">
       <button
         class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background p-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
         aria-label="Toggle theme"
       >
         <svg
-          id="theme-toggle-sun-icon"
+          id={"#{@unique_id}-sun-icon"}
           class="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -50,9 +57,9 @@ defmodule XIAMWeb.Components.UI.ThemeToggle do
             stroke-linejoin="round"
           />
         </svg>
-        
+
         <svg
-          id="theme-toggle-moon-icon"
+          id={"#{@unique_id}-moon-icon"}
           class="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"

@@ -5,7 +5,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
   alias XIAM.Consent.ConsentRecord
   alias XIAM.Repo
   alias XIAM.Auth.JWT
-  alias XIAM.Rbac.ProductContext # Alias for product context (Corrected casing)
+  alias XIAM.Rbac.ProductContext
 
   setup %{conn: conn} do
     # Explicitly ensure repo is available
@@ -63,7 +63,8 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
       %{product_id: product.id, name: "create_consent", description: "Can create consents"},
       %{product_id: product.id, name: "update_consent", description: "Can update consents"},
       %{product_id: product.id, name: "delete_consent", description: "Can delete consents"},
-      %{product_id: product.id, name: "admin_consents", description: "Admin capabilities for consents"}
+      %{product_id: product.id, name: "admin_consents", description: "Admin capabilities for consents"},
+      %{product_id: product.id, name: "auth", description: "Basic auth capabilities"}
     ]
 
     capabilities = Enum.map(capabilities_to_create, fn cap_attrs ->
