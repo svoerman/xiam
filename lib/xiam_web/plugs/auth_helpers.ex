@@ -6,6 +6,7 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
 
   import Plug.Conn
   import Phoenix.Controller
+  require Logger
 
   alias XIAM.Auth.JWT
   alias XIAM.Repo
@@ -22,8 +23,14 @@ defmodule XIAMWeb.Plugs.AuthHelpers do
   """
   def extract_token(conn) do
     case get_req_header(conn, "authorization") do
-      ["Bearer " <> token] -> {:ok, token}
-      ["bearer " <> token] -> {:ok, token}
+      ["Bearer " <> token] -> 
+        # Log the token (for debugging only, remove in production)
+        Logger.debug("Received Bearer token: #{String.slice(token, 0, 10)}...")
+        {:ok, token}
+      ["bearer " <> token] -> 
+        # Log the token (for debugging only, remove in production)
+        Logger.debug("Received bearer token: #{String.slice(token, 0, 10)}...")
+        {:ok, token}
       [] -> {:error, :token_not_found}
       _ -> {:error, :invalid_token_format}
     end

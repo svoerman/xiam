@@ -98,7 +98,7 @@ defmodule XIAMWeb.API.UsersController do
       user ->
         # Log the user view
         current_user = conn.assigns.current_user
-        AuditLogger.log_action("api_user_view", current_user.id, %{target_user_id: user.id}, current_user.email)
+        AuditLogger.log_action("api_user_view", current_user.id, %{"resource_type" => "user", "target_user_id" => user.id}, current_user.email)
 
         # Format the user for JSON response, excluding sensitive fields
         user_json = %{
@@ -149,8 +149,9 @@ defmodule XIAMWeb.API.UsersController do
 
         # Log the user creation
         AuditLogger.log_action("api_user_create", current_user.id, %{
-          new_user_id: user.id,
-          new_user_email: user.email
+          "resource_type" => "user",
+          "new_user_id" => user.id,
+          "new_user_email" => user.email
         }, current_user.email)
 
         conn
@@ -224,8 +225,9 @@ defmodule XIAMWeb.API.UsersController do
 
             # Log the user update
             AuditLogger.log_action("api_user_update", current_user.id, %{
-              target_user_id: updated_user.id,
-              target_user_email: updated_user.email
+              "resource_type" => "user",
+              "target_user_id" => updated_user.id,
+              "target_user_email" => updated_user.email
             }, current_user.email)
 
             conn
@@ -309,8 +311,9 @@ defmodule XIAMWeb.API.UsersController do
         else
           # Log the deletion attempt before actually deleting
           AuditLogger.log_action("api_user_delete", current_user.id, %{
-            target_user_id: user.id,
-            target_user_email: user.email
+            "resource_type" => "user",
+            "target_user_id" => user.id,
+            "target_user_email" => user.email
           }, current_user.email)
 
           case Repo.delete(user) do

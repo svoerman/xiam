@@ -6,7 +6,8 @@ defmodule XIAMWeb.API.AccessControlController do
 
   # Apply authorization plugs with specific capabilities
   plug APIAuthorizePlug, :manage_access when action in [:set_user_access]
-  plug APIAuthorizePlug, :view_access when action in [:get_user_access]
+  # Allow any authenticated user to view access (no specific capability required)
+  plug APIAuthorizePlug, nil when action in [:get_user_access]
   # create_product and list_products seem to be handled by ProductController now, remove if redundant
   # plug APIAuthorizePlug, :manage_products when action in [:create_product]
   # plug APIAuthorizePlug, :view_products when action in [:list_products]

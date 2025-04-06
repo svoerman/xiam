@@ -149,4 +149,39 @@ defmodule XIAM.Auth.JWT do
       error -> error
     end
   end
+
+  @doc """
+  Generates a partial JWT token for MFA authentication flow.
+  This token has a shorter expiry time and contains a flag indicating it's for MFA.
+
+  ## Parameters
+  - user: The User struct to generate a token for
+
+  ## Returns
+  - {:ok, token, claims} on success
+  - {:error, reason} on failure
+  """
+  def generate_partial_token(user) do
+    signing_key = get_signing_key!()
+    # Shorter expiry for partial tokens (5 minutes)
+    partial_token_expiry = 300
+    
+    claims = %{
+      "sub" => user.id,
+      "email" => user.email,
+      "exp" => :os.system_time(:second) + partial_token_expiry,
+      "iat" => :os.system_time(:second),
+      "typ" => "mfa_required",  # Special type to indicate this is a partial token
+      "mfa_pending" => true     # Flag indicating MFA is still needed
+    }
+
+    jwk = :jose_jwk.from_oct(signing_key)
+    jws = :jose_jws.from_map(%{"alg" => "HS256"})
+    jwt = :jose_jwt.from_map(claims)
+
+    {_, token} = :jose_jwt.sign(jwk, jws, jwt)
+    {_, encoded} = :jose_jws.compact(token)
+
+    {:ok, encoded, claims}
+  end
 end

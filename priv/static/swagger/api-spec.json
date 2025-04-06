@@ -132,7 +132,7 @@
     "/api/auth/login": {
       "post": {
         "summary": "Authenticate user and get JWT token",
-        "description": "Login with email and password to receive a JWT token",
+        "description": "Login with email and password to receive a JWT token. For users with MFA enabled, returns a partial token that must be used with the MFA verification endpoint.",
         "tags": ["Auth"],
         "requestBody": {
           "required": true,
@@ -167,9 +167,17 @@
                       "type": "boolean",
                       "description": "Success status"
                     },
+                    "mfa_required": {
+                      "type": "boolean",
+                      "description": "Indicates if MFA verification is required"
+                    },
                     "token": {
                       "type": "string",
-                      "description": "JWT Token"
+                      "description": "JWT Token (only present if MFA is not required)"
+                    },
+                    "partial_token": {
+                      "type": "string",
+                      "description": "Partial JWT Token for MFA flow (only present if MFA is required)"
                     },
                     "user": {
                       "$ref": "#/components/schemas/User"
@@ -289,6 +297,172 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/challenge": {
+      "get": {
+        "summary": "MFA Challenge",
+        "description": "Get MFA challenge information for a user with MFA enabled",
+        "tags": ["Auth"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MFA challenge information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Please enter the code from your authenticator app"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "MFA not enabled for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "MFA is not enabled for this user"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/mfa/verify": {
+      "post": {
+        "summary": "Verify MFA Code",
+        "description": "Verify the TOTP code provided by the user and issue a full JWT token",
+        "tags": ["Auth"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "TOTP code from authenticator app",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MFA verification successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "token": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "MFA verification successful"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid authentication flow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Invalid authentication flow. Please login again."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid MFA code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Invalid MFA code"
+                    }
+                  }
                 }
               }
             }

@@ -94,6 +94,14 @@ defmodule XIAMWeb.Router do
     get "/system/health", SystemController, :health # Keep for backward compatibility
   end
 
+  # MFA API routes - require partial token
+  scope "/api", XIAMWeb.API do
+    pipe_through [:api, :api_jwt]
+    
+    get "/auth/mfa/challenge", AuthController, :mfa_challenge
+    post "/auth/mfa/verify", AuthController, :mfa_verify
+  end
+
   # Protected API routes requiring JWT authentication
   scope "/api", XIAMWeb.API do
     pipe_through [:api, :api_jwt]

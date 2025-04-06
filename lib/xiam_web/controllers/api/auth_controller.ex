@@ -29,26 +29,44 @@ defmodule XIAMWeb.API.AuthController do
         user = Pow.Plug.current_user(conn)
 
         # Log the successful login
-        AuditLogger.log_action("api_login_success", user.id, %{ip: format_ip(conn.remote_ip)}, email)
+        AuditLogger.log_action("api_login_success", user.id, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, email)
 
-        # JWT.generate_token is expected to always succeed in normal operation
-        # but we'll still handle potential errors for robustness
-        {:ok, token, _claims} = JWT.generate_token(user)
+        if user.mfa_enabled do
+          # For MFA-enabled users, return a partial token
+          {:ok, partial_token, _claims} = JWT.generate_partial_token(user)
+          
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            mfa_required: true,
+            partial_token: partial_token,
+            user: %{
+              id: user.id,
+              email: user.email
+            }
+          })
+        else
+          # For users without MFA, proceed with normal flow
+          # JWT.generate_token is expected to always succeed in normal operation
+          # but we'll still handle potential errors for robustness
+          {:ok, token, _claims} = JWT.generate_token(user)
 
-        conn
-        |> put_status(:ok)
-        |> json(%{
-          success: true,
-          token: token,
-          user: %{
-            id: user.id,
-            email: user.email
-          }
-        })
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            token: token,
+            user: %{
+              id: user.id,
+              email: user.email
+            }
+          })
+        end
 
       {:error, conn} ->
         # Log the failed login attempt
-        AuditLogger.log_action("api_login_failure", nil, %{ip: format_ip(conn.remote_ip)}, email)
+        AuditLogger.log_action("api_login_failure", nil, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, email)
 
         conn
         |> put_status(:unauthorized)
@@ -69,7 +87,7 @@ defmodule XIAMWeb.API.AuthController do
     case JWT.refresh_token(claims) do
       {:ok, token, _claims} ->
         # Log the token refresh
-        AuditLogger.log_action("api_token_refresh", user.id, %{ip: format_ip(conn.remote_ip)}, user.email)
+        AuditLogger.log_action("api_token_refresh", user.id, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, user.email)
 
         conn
         |> put_status(:ok)
@@ -128,7 +146,7 @@ defmodule XIAMWeb.API.AuthController do
     user = conn.assigns.current_user
 
     # Log the logout
-    AuditLogger.log_action("api_logout", user.id, %{ip: format_ip(conn.remote_ip)}, user.email)
+    AuditLogger.log_action("api_logout", user.id, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, user.email)
 
     conn
     |> put_status(:ok)
@@ -136,5 +154,80 @@ defmodule XIAMWeb.API.AuthController do
       success: true,
       message: "Logged out successfully"
     })
+  end
+
+  @doc """
+  MFA challenge endpoint.
+  Requires a partial token in the Authorization header.
+  Returns information needed for the MFA challenge.
+  """
+  def mfa_challenge(conn, _params) do
+    user = conn.assigns.current_user
+    
+    # Verify this is a user with MFA enabled
+    if user.mfa_enabled do
+      conn
+      |> put_status(:ok)
+      |> json(%{
+        success: true,
+        message: "Please enter the code from your authenticator app"
+      })
+    else
+      conn
+      |> put_status(:bad_request)
+      |> json(%{
+        success: false,
+        error: "MFA is not enabled for this user"
+      })
+    end
+  end
+
+  @doc """
+  MFA verification endpoint.
+  Verifies the TOTP code and issues a full JWT token if successful.
+  Requires a partial token in the Authorization header.
+  """
+  def mfa_verify(conn, %{"code" => totp_code}) do
+    user = conn.assigns.current_user
+    claims = conn.assigns.jwt_claims
+    
+    # Verify this is a partial token for MFA
+    if claims["typ"] != "mfa_required" or !claims["mfa_pending"] do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{
+        success: false,
+        error: "Invalid authentication flow. Please login again."
+      })
+    else
+      # Verify the TOTP code
+      case XIAM.Users.User.verify_totp(user, totp_code) do
+        true ->
+          # Log the successful MFA verification
+          AuditLogger.log_action("api_mfa_success", user.id, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, user.email)
+          
+          # Generate a full token
+          {:ok, token, _claims} = JWT.generate_token(user)
+          
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            token: token,
+            message: "MFA verification successful"
+          })
+          
+        false ->
+          # Log the failed MFA attempt
+          AuditLogger.log_action("api_mfa_failure", user.id, %{"resource_type" => "api", "ip" => format_ip(conn.remote_ip)}, user.email)
+          
+          conn
+          |> put_status(:unauthorized)
+          |> json(%{
+            success: false,
+            error: "Invalid MFA code"
+          })
+      end
+    end
   end
 end
