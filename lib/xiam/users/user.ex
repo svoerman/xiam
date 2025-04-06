@@ -150,6 +150,7 @@ defmodule XIAM.Users.User do
   @doc """
   Verifies a TOTP code against the user's secret.
   """
+  
   def verify_totp(%__MODULE__{} = user, totp_code) do
     case user.mfa_secret do
       nil -> {:error, :no_mfa_secret}

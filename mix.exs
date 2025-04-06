@@ -87,6 +87,7 @@ defmodule XIAM.MixProject do
       {:cors_plug, "~> 3.0"},
       {:plug_cowboy, "~> 2.7", [hex: :plug_cowboy, repo: "hexpm", optional: false]},
       {:mock, "~> 0.3.7", only: :test},
+      {:mox, "~> 1.1", only: :test},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:qr_code, "~> 3.2.0"},
 

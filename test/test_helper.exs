@@ -12,6 +12,7 @@ Application.put_env(:oban, :plugins, false)
 Application.put_env(:oban, :peer, false)
 Application.put_env(:xiam, :oban_testing, true)
 
+
 # Configure ExUnit 
 ExUnit.configure(exclude: [pending: true])
 ExUnit.start()

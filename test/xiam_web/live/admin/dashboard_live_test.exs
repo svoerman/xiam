@@ -9,7 +9,7 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
   def create_admin_user() do
     # Create a timestamp for unique email
     timestamp = System.system_time(:millisecond)
-    
+
     # Create a user
     {:ok, user} = %User{}
       |> User.pow_changeset(%{
@@ -32,7 +32,7 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
       description: "Product for testing dashboard admin access"
     }
     |> Repo.insert()
-    
+
     # Add admin capability
     {:ok, capability} = %Xiam.Rbac.Capability{
       name: "admin_access",
@@ -40,7 +40,7 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
       product_id: product.id
     }
     |> Repo.insert()
-    
+
     # Associate capability with role
     role
     |> Repo.preload(:capabilities)
@@ -134,33 +134,33 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
 
     test "assigns the correct page title", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
-      
+
       # Test the internal socket assigns
       assert view.module == XIAMWeb.Admin.DashboardLive
       assert render(view) =~ "XIAM Admin Dashboard"
-      
+
       # Get the socket assigns directly
       assert has_element?(view, "[data-test-id='page-title']", "Admin Dashboard")
     end
-    
+
     test "admin_header component works as expected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
-      
+
       # Verify that the admin_header component renders correctly
       assert has_element?(view, ".admin-header")
       assert has_element?(view, "h1", "XIAM Admin Dashboard")
       assert has_element?(view, ".text-sm", "Manage your CIAM system")
     end
-    
+
     test "all dashboard card components render correctly", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
-      
+
       # Verify all cards have the correct styling classes
       assert has_element?(view, ".grid .bg-card")
       assert has_element?(view, ".grid .rounded-lg")
       assert has_element?(view, ".grid .border")
       assert has_element?(view, ".grid .shadow-sm")
-      
+
       # Count the number of cards
       cards = view |> element(".grid") |> render() |> Floki.parse_document!() |> Floki.find(".bg-card")
       assert length(cards) >= 9 # There should be at least 9 cards

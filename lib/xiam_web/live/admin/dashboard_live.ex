@@ -5,7 +5,7 @@ defmodule XIAMWeb.Admin.DashboardLive do
   def mount(_params, _session, socket) do
     {:ok, assign(socket, page_title: "Admin Dashboard")}
   end
-  
+
   # Add a helper function to expose page title for testing
   def page_title(assigns) do
     ~H"""

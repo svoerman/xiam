@@ -165,7 +165,7 @@ defmodule XIAM.Auth.JWT do
     signing_key = get_signing_key!()
     # Shorter expiry for partial tokens (5 minutes)
     partial_token_expiry = 300
-    
+
     claims = %{
       "sub" => user.id,
       "email" => user.email,
