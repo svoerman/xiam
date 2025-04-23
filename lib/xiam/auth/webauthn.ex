@@ -27,7 +27,6 @@ defmodule XIAM.Auth.WebAuthn do
     # Create a new registration challenge
     challenge = Wax.new_registration_challenge(
       rp_id: @rp_id,
-      rp_name: @rp_name,
       user_id: "user-#{user.id}",
       user_name: user.email,
       user_display_name: user.name || user.email,
@@ -44,7 +43,7 @@ defmodule XIAM.Auth.WebAuthn do
       challenge: Base.url_encode64(challenge.bytes, padding: false),
       rp: %{
         id: challenge.rp_id,
-        name: challenge.rp_name
+        name: @rp_name
       },
       user: %{
         id: Base.url_encode64(challenge.user_id, padding: false),
