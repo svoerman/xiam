@@ -13,6 +13,8 @@ defmodule XIAMWeb.Pow.SessionController do
 
   defp handle_authentication_result({:ok, conn}, _params) do
     user = Plug.current_user(conn)
+    # Update last_sign_in_at timestamp
+    _ = XIAM.Users.update_user_login_timestamp(user)
     redirect_path = get_redirect_path_for_user(user)
 
     conn

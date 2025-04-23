@@ -98,16 +98,22 @@ defmodule XIAMWeb.AccountSettingsLive do
   end
 
   defp atomize_and_parse_passkey(map) do
+    allowed_keys = ~w(id name created_at last_used_at credential_id)a
     for {k, v} <- map, into: %{} do
-      key = String.to_atom(k)
-      value =
-        case key do
-          :created_at -> parse_datetime(v)
-          :last_used_at -> parse_datetime(v)
-          _ -> v
-        end
-      {key, value}
+      if k in Enum.map(allowed_keys, &Atom.to_string/1) do
+        key = String.to_existing_atom(k)
+        value =
+          case key do
+            :created_at -> parse_datetime(v)
+            :last_used_at -> parse_datetime(v)
+            _ -> v
+          end
+        {key, value}
+      else
+        nil
+      end
     end
+    |> Enum.reject(&is_nil/1)
   end
 
   defp parse_datetime(nil), do: nil

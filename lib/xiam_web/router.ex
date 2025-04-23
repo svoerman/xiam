@@ -11,6 +11,7 @@ defmodule XIAMWeb.Router do
     plug :put_root_layout, html: {XIAMWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug XIAMWeb.Plugs.CSPHeaderPlug
   end
 
   pipeline :admin_protected do
@@ -29,10 +30,12 @@ defmodule XIAMWeb.Router do
   end
 
   pipeline :skip_csrf_protection do
+    # CSRF protection is skipped ONLY for PowAssent OAuth callback POSTs, which cannot include CSRF tokens.
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_flash
     plug :put_secure_browser_headers
+    plug XIAMWeb.Plugs.CSPHeaderPlug
   end
 
   # API routes with JWT authentication
@@ -46,6 +49,7 @@ defmodule XIAMWeb.Router do
     plug :accepts, ["json"]
     plug :fetch_session
     plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
+    plug :protect_from_forgery
   end
 
   # Pow authentication routes

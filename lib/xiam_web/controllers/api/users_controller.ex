@@ -130,9 +130,12 @@ defmodule XIAMWeb.API.UsersController do
     # Extract role_id before creating user
     {role_id, user_params} = Map.pop(user_params, "role_id")
 
-    # Convert map keys to atoms for Pow Context
-    user_params_map = user_params
-      |> Enum.map(fn {k, v} -> {String.to_atom(k), v} end)
+    # Convert map keys to atoms for Pow Context, but only for allowed keys
+    allowed_keys = ~w(email password password_confirmation)a
+    user_params_map =
+      user_params
+      |> Enum.filter(fn {k, _v} -> k in Enum.map(allowed_keys, &Atom.to_string/1) end)
+      |> Enum.map(fn {k, v} -> {String.to_existing_atom(k), v} end)
       |> Enum.into(%{})
 
     # Create user with Pow with explicit config
