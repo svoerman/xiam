@@ -22,6 +22,10 @@ defmodule XIAM.Users.User do
     # Role relationship
     belongs_to :role, Xiam.Rbac.Role
 
+    # Passkey field
+    field :passkey_enabled, :boolean, default: false
+    has_many :passkeys, XIAM.Auth.UserPasskey
+
     timestamps()
   end
 
@@ -181,17 +185,27 @@ defmodule XIAM.Users.User do
   end
 
   @doc """
+  Changeset for updating passkey settings.
+  """
+  def passkey_changeset(user_or_changeset, attrs) do
+    user_or_changeset
+    |> cast(attrs, [:passkey_enabled])
+    |> validate_required([:passkey_enabled])
+  end
+
+  @doc """
   Changeset for anonymizing user data for GDPR compliance.
   This removes personal information while maintaining references for system integrity.
   """
   def anonymize_changeset(user, attrs) do
     user
-    |> cast(attrs, [:email, :mfa_enabled, :mfa_secret, :mfa_backup_codes])
+    |> cast(attrs, [:email, :mfa_enabled, :mfa_secret, :mfa_backup_codes, :passkey_enabled])
     |> validate_required([:email])
     |> unique_constraint(:email)
     # Clear personal data but maintain user record
     |> put_change(:mfa_enabled, false)
     |> put_change(:mfa_secret, nil)
     |> put_change(:mfa_backup_codes, nil)
+    |> put_change(:passkey_enabled, false)
   end
 end

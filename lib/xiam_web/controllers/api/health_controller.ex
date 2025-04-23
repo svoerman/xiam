@@ -1,15 +1,30 @@
 defmodule XIAMWeb.API.HealthController do
   @moduledoc """
-  Controller for API health check.
-  Provides a simple endpoint for checking API status.
+  Controller for health check endpoints.
+
+  Provides a simple health check endpoint for the API.
+  Returns basic information about the system's health status.
   """
   
   use XIAMWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+  
+  alias XIAMWeb.Schemas.HealthResponse
   
   @doc """
   Provides a simple health check endpoint for the API.
   Returns basic information about the system's health status.
   """
+  # Use the operation/2 macro/function provided by ControllerSpecs
+  operation :index, # Action name atom
+    # Keyword list with operation details
+    summary: "Simple health check endpoint",
+    description: "Returns a simple 200 OK with current status and version.",
+    tags: ["Health"], # Add a tag for grouping in Swagger UI
+    responses: %{
+      # Use the tuple format: {description, content_type, schema}
+      200 => {"OK", "application/json", HealthResponse.Response}
+    }
   def index(conn, _params) do
     # Get application version from mix.exs
     version = Application.spec(:xiam, :vsn) |> to_string()

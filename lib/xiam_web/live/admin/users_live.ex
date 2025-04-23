@@ -2,13 +2,20 @@ defmodule XIAMWeb.Admin.UsersLive do
   use XIAMWeb, :live_view
 
   alias XIAM.Users.User
+  alias XIAM.Users
   alias Xiam.Rbac.Role
   alias XIAM.Repo
   import Ecto.Query
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     theme = if connected?(socket), do: get_connect_params(socket)["theme"], else: "light"
+    current_user = session["pow_user_id"]
+    |> to_int()
+    |> case do
+      id when is_integer(id) -> Repo.get_by(User, id: id)
+      _ -> nil
+    end
 
     users_query = from u in User,
                   left_join: r in assoc(u, :role),
@@ -25,15 +32,25 @@ defmodule XIAMWeb.Admin.UsersLive do
       roles: roles,
       selected_user: nil,
       show_edit_modal: false,
-      show_mfa_modal: false
+      show_mfa_modal: false,
+      show_passkey_modal: false,
+      passkeys: [],
+      current_user: current_user
     )}
   end
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    case Repo.get(User, id) |> Repo.preload(:role) do
-      nil -> {:noreply, socket |> put_flash(:error, "User not found") |> push_patch(to: ~p"/admin/users")}
-      user -> {:noreply, assign(socket, selected_user: user)}
+    user = id
+    |> to_int()
+    |> case do
+      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      _ -> nil
+    end
+    if user do
+      {:noreply, assign(socket, selected_user: user)}
+    else
+      {:noreply, socket |> put_flash(:error, "User not found") |> push_patch(to: ~p"/admin/users")}
     end
   end
 
@@ -43,12 +60,17 @@ defmodule XIAMWeb.Admin.UsersLive do
 
   @impl true
   def handle_event("show_edit_modal", %{"id" => id}, socket) do
-    user = Repo.get(User, id) |> Repo.preload(:role)
+    user = id
+    |> to_int()
+    |> case do
+      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      _ -> nil
+    end
     {:noreply, assign(socket, selected_user: user, show_edit_modal: true)}
   end
 
   def handle_event("close_modal", _, socket) do
-    {:noreply, assign(socket, show_edit_modal: false, show_mfa_modal: false)}
+    {:noreply, assign(socket, show_edit_modal: false, show_mfa_modal: false, show_passkey_modal: false)}
   end
 
   def handle_event("update_user_role", %{"user" => %{"role_id" => role_id}}, socket) do
@@ -64,6 +86,7 @@ defmodule XIAMWeb.Admin.UsersLive do
 
             {:noreply, socket
               |> assign(users: users, show_edit_modal: false)
+              |> assign(current_user: socket.assigns.current_user)
               |> put_flash(:info, "User role updated successfully")}
 
           {:error, changeset} ->
@@ -72,8 +95,67 @@ defmodule XIAMWeb.Admin.UsersLive do
     end
   end
 
+  def handle_event("toggle_passkey", %{"id" => id}, socket) do
+    user = id
+    |> to_int()
+    |> case do
+      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      _ -> nil
+    end
+    
+    case user.passkey_enabled do
+      true ->
+        # Disable passkeys
+        case Users.update_user_passkey_settings(user, %{passkey_enabled: false}) do
+          {:ok, _updated_user} ->
+            users = refresh_users(socket)
+
+            {:noreply, socket
+              |> assign(users: users)
+              |> put_flash(:info, "Passkeys disabled for user")}
+
+          {:error, _changeset} ->
+            {:noreply, socket |> put_flash(:error, "Failed to disable passkeys")}
+        end
+
+      false ->
+        # Show passkey management modal
+        passkeys = Users.list_user_passkeys(user)
+        
+        {:noreply, socket
+          |> assign(
+            selected_user: user,
+            show_passkey_modal: true,
+            passkeys: passkeys
+          )}
+    end
+  end
+  
+  def handle_event("toggle_passkey_setting", %{"value" => value}, socket) do
+    user = socket.assigns.selected_user
+    enable = value == "on"
+
+    case Users.update_user_passkey_settings(user, %{passkey_enabled: enable}) do
+      {:ok, updated_user} ->
+        users = refresh_users(socket)
+        passkeys = if enable, do: Users.list_user_passkeys(updated_user), else: []
+
+        {:noreply, socket
+          |> assign(users: users, selected_user: updated_user, passkeys: passkeys)
+          |> put_flash(:info, if(enable, do: "Passkeys enabled successfully", else: "Passkeys disabled successfully"))}
+
+      {:error, _changeset} ->
+        {:noreply, socket |> put_flash(:error, "Failed to update passkey settings")}
+    end
+  end
+  
   def handle_event("toggle_mfa", %{"id" => id}, socket) do
-    user = Repo.get(User, id) |> Repo.preload(:role)
+    user = id
+    |> to_int()
+    |> case do
+      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      _ -> nil
+    end
 
     case user.mfa_enabled do
       true ->
@@ -128,6 +210,15 @@ defmodule XIAMWeb.Admin.UsersLive do
 
   # Private helpers
 
+  defp to_int(value) when is_integer(value), do: value
+  defp to_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {i, ""} -> i
+      _ -> nil
+    end
+  end
+  defp to_int(_), do: nil
+
   defp refresh_users(_socket) do
     users_query = from u in User,
                   left_join: r in assoc(u, :role),
@@ -158,6 +249,7 @@ defmodule XIAMWeb.Admin.UsersLive do
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">User</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">MFA Status</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Passkey Status</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Joined</th>
                 <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
               </tr>
@@ -183,6 +275,11 @@ defmodule XIAMWeb.Admin.UsersLive do
                       <%= if user.mfa_enabled, do: "Enabled", else: "Disabled" %>
                     </span>
                   </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class={["px-2 inline-flex text-xs leading-5 font-semibold rounded-full", (if user.passkey_enabled, do: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300", else: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300")]}>
+                      <%= if user.passkey_enabled, do: "Enabled", else: "Disabled" %>
+                    </span>
+                  </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <%= Calendar.strftime(user.inserted_at, "%Y-%m-%d %H:%M") %>
                   </td>
@@ -190,8 +287,11 @@ defmodule XIAMWeb.Admin.UsersLive do
                     <button class="text-primary hover:text-primary/80 mr-3 transition-colors" phx-click="show_edit_modal" phx-value-id={user.id}>
                       Edit
                     </button>
-                    <button class={if user.mfa_enabled, do: "text-destructive hover:text-destructive/80", else: "text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-500"} phx-click="toggle_mfa" phx-value-id={user.id} class="transition-colors">
+                    <button class={if user.mfa_enabled, do: "text-destructive hover:text-destructive/80", else: "text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-500"} phx-click="toggle_mfa" phx-value-id={user.id} class="transition-colors mr-3">
                       <%= if user.mfa_enabled, do: "Disable MFA", else: "Enable MFA" %>
+                    </button>
+                    <button class={if user.passkey_enabled, do: "text-destructive hover:text-destructive/80", else: "text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-500"} phx-click="toggle_passkey" phx-value-id={user.id} class="transition-colors">
+                      <%= if user.passkey_enabled, do: "Manage Passkeys", else: "Enable Passkeys" %>
                     </button>
                   </td>
                 </tr>
@@ -296,6 +396,85 @@ defmodule XIAMWeb.Admin.UsersLive do
               <button type="button" phx-click="enable_mfa" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm">
                 Enable MFA
               </button>
+            </div>
+          </div>
+        </div>
+      <% end %>
+      
+      <%= if @show_passkey_modal do %>
+        <div class="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div class="bg-card text-card-foreground rounded-lg shadow-xl max-w-lg w-full mx-auto p-6 border border-border">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-medium text-foreground">Passkey Management</h3>
+              <button class="text-muted-foreground hover:text-foreground transition-colors" phx-click="close_modal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            
+            <div class="mb-6">
+              <p class="text-sm text-muted-foreground mb-4">
+                Passkeys provide a more secure way to sign in without passwords. They use biometrics 
+                (like fingerprint or face) or device PIN to authenticate.
+              </p>
+              
+              <div class="flex items-center mb-4">
+                <label class="inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    class="sr-only peer"
+                    checked={@selected_user.passkey_enabled}
+                    phx-click="toggle_passkey_setting"
+                  />
+                  <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                  <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Enable Passkeys</span>
+                </label>
+              </div>
+            </div>
+            
+            <%= if @selected_user.passkey_enabled do %>
+              <div class="mb-6">
+                <h4 class="text-md font-medium mb-2">Registered Passkeys</h4>
+                <%= if Enum.empty?(@passkeys) do %>
+                  <p class="text-sm text-muted-foreground italic">No passkeys registered yet.</p>
+                <% else %>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-border">
+                      <thead class="bg-muted/50">
+                        <tr>
+                          <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
+                          <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</th>
+                          <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Used</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-background divide-y divide-border">
+                        <%= for passkey <- @passkeys do %>
+                          <tr>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm"><%= passkey.friendly_name %></td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm"><%= Calendar.strftime(passkey.created_at, "%Y-%m-%d %H:%M") %></td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm">
+                              <%= if passkey.last_used_at do %>
+                                <%= Calendar.strftime(passkey.last_used_at, "%Y-%m-%d %H:%M") %>
+                              <% else %>
+                                Never
+                              <% end %>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  </div>
+                <% end %>
+              </div>
+              
+              <p class="text-sm text-muted-foreground mb-4">
+                Note: Currently, passkeys can only be managed by administrators. In the future, you may want to add passkey registration functionality to the user account settings page and login flow.
+              </p>
+            <% end %>
+            
+            <div class="flex justify-end mt-6">
+              <button class="btn btn-primary" phx-click="close_modal">Close</button>
             </div>
           </div>
         </div>

@@ -93,9 +93,9 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-
-
 config :xiam, :pow,
+  plug: Pow.Plug.Session,
+  otp_app: :xiam,
   user: XIAM.Users.User,
   repo: XIAM.Repo,
   web_module: XIAMWeb,
@@ -163,6 +163,9 @@ config :plug_attack,
     }
     # Add more rules here for other endpoints if needed
   ]
+
+# Import WebAuthn (Passkey) configuration
+import_config "webauthn.exs"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

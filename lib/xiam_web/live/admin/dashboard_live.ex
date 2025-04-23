@@ -6,13 +6,6 @@ defmodule XIAMWeb.Admin.DashboardLive do
     {:ok, assign(socket, page_title: "Admin Dashboard")}
   end
 
-  # Add a helper function to expose page title for testing
-  def page_title(assigns) do
-    ~H"""
-    <span data-test-id="page-title"><%= @page_title %></span>
-    """
-  end
-
   @impl true
   def handle_event("toggle_theme", _, socket) do
     {:noreply, socket}
@@ -21,6 +14,7 @@ defmodule XIAMWeb.Admin.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <span data-test-id="page-title"><%= @page_title %></span>
     <div class="container mx-auto px-4 py-8">
       <div class="admin-header">
         <.admin_header

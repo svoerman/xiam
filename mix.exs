@@ -5,7 +5,7 @@ defmodule XIAM.MixProject do
     [
       app: :xiam,
       version: "0.1.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -88,6 +88,7 @@ defmodule XIAM.MixProject do
       {:plug_cowboy, "~> 2.7", [hex: :plug_cowboy, repo: "hexpm", optional: false]},
       {:mock, "~> 0.3.7", only: :test},
       {:mox, "~> 1.1", only: :test},
+      {:open_api_spex, "~> 3.21"}, # Updated for Elixir 1.18 compatibility
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:qr_code, "~> 3.2.0"},
 
@@ -98,7 +99,12 @@ defmodule XIAM.MixProject do
 
       # Security
       {:plug_attack, "~> 0.4.3"},
-      {:uuid, "~> 1.1"}
+      {:uuid, "~> 1.1"},
+
+      # WebAuthn/Passkey support
+      {:wax_, "~> 0.6.7"},
+      {:cbor, "~> 1.0.0"},
+      {:credo, "~> 1.6", only: [:dev, :test]}
     ]
   end
 

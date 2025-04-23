@@ -6,6 +6,7 @@ defmodule XIAMWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug Pow.Plug.Session
     plug :fetch_live_flash
     plug :put_root_layout, html: {XIAMWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -17,8 +18,13 @@ defmodule XIAMWeb.Router do
     plug XIAMWeb.Plugs.AdminAuthPlug
   end
 
+  pipeline :protected do
+    plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: XIAMWeb.ApiSpec
     plug :put_secure_browser_headers
     # PlugAttack needs different integration method
   end
@@ -35,6 +41,12 @@ defmodule XIAMWeb.Router do
     plug :accepts, ["json"]
     plug CORSPlug, origin: ["*"]
     plug XIAMWeb.Plugs.APIAuthPlug
+  end
+
+  pipeline :api_session do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
   end
 
   # Pow authentication routes
@@ -56,32 +68,59 @@ defmodule XIAMWeb.Router do
     # Home page
     get "/", PageController, :home
 
-    # Documentation routes
-    get "/api/docs", SwaggerController, :index
-    get "/swagger/api-spec.json", SwaggerController, :api_json
-    get "/api/docs/swagger.json", SwaggerController, :api_json
+    # Authentication routes
+    get "/auth/passkey/complete", AuthController, :complete_passkey_auth
 
     # LiveView routes
     live "/shadcn", ShadcnDemoLive, :index
     live "/docs", DocsLive, :index
   end
 
+  # Serve OpenAPI Specification and Swagger UI
+  scope "/api/docs" do
+    pipe_through [:api]
+
+    # Serve Swagger UI (if you want to keep the UI, point it to the static JSON)
+    # You can keep the UI route if desired, but it must use the static JSON now.
+    get "/", OpenApiSpex.Plug.SwaggerUI, path: "/api/docs/openapi.json"
+
+    # Serve static OpenAPI JSON
+    get "/openapi.json", XIAMWeb.SwaggerController, :api_json
+  end
+
+  # User account routes
+  scope "/account", XIAMWeb do
+    pipe_through [:browser, :protected]
+    
+    # Use LiveAuth hooks for user authentication
+    live_session :account,
+      on_mount: {XIAMWeb.LiveAuth, :require_authenticated},
+      session: {XIAMWeb.LiveAuth, :build_admin_session, []} do
+      live "/", AccountSettingsLive, :index
+    end
+  end
+
   # Admin routes
   scope "/admin", XIAMWeb.Admin do
     pipe_through [:browser, :admin_protected]
-
-    live "/", DashboardLive, :index
-    live "/users", UsersLive, :index
-    live "/users/:id", UsersLive, :show
-    live "/roles", RolesLive, :index
-    live "/roles/:id", RolesLive, :show
-    live "/entity-access", EntityAccessLive, :index
-    live "/products", ProductsLive, :index
-    live "/gdpr", GDPRLive, :index
-    live "/settings", SettingsLive, :index
-    live "/audit-logs", AuditLogsLive, :index
-    live "/status", StatusLive, :index
-    live "/consents", ConsentRecordsLive, :index
+    
+    # Use LiveAuth hooks for admin authentication
+    live_session :admin,
+      on_mount: {XIAMWeb.LiveAuth, :require_admin},
+      session: {XIAMWeb.LiveAuth, :build_admin_session, []} do
+      live "/", DashboardLive, :index
+      live "/users", UsersLive, :index
+      live "/users/:id", UsersLive, :show
+      live "/roles", RolesLive, :index
+      live "/roles/:id", RolesLive, :show
+      live "/entity-access", EntityAccessLive, :index
+      live "/products", ProductsLive, :index
+      live "/gdpr", GDPRLive, :index
+      live "/settings", SettingsLive, :index
+      live "/audit-logs", AuditLogsLive, :index
+      live "/status", StatusLive, :index
+      live "/consents", ConsentRecordsLive, :index
+    end
   end
 
   # Unprotected API routes
@@ -92,6 +131,10 @@ defmodule XIAMWeb.Router do
     get "/health", HealthController, :index
     get "/health/detailed", HealthController, :health
     get "/system/health", SystemController, :health # Keep for backward compatibility
+    
+    # Passkey authentication routes (unprotected)
+    get "/auth/passkey/options", PasskeyController, :authentication_options
+    post "/auth/passkey", PasskeyController, :authenticate
   end
 
   # MFA API routes - require partial token
@@ -100,6 +143,16 @@ defmodule XIAMWeb.Router do
     
     get "/auth/mfa/challenge", AuthController, :mfa_challenge
     post "/auth/mfa/verify", AuthController, :mfa_verify
+  end
+
+  # Passkey API using session cookies
+  scope "/api", XIAMWeb.API do
+    pipe_through [:api_session]
+    get "/passkeys/registration_options", PasskeyController, :registration_options
+    post "/passkeys/register", PasskeyController, :register
+    get "/passkeys", PasskeyController, :list_passkeys
+    get "/passkeys/debug", PasskeyController, :debug_passkeys  # Debug endpoint
+    delete "/passkeys/:id", PasskeyController, :delete_passkey
   end
 
   # Protected API routes requiring JWT authentication

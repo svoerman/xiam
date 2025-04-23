@@ -1,4 +1,7 @@
 defmodule XIAMWeb.Layouts do
+  use Phoenix.Component
+  import XIAMWeb.HeaderComponent, only: [main_header: 1]
+
   @moduledoc """
   This module holds different layouts used by your application.
 

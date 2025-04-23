@@ -43,8 +43,7 @@ defmodule XIAMWeb.Pow.SessionController do
   end
 
   defp is_admin?(user) do
-    user.role != nil &&
-    user.role.name == "Administrator" &&
-    Enum.any?(user.role.capabilities || [], &(&1.name == "admin_access"))
+    # Use the same admin check as XIAMWeb.Plugs.AuthHelpers
+    XIAMWeb.Plugs.AuthHelpers.has_admin_privileges?(user)
   end
 end

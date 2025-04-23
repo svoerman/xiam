@@ -36,7 +36,11 @@ defmodule XIAMWeb.Admin.GDPRLive do
 
   @impl true
   def handle_params(%{"user_id" => user_id}, _uri, socket) do
-    user = Repo.get(User, user_id)
+    # Convert user_id to integer and fetch user
+    user = case Integer.parse(user_id) do
+      {id, ""} -> Repo.get_by(User, id: id)
+      _ -> nil
+    end
 
     if user do
       consents = Consent.get_user_consents(user.id)

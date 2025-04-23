@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "XIAM API",
-    "description": "API Documentation for XIAM Identity and Access Management system",
-    "version": "1.0.0"
+    "version": "0.1.0",
+    "description": "API for XIAM user authentication and management."
   },
   "servers": [
     {
@@ -13,117 +13,506 @@
   ],
   "components": {
     "securitySchemes": {
-      "bearerAuth": {
+      "jwt": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT token in the format: Bearer [token]"
+        "description": "JWT authentication token. Prefix with 'Bearer '."
+      },
+      "session": {
+        "type": "apiKey",
+        "name": "_xiam_key",
+        "in": "cookie",
+        "description": "Session cookie authentication (used for passkey management)"
+      },
+      "partialJwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Partial JWT token issued during MFA flow. Prefix with 'Bearer '."
       }
     },
     "schemas": {
-      "User": {
+      "ErrorResponse": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "User's unique identifier"
+          "success": {"type": "boolean", "example": false},
+          "error": {"type": "string"},
+          "details": {"type": "object", "nullable": true, "description": "Validation errors"}
+        },
+        "required": ["success", "error"]
+      },
+      "SuccessMessageResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "message": {"type": "string"}
+        },
+        "required": ["success", "message"]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": {"type": "integer"},
+          "per_page": {"type": "integer"},
+          "total": {"type": "integer"},
+          "total_pages": {"type": "integer"}
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string", "example": "ok"},
+          "version": {"type": "string", "example": "0.1.0"},
+          "environment": {"type": "string", "example": "dev"},
+          "timestamp": {"type": "string", "format": "date-time"}
+        }
+      },
+      "DetailedStatusResponse": {
+        "type": "object",
+        "description": "Detailed system status",
+        "properties": {
+          "db_status": {"type": "string", "example": "ok"},
+          "memory": {
+            "type": "object",
+            "properties": {
+              "total": {"type": "number", "format": "float", "description": "Total memory in MB"},
+              "allocated": {"type": "number", "format": "float", "description": "Allocated memory in MB"},
+              "atom": {"type": "number", "format": "float", "description": "Atom memory in MB"},
+              "binary": {"type": "number", "format": "float", "description": "Binary memory in MB"},
+              "code": {"type": "number", "format": "float", "description": "Code memory in MB"},
+              "ets": {"type": "number", "format": "float", "description": "ETS memory in MB"},
+              "processes": {"type": "number", "format": "float", "description": "Processes memory in MB"}
+            }
           },
-          "email": {
-            "type": "string",
-            "description": "User's email address"
-          },
-          "mfa_enabled": {
-            "type": "boolean",
-            "description": "Whether multi-factor authentication is enabled for the user"
+          "version": {"type": "string", "example": "0.1.0"},
+          "environment": {"type": "string", "example": "dev"},
+          "timestamp": {"type": "string", "format": "date-time"}
+        }
+      },
+      "SystemStatusResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "status": {"type": "string", "example": "ok"},
+          "uptime": {"type": "string", "example": "3 days, 2 hours, 1 minute"},
+          "stats": {
+            "type": "object",
+            "properties": {
+              "users": {"type": "integer", "example": 1250},
+              "active_sessions": {"type": "integer", "example": 48}
+            }
           }
         }
       },
-      "Role": {
+      "LoginRequest": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Role's unique identifier"
+          "email": {"type": "string", "format": "email"},
+          "password": {"type": "string", "format": "password"}
+        },
+        "required": ["email", "password"]
+      },
+      "LoginSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "mfa_required": {"type": "boolean", "example": false, "nullable": true, "description": "Indicates if MFA verification step is required"},
+          "partial_token": {"type": "string", "description": "Partial JWT token issued if mfa_required is true", "nullable": true},
+          "token": {"type": "string", "description": "Full JWT token if login is complete (no MFA or MFA verified)", "nullable": true},
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "integer"},
+              "email": {"type": "string"}
+            }
+          }
+        },
+        "required": ["success"]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "token": {"type": "string", "description": "JWT token"}
+        },
+        "required": ["success", "token"]
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "valid": {"type": "boolean", "example": true},
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "integer"},
+              "email": {"type": "string"},
+              "mfa_enabled": {"type": "boolean"},
+              "role": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "id": {"type": "integer"},
+                  "name": {"type": "string"},
+                  "capabilities": {"type": "array", "items": {"type": "string"}}
+                }
+              }
+            }
+          }
+        },
+        "required": ["success", "valid", "user"]
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "message": {"type": "string", "example": "Logged out successfully"}
+        },
+        "required": ["success", "message"]
+      },
+      "MfaChallengeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "message": {"type": "string", "example": "Please enter the code from your authenticator app"}
+        },
+        "required": ["success", "message"]
+      },
+      "MfaVerifyRequest": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "string", "description": "The TOTP code from the authenticator app"}
+        },
+        "required": ["code"]
+      },
+      "UserBase": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "email": {"type": "string"},
+          "mfa_enabled": {"type": "boolean"},
+          "role": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {"type": "integer"},
+              "name": {"type": "string"}
+            }
           },
-          "name": {
-            "type": "string",
-            "description": "Role name"
-          },
-          "capabilities": {
+          "inserted_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/UserBase"}},
+          "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"$ref": "#/components/schemas/UserBase"}
+        }
+      },
+      "UserCreateRequest": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string", "format": "email"},
+          "password": {"type": "string", "format": "password"},
+          "password_confirmation": {"type": "string", "format": "password"},
+          "role_id": {"type": "integer", "nullable": true}
+        },
+        "required": ["email", "password", "password_confirmation"]
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string", "format": "email"},
+          "current_password": {"type": "string", "format": "password"},
+          "password": {"type": "string", "format": "password", "nullable": true},
+          "password_confirmation": {"type": "string", "format": "password", "nullable": true},
+          "role_id": {"type": "integer", "nullable": true},
+          "mfa_enabled": {"type": "boolean", "nullable": true}
+        }
+      },
+      "ConsentBase": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "type": {"type": "string", "enum": ["marketing", "data_processing", "terms_and_conditions"]},
+          "granted": {"type": "boolean"},
+          "data": {"type": "object", "nullable": true},
+          "inserted_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "ConsentListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/ConsentBase"}},
+          "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+        }
+      },
+      "ConsentCreateRequest": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "integer"},
+          "type": {"type": "string", "enum": ["marketing", "data_processing", "terms_and_conditions"]},
+          "granted": {"type": "boolean"},
+          "data": {"type": "object", "nullable": true}
+        },
+        "required": ["user_id", "type", "granted"]
+      },
+      "ConsentUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "granted": {"type": "boolean"},
+          "data": {"type": "object", "nullable": true}
+        },
+        "required": ["granted"]
+      },
+      "UserAccessRequest": {
+        "type": "object",
+        "properties": {
+          "user_id": {"type": "integer"},
+          "product_id": {"type": "integer"},
+          "role_id": {"type": "integer"}
+        },
+        "required": ["user_id", "product_id", "role_id"]
+      },
+      "UserAccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {
             "type": "array",
             "items": {
-              "type": "string"
-            },
-            "description": "List of capabilities associated with the role"
+              "type": "object",
+              "properties": {
+                "id": {"type": "integer"},
+                "user_id": {"type": "integer"},
+                "product_id": {"type": "integer"},
+                "role_id": {"type": "integer"},
+                "product": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string", "nullable": true}
+                  }
+                },
+                "role": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "capabilities": {
+                      "type": "array",
+                      "items": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
-      "ConsentRecord": {
+      "ProductBase": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Consent record's unique identifier"
-          },
-          "consent_type": {
-            "type": "string",
-            "description": "Type of consent (e.g., marketing_emails, data_processing)"
-          },
-          "consent_given": {
-            "type": "boolean",
-            "description": "Whether consent was given"
-          },
-          "revoked_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When the consent was revoked, if applicable"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "ID of the user who gave/denied consent"
-          },
-          "ip_address": {
-            "type": "string",
-            "description": "IP address from which consent was given/denied"
-          },
-          "user_agent": {
-            "type": "string",
-            "description": "User agent from which consent was given/denied"
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "description": {"type": "string", "nullable": true},
+          "inserted_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "ProductListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/ProductBase"}}
+        }
+      },
+      "ProductCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "description": {"type": "string", "nullable": true}
+        },
+        "required": ["name"]
+      },
+      "CapabilityBase": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "product_id": {"type": "integer"},
+          "inserted_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "CapabilityListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/CapabilityBase"}}
+        }
+      },
+      "CapabilityCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "product_id": {"type": "integer"}
+        },
+        "required": ["name", "product_id"]
+      },
+      "AuthenticationOptionsRequest": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string", "format": "email"}
+        },
+        "required": ["email"]
+      },
+      "AuthenticationOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "options": {
+            "type": "object",
+            "properties": {
+              "challenge": {"type": "string"},
+              "timeout": {"type": "integer"},
+              "rpId": {"type": "string"},
+              "allowCredentials": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "type": {"type": "string", "enum": ["public-key"]}
+                  }
+                }
+              },
+              "userVerification": {"type": "string", "enum": ["preferred", "required", "discouraged"]}
+            }
           }
         }
       },
-      "Error": {
+      "AuthenticationRequest": {
         "type": "object",
         "properties": {
-          "error": {
-            "type": "string",
-            "description": "Error message"
+          "id": {"type": "string"},
+          "rawId": {"type": "string"},
+          "response": {
+            "type": "object",
+            "properties": {
+              "clientDataJSON": {"type": "string"},
+              "authenticatorData": {"type": "string"},
+              "signature": {"type": "string"},
+              "userHandle": {"type": "string", "nullable": true}
+            }
+          },
+          "type": {"type": "string", "enum": ["public-key"]}
+        },
+        "required": ["id", "rawId", "response", "type"]
+      },
+      "RegistrationOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "options": {
+            "type": "object",
+            "properties": {
+              "challenge": {"type": "string"},
+              "rp": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "id": {"type": "string"}
+                }
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {"type": "string"},
+                  "name": {"type": "string"},
+                  "displayName": {"type": "string"}
+                }
+              },
+              "pubKeyCredParams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {"type": "string", "enum": ["public-key"]},
+                    "alg": {"type": "integer"}
+                  }
+                }
+              },
+              "timeout": {"type": "integer"},
+              "attestation": {"type": "string", "enum": ["none", "direct", "indirect"]},
+              "excludeCredentials": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "type": {"type": "string", "enum": ["public-key"]}
+                  }
+                }
+              },
+              "authenticatorSelection": {
+                "type": "object",
+                "properties": {
+                  "authenticatorAttachment": {"type": "string", "enum": ["platform", "cross-platform"]},
+                  "requireResidentKey": {"type": "boolean"},
+                  "userVerification": {"type": "string", "enum": ["preferred", "required", "discouraged"]}
+                }
+              }
+            }
           }
         }
       },
-      "EntityAccess": {
+      "RegistrationRequest": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Access entry's unique identifier"
+          "name": {"type": "string"},
+          "id": {"type": "string"},
+          "rawId": {"type": "string"},
+          "response": {
+            "type": "object",
+            "properties": {
+              "clientDataJSON": {"type": "string"},
+              "attestationObject": {"type": "string"},
+              "transports": {"type": "array", "items": {"type": "string"}}
+            }
           },
-          "user_id": {
-            "type": "string",
-            "description": "ID of the user"
-          },
-          "entity_type": {
-            "type": "string",
-            "description": "Type of the entity (e.g., 'document', 'project')"
-          },
-          "entity_id": {
-            "type": "string",
-            "description": "ID of the specific entity"
-          },
-          "role_id": {
-            "type": "string",
-            "description": "ID of the role assigned for this access"
-          }
+          "type": {"type": "string", "enum": ["public-key"]}
+        },
+        "required": ["name", "id", "rawId", "response", "type"]
+      },
+      "PasskeyBase": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "last_used_at": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "PasskeyListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean", "example": true},
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/PasskeyBase"}}
         }
       }
     }
@@ -131,68 +520,37 @@
   "paths": {
     "/api/auth/login": {
       "post": {
-        "summary": "Authenticate user and get JWT token",
-        "description": "Login with email and password to receive a JWT token. For users with MFA enabled, returns a partial token that must be used with the MFA verification endpoint.",
-        "tags": ["Auth"],
+        "summary": "User login",
+        "description": "Authenticate a user with email and password",
+        "operationId": "login",
+        "tags": ["Authentication"],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["email", "password"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "description": "User's email address"
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "User's password"
-                  }
-                }
+                "$ref": "#/components/schemas/LoginRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Successful login",
+            "description": "Success - may require MFA or login directly",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "mfa_required": {
-                      "type": "boolean",
-                      "description": "Indicates if MFA verification is required"
-                    },
-                    "token": {
-                      "type": "string",
-                      "description": "JWT Token (only present if MFA is not required)"
-                    },
-                    "partial_token": {
-                      "type": "string",
-                      "description": "Partial JWT Token for MFA flow (only present if MFA is required)"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "$ref": "#/components/schemas/LoginSuccessResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized - invalid credentials",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -200,93 +558,44 @@
         }
       }
     },
-    "/api/auth/refresh": {
-      "post": {
-        "summary": "Refresh JWT token",
-        "description": "Refresh an existing JWT token with a new one",
-        "tags": ["Auth"],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successfully refreshed token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "token": {
-                      "type": "string",
-                      "description": "New JWT Token"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/verify": {
+    "/api/health": {
       "get": {
-        "summary": "Verify JWT token",
-        "description": "Verify a JWT token and get user information",
-        "tags": ["Auth"],
+        "summary": "Basic Health Check",
+        "description": "Get basic system health status",
+        "operationId": "basicHealth",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Basic health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/detailed": {
+      "get": {
+        "summary": "Detailed Health Check",
+        "description": "Get detailed system health metrics",
+        "operationId": "detailedHealth",
+        "tags": ["System"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Token is valid",
+            "description": "Detailed health metrics",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "user": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "description": "User ID"
-                        },
-                        "email": {
-                          "type": "string",
-                          "description": "User email"
-                        },
-                        "mfa_enabled": {
-                          "type": "boolean",
-                          "description": "MFA status"
-                        },
-                        "role": {
-                          "$ref": "#/components/schemas/Role"
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/DetailedStatusResponse"
                 }
               }
             }
@@ -296,7 +605,124 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/health": {
+      "get": {
+        "summary": "System Health",
+        "description": "Get system health status",
+        "operationId": "systemHealth",
+        "tags": ["System"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "System health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkey/options": {
+      "get": {
+        "summary": "Get Passkey Authentication Options",
+        "description": "Get challenge and options for passkey authentication",
+        "operationId": "passkeyAuthenticationOptions",
+        "tags": ["Authentication", "Passkey"],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            },
+            "description": "User's email address"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authentication options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticationOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkey": {
+      "post": {
+        "summary": "Authenticate with Passkey",
+        "description": "Authenticate a user with passkey credentials",
+        "operationId": "passkeyAuthenticate",
+        "tags": ["Authentication", "Passkey"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginSuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -306,51 +732,22 @@
     },
     "/api/auth/mfa/challenge": {
       "get": {
-        "summary": "MFA Challenge",
-        "description": "Get MFA challenge information for a user with MFA enabled",
-        "tags": ["Auth"],
+        "summary": "Request MFA Challenge",
+        "description": "Request a challenge for MFA verification",
+        "operationId": "mfaChallenge",
+        "tags": ["Authentication", "MFA"],
         "security": [
           {
-            "bearerAuth": []
+            "partialJwt": []
           }
         ],
         "responses": {
           "200": {
-            "description": "MFA challenge information",
+            "description": "MFA challenge message",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Please enter the code from your authenticator app"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "MFA not enabled for user",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "MFA is not enabled for this user"
-                    }
-                  }
+                  "$ref": "#/components/schemas/MfaChallengeResponse"
                 }
               }
             }
@@ -360,13 +757,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Unauthorized"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -377,30 +768,23 @@
     "/api/auth/mfa/verify": {
       "post": {
         "summary": "Verify MFA Code",
-        "description": "Verify the TOTP code provided by the user and issue a full JWT token",
-        "tags": ["Auth"],
+        "description": "Verify the MFA code to complete login",
+        "operationId": "mfaVerify",
+        "tags": ["Authentication", "MFA"],
         "security": [
           {
-            "bearerAuth": []
+            "partialJwt": []
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["code"],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "description": "TOTP code from authenticator app",
-                    "example": "123456"
-                  }
-                }
+                "$ref": "#/components/schemas/MfaVerifyRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -408,41 +792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "token": {
-                      "type": "string",
-                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "MFA verification successful"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid authentication flow",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Invalid authentication flow. Please login again."
-                    }
-                  }
+                  "$ref": "#/components/schemas/TokenResponse"
                 }
               }
             }
@@ -452,17 +802,293 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "error": {
-                      "type": "string",
-                      "example": "Invalid MFA code"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passkeys/registration_options": {
+      "get": {
+        "summary": "Get Passkey Registration Options",
+        "description": "Get challenge and options for registering a new passkey",
+        "operationId": "passkeyRegistrationOptions",
+        "tags": ["Passkey"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registration options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOptionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passkeys/register": {
+      "post": {
+        "summary": "Register Passkey",
+        "description": "Register a new passkey for the authenticated user",
+        "operationId": "registerPasskey",
+        "tags": ["Passkey"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid registration data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passkeys": {
+      "get": {
+        "summary": "List User Passkeys",
+        "description": "Get a list of passkeys registered for the authenticated user",
+        "operationId": "listPasskeys",
+        "tags": ["Passkey"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of passkeys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passkeys/debug": {
+      "get": {
+        "summary": "Debug Passkeys",
+        "description": "Get debug information about passkeys (development only)",
+        "operationId": "debugPasskeys",
+        "tags": ["Passkey", "Debug"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passkeys/{id}": {
+      "delete": {
+        "summary": "Delete Passkey",
+        "description": "Delete a passkey by ID",
+        "operationId": "deletePasskey",
+        "tags": ["Passkey"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Passkey ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passkey deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Passkey not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Refresh Token",
+        "description": "Refresh an authentication token",
+        "operationId": "refreshToken",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or token expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/verify": {
+      "get": {
+        "summary": "Verify Token",
+        "description": "Verify an authentication token and get user information",
+        "operationId": "verifyToken",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -472,31 +1098,22 @@
     },
     "/api/auth/logout": {
       "post": {
-        "summary": "Logout user",
-        "description": "Logout and invalidate the session (for audit purposes)",
-        "tags": ["Auth"],
+        "summary": "Logout",
+        "description": "Log out a user and invalidate their token",
+        "operationId": "logout",
+        "tags": ["Authentication"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Successfully logged out",
+            "description": "Logged out successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "message": {
-                      "type": "string",
-                      "description": "Success message"
-                    }
-                  }
+                  "$ref": "#/components/schemas/LogoutResponse"
                 }
               }
             }
@@ -506,32 +1123,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/health": {
-      "get": {
-        "summary": "Health check",
-        "description": "Check if the API is up and running",
-        "tags": ["System"],
-        "responses": {
-          "200": {
-            "description": "API is healthy",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "description": "Health status"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -541,39 +1133,22 @@
     },
     "/api/system/status": {
       "get": {
-        "summary": "System status",
-        "description": "Get detailed system status information",
+        "summary": "System Status",
+        "description": "Get detailed system status and statistics",
+        "operationId": "systemStatus",
         "tags": ["System"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "responses": {
           "200": {
-            "description": "System status information",
+            "description": "System status and statistics",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "description": "Overall system status"
-                    },
-                    "version": {
-                      "type": "string",
-                      "description": "System version"
-                    },
-                    "uptime": {
-                      "type": "number",
-                      "description": "System uptime in seconds"
-                    },
-                    "resources": {
-                      "type": "object",
-                      "description": "System resource utilization"
-                    }
-                  }
+                  "$ref": "#/components/schemas/SystemStatusResponse"
                 }
               }
             }
@@ -583,7 +1158,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -593,32 +1168,36 @@
     },
     "/api/users": {
       "get": {
-        "summary": "List users",
-        "description": "Get a list of users",
+        "summary": "List Users",
+        "description": "Get a paginated list of users",
+        "operationId": "listUsers",
         "tags": ["Users"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "page",
             "in": "query",
-            "description": "Page number",
             "schema": {
               "type": "integer",
+              "minimum": 1,
               "default": 1
-            }
+            },
+            "description": "Page number"
           },
           {
             "name": "per_page",
             "in": "query",
-            "description": "Number of items per page",
             "schema": {
               "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
               "default": 20
-            }
+            },
+            "description": "Items per page"
           }
         ],
         "responses": {
@@ -627,27 +1206,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/User"
-                      }
-                    },
-                    "total_count": {
-                      "type": "integer",
-                      "description": "Total number of users"
-                    },
-                    "page": {
-                      "type": "integer",
-                      "description": "Current page"
-                    },
-                    "total_pages": {
-                      "type": "integer",
-                      "description": "Total number of pages"
-                    }
-                  }
+                  "$ref": "#/components/schemas/UserListResponse"
                 }
               }
             }
@@ -657,7 +1216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -665,65 +1224,42 @@
         }
       },
       "post": {
-        "summary": "Create user",
+        "summary": "Create User",
         "description": "Create a new user",
+        "operationId": "createUser",
         "tags": ["Users"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["email", "password"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "description": "User's email address"
-                  },
-                  "password": {
-                    "type": "string",
-                    "description": "User's password"
-                  },
-                  "role_id": {
-                    "type": "string",
-                    "description": "ID of the role to assign to the user"
-                  }
-                }
+                "$ref": "#/components/schemas/UserCreateRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {
-            "description": "User created",
+            "description": "User created successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Invalid request data",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -733,7 +1269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -743,23 +1279,24 @@
     },
     "/api/users/{id}": {
       "get": {
-        "summary": "Get user",
+        "summary": "Get User",
         "description": "Get a user by ID",
+        "operationId": "getUser",
         "tags": ["Users"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "User ID",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
@@ -768,16 +1305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             }
@@ -787,7 +1315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -797,7 +1325,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -805,75 +1333,53 @@
         }
       },
       "put": {
-        "summary": "Update user",
+        "summary": "Update User",
         "description": "Update a user by ID",
+        "operationId": "updateUser",
         "tags": ["Users"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "User ID",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "User ID"
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "description": "User's email address"
-                  },
-                  "role_id": {
-                    "type": "string",
-                    "description": "ID of the role to assign to the user"
-                  },
-                  "mfa_enabled": {
-                    "type": "boolean",
-                    "description": "Whether to enable MFA for the user"
-                  }
-                }
+                "$ref": "#/components/schemas/UserUpdateRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "User updated",
+            "description": "User updated successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "$ref": "#/components/schemas/UserResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Invalid request data",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -883,7 +1389,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -893,7 +1399,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -901,38 +1407,33 @@
         }
       },
       "delete": {
-        "summary": "Delete user",
+        "summary": "Delete User",
         "description": "Delete a user by ID",
+        "operationId": "deleteUser",
         "tags": ["Users"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "User ID",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
           "200": {
-            "description": "User deleted",
+            "description": "User deleted successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    }
-                  }
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
                 }
               }
             }
@@ -942,7 +1443,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -952,7 +1453,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -962,77 +1463,53 @@
     },
     "/api/consents": {
       "get": {
-        "summary": "List consent records",
-        "description": "Get a list of consent records",
-        "tags": ["Consent"],
+        "summary": "List Consents",
+        "description": "Get a paginated list of consents",
+        "operationId": "listConsents",
+        "tags": ["Consents"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "page",
             "in": "query",
-            "description": "Page number",
             "schema": {
               "type": "integer",
+              "minimum": 1,
               "default": 1
-            }
+            },
+            "description": "Page number"
           },
           {
             "name": "per_page",
             "in": "query",
-            "description": "Number of items per page",
             "schema": {
               "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
               "default": 20
-            }
-          },
-          {
-            "name": "consent_type",
-            "in": "query",
-            "description": "Filter by consent type",
-            "schema": {
-              "type": "string"
-            }
+            },
+            "description": "Items per page"
           },
           {
             "name": "user_id",
             "in": "query",
-            "description": "Filter by user ID",
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "Filter by user ID"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of consent records",
+            "description": "List of consents",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ConsentRecord"
-                      }
-                    },
-                    "total_count": {
-                      "type": "integer",
-                      "description": "Total number of consent records"
-                    },
-                    "page": {
-                      "type": "integer",
-                      "description": "Current page"
-                    },
-                    "total_pages": {
-                      "type": "integer",
-                      "description": "Total number of pages"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ConsentListResponse"
                 }
               }
             }
@@ -1042,7 +1519,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1050,65 +1527,42 @@
         }
       },
       "post": {
-        "summary": "Create consent record",
+        "summary": "Create Consent",
         "description": "Create a new consent record",
-        "tags": ["Consent"],
+        "operationId": "createConsent",
+        "tags": ["Consents"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["consent_type", "consent_given", "user_id"],
-                "properties": {
-                  "consent_type": {
-                    "type": "string",
-                    "description": "Type of consent"
-                  },
-                  "consent_given": {
-                    "type": "boolean",
-                    "description": "Whether consent is given"
-                  },
-                  "user_id": {
-                    "type": "string",
-                    "description": "ID of the user giving/denying consent"
-                  }
-                }
+                "$ref": "#/components/schemas/ConsentCreateRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {
-            "description": "Consent record created",
+            "description": "Consent created successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "consent_record": {
-                      "$ref": "#/components/schemas/ConsentRecord"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ConsentBase"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Invalid request data",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1118,7 +1572,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1128,67 +1582,53 @@
     },
     "/api/consents/{id}": {
       "put": {
-        "summary": "Update consent record",
+        "summary": "Update Consent",
         "description": "Update a consent record by ID",
-        "tags": ["Consent"],
+        "operationId": "updateConsent",
+        "tags": ["Consents"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "Consent record ID",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "Consent ID"
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "consent_given": {
-                    "type": "boolean",
-                    "description": "Whether consent is given"
-                  }
-                }
+                "$ref": "#/components/schemas/ConsentUpdateRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Consent record updated",
+            "description": "Consent updated successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    },
-                    "consent_record": {
-                      "$ref": "#/components/schemas/ConsentRecord"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ConsentBase"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Invalid request data",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1198,17 +1638,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Consent record not found",
+            "description": "Consent not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1216,38 +1656,33 @@
         }
       },
       "delete": {
-        "summary": "Delete consent record",
+        "summary": "Delete Consent",
         "description": "Delete a consent record by ID",
-        "tags": ["Consent"],
+        "operationId": "deleteConsent",
+        "tags": ["Consents"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "Consent record ID",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "Consent ID"
           }
         ],
         "responses": {
           "200": {
-            "description": "Consent record deleted",
+            "description": "Consent deleted successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    }
-                  }
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
                 }
               }
             }
@@ -1257,17 +1692,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Consent record not found",
+            "description": "Consent not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1277,42 +1712,24 @@
     },
     "/api/access": {
       "post": {
-        "summary": "Set user access to entity",
-        "description": "Create or update user access to a specific entity",
+        "summary": "Set User Access",
+        "description": "Assign a role to a user for a specific product",
+        "operationId": "setUserAccess",
         "tags": ["Access Control"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["user_id", "entity_type", "entity_id", "role_id"],
-                "properties": {
-                  "user_id": {
-                    "type": "string",
-                    "description": "ID of the user"
-                  },
-                  "entity_type": {
-                    "type": "string",
-                    "description": "Type of the entity"
-                  },
-                  "entity_id": {
-                    "type": "string",
-                    "description": "ID of the specific entity"
-                  },
-                  "role_id": {
-                    "type": "string",
-                    "description": "ID of the role to assign"
-                  }
-                }
+                "$ref": "#/components/schemas/UserAccessRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -1320,22 +1737,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/EntityAccess"
-                    }
-                  }
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Invalid request data",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1345,7 +1757,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1353,40 +1765,33 @@
         }
       },
       "get": {
-        "summary": "Get user access",
-        "description": "Get all access entries for a specific user",
+        "summary": "Get User Access",
+        "description": "Get a user's access permissions across products",
+        "operationId": "getUserAccess",
         "tags": ["Access Control"],
         "security": [
           {
-            "bearerAuth": []
+            "jwt": []
           }
         ],
         "parameters": [
           {
             "name": "user_id",
             "in": "query",
-            "description": "ID of the user",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "integer"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of access entries",
+            "description": "User access information",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/EntityAccess"
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/UserAccessResponse"
                 }
               }
             }
@@ -1396,7 +1801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1404,40 +1809,24 @@
         }
       }
     },
-    "/api/access/{id}": {
-      "delete": {
-        "summary": "Delete entity access",
-        "description": "Delete a specific entity access entry",
-        "tags": ["Access Control"],
+    "/api/products": {
+      "get": {
+        "summary": "List Products",
+        "description": "Get a list of all products",
+        "operationId": "listProducts",
+        "tags": ["Products"],
         "security": [
           {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Access entry ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "jwt": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Access deleted successfully",
+            "description": "List of products",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "description": "Success status"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ProductListResponse"
                 }
               }
             }
@@ -1447,17 +1836,171 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Product",
+        "description": "Create a new product",
+        "operationId": "createProduct",
+        "tags": ["Products"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Product created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductBase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{product_id}/capabilities": {
+      "get": {
+        "summary": "Get Product Capabilities",
+        "description": "Get a list of capabilities for a specific product",
+        "operationId": "getProductCapabilities",
+        "tags": ["Products", "Access Control"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Product ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Access entry not found",
+            "description": "Product not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capabilities": {
+      "post": {
+        "summary": "Create Capability",
+        "description": "Create a new capability for a product",
+        "operationId": "createCapability",
+        "tags": ["Access Control"],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Capability created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityBase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

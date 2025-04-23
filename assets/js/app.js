@@ -3,7 +3,7 @@ import "../node_modules/phoenix_html"
 import {Socket} from "../node_modules/phoenix"
 import {LiveSocket} from "../node_modules/phoenix_live_view"
 import topbar from "../vendor/topbar"
-import Hooks from "./hooks"
+import Hooks from "./hooks/index"
 
 // Theme handling functions
 const getThemePreference = () => {

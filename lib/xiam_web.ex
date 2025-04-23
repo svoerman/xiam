@@ -55,6 +55,9 @@ defmodule XIAMWeb do
       use Phoenix.LiveView,
         layout: {XIAMWeb.Layouts, :app}
 
+      # Add LiveAuth hooks
+      on_mount {XIAMWeb.LiveAuth, :default}
+
       unquote(html_helpers())
     end
   end
