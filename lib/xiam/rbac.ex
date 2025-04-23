@@ -28,6 +28,14 @@ defmodule Xiam.Rbac do
   end
 
   @doc """
+  Gets a single role by name.
+  """
+  def get_role_by_name(name) do
+    Role
+    |> Repo.get_by(name: name)
+  end
+
+  @doc """
   Creates a role.
   """
   def create_role(attrs \\ %{}) do

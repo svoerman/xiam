@@ -12,7 +12,7 @@ defmodule XIAM.Users do
   @doc """
   Gets a user by ID.
   """
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id), do: Repo.get_by(User, id: id)
 
   @doc """
   Gets a user by email.

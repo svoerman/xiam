@@ -6,6 +6,7 @@ defmodule XIAMWeb.AuthController do
   """
   use XIAMWeb, :controller
   alias XIAM.Users
+  alias XIAM.Auth.PasskeyTokenReplay
   
   @max_token_age 300 # 5 minutes in seconds
   
@@ -37,34 +38,42 @@ defmodule XIAMWeb.AuthController do
             |> Base.url_encode64(padding: false)
             
           if expected_hmac == received_hmac do
-            # Valid token, get the user
-            user = Users.get_user(user_id)
+            # REPLAY PROTECTION: Check if this token was already used
+            if PasskeyTokenReplay.used?(user_id, timestamp) do
+              conn
+              |> put_flash(:error, "This authentication token has already been used. Please sign in again.")
+              |> redirect(to: ~p"/session/new")
+            else
+              PasskeyTokenReplay.mark_used(user_id, timestamp)
+              # Valid token, get the user
+              user = Users.get_user(user_id)
         
-            # Fetch redirect path BEFORE Pow potentially modifies the conn session
-            original_request_path = get_session(conn, "request_path")
-            IO.puts "AuthController: Checking session for 'request_path': #{inspect(original_request_path)}"
+              # Fetch redirect path BEFORE Pow potentially modifies the conn session
+              original_request_path = get_session(conn, "request_path")
+              # IO.puts "AuthController: Checking session for 'request_path': #{inspect(original_request_path)}"
+              
+              # Use Pow.Plug.create to properly initialize the Pow session
+              conn = Pow.Plug.create(conn, user, plug: Pow.Plug.Session, otp_app: :xiam)
+              
+              # Also update the last login timestamp for the user
+              {:ok, _} = XIAM.Users.update_user_login_timestamp(user)
+              
+              # Determine redirect path using the value fetched earlier
+              redirect_path = case original_request_path do
+                nil -> 
+                  # IO.puts "AuthController: No 'request_path' found, defaulting to /admin"
+                  "/admin" # Default to admin page if no specific path was requested
+                path -> 
+                  # IO.puts "AuthController: Found 'request_path' #{path}, redirecting..."
+                  path
+              end
             
-            # Use Pow.Plug.create to properly initialize the Pow session
-            conn = Pow.Plug.create(conn, user, plug: Pow.Plug.Session, otp_app: :xiam)
-            
-            # Also update the last login timestamp for the user
-            {:ok, _} = XIAM.Users.update_user_login_timestamp(user)
-            
-            # Determine redirect path using the value fetched earlier
-            redirect_path = case original_request_path do
-              nil -> 
-                IO.puts "AuthController: No 'request_path' found, defaulting to /admin"
-                "/admin" # Default to admin page if no specific path was requested
-              path -> 
-                IO.puts "AuthController: Found 'request_path' #{path}, redirecting..."
-                path
+              # Redirect to the desired path with success message
+              conn
+              |> delete_session("request_path")
+              |> put_flash(:info, "Successfully signed in with passkey")
+              |> redirect(to: redirect_path)
             end
-            
-            # Redirect to the desired path with success message
-            conn
-            |> delete_session("request_path")
-            |> put_flash(:info, "Successfully signed in with passkey")
-            |> redirect(to: redirect_path)
           else
             # Invalid HMAC
             conn

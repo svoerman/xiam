@@ -97,10 +97,10 @@ defmodule XIAM.Auth.UserPasskey do
         valid_formats = Enum.filter(all_formats, fn {_format, value} -> value != nil end)
         
         # Try each format
-        Enum.reduce_while(valid_formats, nil, fn {format, id}, _acc ->
+        Enum.reduce_while(valid_formats, nil, fn {_format, id}, _acc ->
           case Repo.one(from p in __MODULE__, where: p.credential_id == ^id, preload: [:user]) do
             %__MODULE__{} = passkey -> 
-              IO.puts("Found passkey with format: #{format}")
+              # IO.puts("Found passkey with format: #{format}")
               {:halt, passkey}
             nil -> {:cont, nil}
           end

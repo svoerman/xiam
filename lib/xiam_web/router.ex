@@ -24,7 +24,6 @@ defmodule XIAMWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug OpenApiSpex.Plug.PutApiSpec, module: XIAMWeb.ApiSpec
     plug :put_secure_browser_headers
     # PlugAttack needs different integration method
   end
@@ -77,15 +76,14 @@ defmodule XIAMWeb.Router do
   end
 
   # Serve OpenAPI Specification and Swagger UI
-  scope "/api/docs" do
+  scope "/api/docs", XIAMWeb do
     pipe_through [:api]
 
-    # Serve Swagger UI (if you want to keep the UI, point it to the static JSON)
-    # You can keep the UI route if desired, but it must use the static JSON now.
-    get "/", OpenApiSpex.Plug.SwaggerUI, path: "/api/docs/openapi.json"
-
     # Serve static OpenAPI JSON
-    get "/openapi.json", XIAMWeb.SwaggerController, :api_json
+    get "/openapi.json", SwaggerController, :api_json
+    
+    # Serve Swagger UI from our own template
+    get "/", SwaggerController, :index
   end
 
   # User account routes

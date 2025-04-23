@@ -4,23 +4,11 @@ defmodule XIAMWeb.API.PasskeyController do
   Handles registration and authentication of passkeys.
   """
   use XIAMWeb, :controller
-  use OpenApiSpex.ControllerSpecs
   
   alias XIAM.Auth.WebAuthn
   alias XIAM.Users
   alias XIAM.Jobs.AuditLogger
   alias XIAM.Auth.JWT
-  alias XIAMWeb.Schemas.Passkey.{
-    AuthenticationOptionsResponse,
-    AuthenticationRequest,
-    AuthenticationResponse,
-    AuthenticationErrorResponse,
-    RegistrationOptionsResponse,
-    RegistrationRequest,
-    RegistrationResponse,
-    RegistrationErrorResponse,
-    ListPasskeysResponse
-  }
   
   # Plug to ensure user is authenticated for protected endpoints
   alias XIAMWeb.Plugs.APIAuthorizePlug
@@ -29,15 +17,6 @@ defmodule XIAMWeb.API.PasskeyController do
   # Private helper to format IP address for JSON compatibility
   defp format_ip(ip) when is_tuple(ip), do: ip |> Tuple.to_list() |> Enum.join(".")
   defp format_ip(ip), do: to_string(ip)
-  
-  operation :registration_options,
-    summary: "Generate registration options for a new passkey",
-    description: "Generates WebAuthn registration options for adding a new passkey to the authenticated user's account.",
-    tags: ["Passkeys"],
-    security: [%{"session" => []}],
-    responses: %{
-      200 => {"Registration options", "application/json", RegistrationOptionsResponse}
-    }
   
   @doc """
   Generates registration options for a new passkey.
@@ -54,18 +33,6 @@ defmodule XIAMWeb.API.PasskeyController do
       options: options
     })
   end
-  
-  operation :register,
-    summary: "Register a new passkey",
-    description: "Registers a new passkey (WebAuthn credential) for the authenticated user.",
-    tags: ["Passkeys"],
-    security: [%{"session" => []}],
-    request_body: {"Attestation response and friendly name", "application/json", RegistrationRequest},
-    responses: %{
-      200 => {"Registration successful", "application/json", RegistrationResponse},
-      400 => {"Registration failed", "application/json", RegistrationErrorResponse},
-      401 => {"Unauthorized", "application/json", RegistrationErrorResponse}
-    }
   
   @doc """
   Registers a new passkey for the authenticated user.
@@ -133,17 +100,6 @@ defmodule XIAMWeb.API.PasskeyController do
     end
   end
   
-  operation :authentication_options,
-    summary: "Generate authentication options for passkey login",
-    description: "Generates WebAuthn authentication options for passkey login. If an email is provided, it limits allowed credentials to that user. Otherwise, it includes all passkeys as allowed credentials.",
-    tags: ["Passkeys"],
-    parameters: [
-      email: [in: :query, type: :string, description: "Optional user email to limit allowed credentials", required: false]
-    ],
-    responses: %{
-      200 => {"Authentication options", "application/json", AuthenticationOptionsResponse}
-    }
-  
   @doc """
   Generate authentication options for passkey login.
   
@@ -171,16 +127,6 @@ defmodule XIAMWeb.API.PasskeyController do
     # Return options to client
     json(conn, options)
   end
-  
-  operation :authenticate,
-    summary: "Authenticate with a passkey",
-    description: "Authenticates a user with a WebAuthn assertion (passkey). Supports usernameless authentication by looking up passkeys in the database directly.",
-    tags: ["Passkeys"],
-    request_body: {"WebAuthn assertion", "application/json", AuthenticationRequest},
-    responses: %{
-      200 => {"Authentication successful", "application/json", AuthenticationResponse},
-      401 => {"Authentication failed", "application/json", AuthenticationErrorResponse}
-    }
   
   @doc """
   Authenticates a user with a WebAuthn assertion (passkey).
@@ -225,6 +171,9 @@ defmodule XIAMWeb.API.PasskeyController do
           
           # Combine all parts into a secure token
           auth_token = user_id_str <> ":" <> timestamp <> ":" <> hmac
+          
+          # NOTE: Replay protection is enforced in the web controller that consumes this token.
+          # See /auth/passkey/complete handler for PasskeyTokenReplay logic.
           
           # Return the response with the token
           conn
@@ -426,21 +375,6 @@ defmodule XIAMWeb.API.PasskeyController do
     
     json(conn, %{success: true, debug_passkeys: debug_info})
   end
-  
-  operation :delete_passkey,
-    summary: "Delete a passkey",
-    description: "Deletes a specific passkey for the authenticated user.",
-    tags: ["Passkeys"],
-    security: [%{"session" => []}],
-    parameters: [
-      id: [in: :path, type: :integer, description: "Passkey ID to delete", required: true]
-    ],
-    responses: %{
-      200 => {"Deletion successful", "application/json", %{type: :object, properties: %{success: %{type: :boolean}, message: %{type: :string}}}},
-      400 => {"Deletion failed", "application/json", %{type: :object, properties: %{error: %{type: :string}}}},
-      401 => {"Unauthorized", "application/json", %{type: :object, properties: %{error: %{type: :string}}}},
-      404 => {"Passkey not found", "application/json", %{type: :object, properties: %{error: %{type: :string}}}}
-    }
   
   @doc """
   Deletes a passkey for the authenticated user.

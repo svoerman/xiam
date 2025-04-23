@@ -10,6 +10,7 @@ defmodule XIAMWeb.API.UsersController do
   alias XIAM.Users.User
   alias XIAM.Repo
   alias XIAM.Jobs.AuditLogger
+  alias XIAM.Users
   import Ecto.Query
 
   # Apply authorization plug with capabilities for specific actions
@@ -89,7 +90,7 @@ defmodule XIAMWeb.API.UsersController do
   Requires the "view_user" capability.
   """
   def show(conn, %{"id" => id}) do
-    case Repo.get(User, id) |> Repo.preload(:role) do
+    case Users.get_user(id) |> Repo.preload(:role) do
       nil ->
         conn
         |> put_status(:not_found)
@@ -182,7 +183,7 @@ defmodule XIAMWeb.API.UsersController do
   def update(conn, %{"id" => id, "user" => user_params}) do
     current_user = conn.assigns.current_user
 
-    case Repo.get(User, id) do
+    case Users.get_user(id) do
       nil ->
         conn
         |> put_status(:not_found)
@@ -296,7 +297,7 @@ defmodule XIAMWeb.API.UsersController do
   def delete(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user
 
-    case Repo.get(User, id) do
+    case Users.get_user(id) do
       nil ->
         conn
         |> put_status(:not_found)

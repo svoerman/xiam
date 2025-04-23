@@ -6,8 +6,8 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
   import XIAMWeb.Components.UI
 
   alias XIAM.Consent
+  alias XIAM.Users
   alias XIAM.Users.User
-  alias XIAM.Repo
 
   @impl true
   def mount(_params, _session, socket) do
@@ -173,7 +173,7 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
   # Format user info
   defp format_user(nil), do: "Unknown"
   defp format_user(user_id) do
-    case Repo.get(User, user_id) do
+    case Users.get_user(user_id) do
       %User{email: email} -> email
       _ -> "User ##{user_id}"
     end

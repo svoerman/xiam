@@ -1,7 +1,7 @@
 defmodule XIAMWeb.API.AccessControlController do
   use XIAMWeb, :controller
   alias Xiam.Rbac.AccessControl
-  alias XIAM.Repo
+  alias Xiam.Rbac
   alias XIAMWeb.Plugs.APIAuthorizePlug
 
   # Apply authorization plugs with specific capabilities
@@ -16,17 +16,13 @@ defmodule XIAMWeb.API.AccessControlController do
 
   def set_user_access(conn, %{"user_id" => user_id, "entity_type" => entity_type, "entity_id" => entity_id, "role" => role}) do
     # Get role ID from role name
-    role_id = Repo.get_by(Xiam.Rbac.Role, name: role)
-    |> case do
-      nil -> nil
-      role -> role.id
-    end
+    role = Rbac.get_role_by_name(role)
 
     case AccessControl.set_user_access(%{
       user_id: user_id,
       entity_type: entity_type,
       entity_id: entity_id,
-      role_id: role_id
+      role_id: role.id
     }) do
       {:ok, access} ->
         # Format the access entry for JSON response

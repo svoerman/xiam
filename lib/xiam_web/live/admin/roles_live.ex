@@ -8,6 +8,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   import Ecto.Query
 
   alias Xiam.Rbac.{Role, Capability}
+  alias Xiam.Rbac
   alias XIAM.Repo
   alias Phoenix.LiveView.JS
 
@@ -34,14 +35,14 @@ defmodule XIAMWeb.Admin.RolesLive do
 
   @impl true
   def handle_params(%{"role_id" => role_id}, _uri, socket) do
-    case Repo.get(Role, role_id) |> Repo.preload(:capabilities) do
+    case Rbac.get_role(role_id) |> Repo.preload(:capabilities) do
       nil -> {:noreply, socket |> put_flash(:error, "Role not found") |> push_patch(to: ~p"/admin/roles")}
       role -> {:noreply, assign(socket, selected_role: role)}
     end
   end
 
   def handle_params(%{"capability_id" => capability_id}, _uri, socket) do
-    case Repo.get(Capability, capability_id) do
+    case Rbac.get_capability(capability_id) do
       nil -> {:noreply, socket |> put_flash(:error, "Capability not found") |> push_patch(to: ~p"/admin/roles")}
       capability -> {:noreply, assign(socket, selected_capability: capability)}
     end
@@ -63,7 +64,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("show_edit_role_modal", %{"id" => id}, socket) do
-    case Role.get_role_with_capabilities(id) do
+    case Rbac.get_role(id) |> Repo.preload(:capabilities) do
       nil ->
         {:noreply, socket |> put_flash(:error, "Role not found")}
       role ->
@@ -91,7 +92,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("show_edit_capability_modal", %{"id" => id}, socket) do
-    capability = Repo.get(Capability, id)
+    capability = Rbac.get_capability(id)
     capability_changeset = Capability.changeset(capability, %{
       name: capability.name,
       description: capability.description,
@@ -204,7 +205,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("delete_role", %{"id" => id}, socket) do
-    case Role.get_role!(id) do
+    case Rbac.get_role(id) do
       nil ->
         {:noreply, socket |> put_flash(:error, "Role not found")}
       role ->
@@ -222,7 +223,7 @@ defmodule XIAMWeb.Admin.RolesLive do
   end
 
   def handle_event("delete_capability", %{"id" => id}, socket) do
-    capability = Repo.get(Capability, id)
+    capability = Rbac.get_capability(id)
 
     if capability do
       case Repo.delete(capability) do

@@ -25,17 +25,18 @@ defmodule XIAM.Auth.WebAuthn do
   """
   def generate_registration_options(%User{} = user) do
     # Create a new registration challenge
+    authenticator_selection = %{
+      authenticator_attachment: "platform",
+      resident_key: "preferred",
+      user_verification: "preferred"
+    }
     challenge = Wax.new_registration_challenge(
       rp_id: @rp_id,
-      user_id: "user-#{user.id}",
+      user_id: <<user.id::unsigned-integer-size(64)>>,
       user_name: user.email,
       user_display_name: user.name || user.email,
       attestation: "none",
-      authenticator_selection: %{
-        authenticator_attachment: "platform",
-        resident_key: "preferred",
-        user_verification: "preferred"
-      }
+      authenticator_selection: authenticator_selection
     )
     
     # Build options for client
@@ -46,9 +47,9 @@ defmodule XIAM.Auth.WebAuthn do
         name: @rp_name
       },
       user: %{
-        id: Base.url_encode64(challenge.user_id, padding: false),
-        name: challenge.user_name,
-        displayName: challenge.user_display_name
+        id: Base.url_encode64(<<user.id::unsigned-integer-size(64)>>, padding: false),
+        name: user.email,
+        displayName: user.name || user.email
       },
       pubKeyCredParams: [
         %{type: "public-key", alg: -7},  # ES256
@@ -56,7 +57,7 @@ defmodule XIAM.Auth.WebAuthn do
       ],
       timeout: challenge.timeout,
       attestation: challenge.attestation,
-      authenticatorSelection: challenge.authenticator_selection
+      authenticatorSelection: authenticator_selection
     }
     
     {options, challenge}
@@ -153,8 +154,8 @@ defmodule XIAM.Auth.WebAuthn do
   end
   
   # Helper function to extract credential info manually from attestation object
-  defp extract_credential_from_attestation(nil, _), do: {:error, "Invalid attestation object"}
-  defp extract_credential_from_attestation(attestation, client_data_hash) do
+  defp extract_credential_from_attestation(nil, _client_data_hash), do: {:error, "Invalid attestation object"}
+  defp extract_credential_from_attestation(attestation, _client_data_hash) do
     try do
       # Extract from auth_data in the CBOR-decoded attestation
       with %{"fmt" => _fmt, "authData" => auth_data} <- attestation,
@@ -257,7 +258,7 @@ defmodule XIAM.Auth.WebAuthn do
     )
     
     # Log for debugging
-    IO.puts("Authentication challenge created with #{length(allow_credentials)} credentials allowed")
+    # IO.puts("Authentication challenge created with #{length(allow_credentials)} credentials allowed")
     
     # Return options for browser and challenge for verification
     {build_auth_options(challenge, allow_credentials), challenge}

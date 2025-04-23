@@ -44,7 +44,7 @@ defmodule XIAMWeb.Admin.UsersLive do
     user = id
     |> to_int()
     |> case do
-      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      int_id when is_integer(int_id) -> Users.get_user(int_id) |> Repo.preload(:role)
       _ -> nil
     end
     if user do
@@ -63,7 +63,7 @@ defmodule XIAMWeb.Admin.UsersLive do
     user = id
     |> to_int()
     |> case do
-      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      int_id when is_integer(int_id) -> Users.get_user(int_id) |> Repo.preload(:role)
       _ -> nil
     end
     {:noreply, assign(socket, selected_user: user, show_edit_modal: true)}
@@ -99,7 +99,7 @@ defmodule XIAMWeb.Admin.UsersLive do
     user = id
     |> to_int()
     |> case do
-      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      int_id when is_integer(int_id) -> Users.get_user(int_id) |> Repo.preload(:role)
       _ -> nil
     end
     
@@ -153,7 +153,7 @@ defmodule XIAMWeb.Admin.UsersLive do
     user = id
     |> to_int()
     |> case do
-      int_id when is_integer(int_id) -> Repo.get_by(User, id: int_id) |> Repo.preload(:role)
+      int_id when is_integer(int_id) -> Users.get_user(int_id) |> Repo.preload(:role)
       _ -> nil
     end
 

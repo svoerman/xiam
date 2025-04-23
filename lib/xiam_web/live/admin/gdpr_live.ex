@@ -2,6 +2,7 @@ defmodule XIAMWeb.Admin.GDPRLive do
   use XIAMWeb, :live_view
 
   alias XIAM.Users.User
+  alias XIAM.Users
   alias XIAM.Consent
   alias XIAM.GDPR.DataPortability
   alias XIAM.GDPR.DataRemoval
@@ -38,7 +39,7 @@ defmodule XIAMWeb.Admin.GDPRLive do
   def handle_params(%{"user_id" => user_id}, _uri, socket) do
     # Convert user_id to integer and fetch user
     user = case Integer.parse(user_id) do
-      {id, ""} -> Repo.get_by(User, id: id)
+      {id, ""} -> Users.get_user(id)
       _ -> nil
     end
 
@@ -46,7 +47,7 @@ defmodule XIAMWeb.Admin.GDPRLive do
       consents = Consent.get_user_consents(user.id)
       {:noreply, assign(socket, selected_user: user, user_consents: consents)}
     else
-      {:noreply, socket |> put_flash(:error, "User not found") |> push_patch(to: ~p"/admin/gdpr")}
+      {:noreply, socket |> put_flash(:error, "User not found") |> push_navigate(to: ~p"/admin/gdpr")}
     end
   end
 

@@ -93,7 +93,34 @@ defmodule XIAMWeb.AccountSettingsLive do
 
   @impl true
   def handle_event("passkeys_loaded", %{"passkeys" => passkeys}, socket) do
-    {:noreply, assign(socket, passkeys: passkeys)}
+    atom_passkeys = Enum.map(passkeys, &atomize_and_parse_passkey/1)
+    {:noreply, assign(socket, passkeys: atom_passkeys)}
+  end
+
+  defp atomize_and_parse_passkey(map) do
+    for {k, v} <- map, into: %{} do
+      key = String.to_atom(k)
+      value =
+        case key do
+          :created_at -> parse_datetime(v)
+          :last_used_at -> parse_datetime(v)
+          _ -> v
+        end
+      {key, value}
+    end
+  end
+
+  defp parse_datetime(nil), do: nil
+  defp parse_datetime("") , do: nil
+  defp parse_datetime(str) when is_binary(str) do
+    case DateTime.from_iso8601(str) do
+      {:ok, dt, _} -> dt
+      _ ->
+        case NaiveDateTime.from_iso8601(str) do
+          {:ok, ndt} -> ndt
+          _ -> str
+        end
+    end
   end
 
   @impl true

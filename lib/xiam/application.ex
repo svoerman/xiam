@@ -40,6 +40,8 @@ defmodule XIAM.Application do
     children = children ++ [
       # Start libcluster for node clustering
       {Cluster.Supervisor, [topologies, [name: XIAM.ClusterSupervisor]]},
+      # Start the passkey token replay protection GenServer
+      XIAM.Auth.PasskeyTokenReplay,
       # Start to serve requests, typically the last entry
       XIAMWeb.Endpoint
     ]
