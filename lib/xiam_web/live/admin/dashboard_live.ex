@@ -14,7 +14,7 @@ defmodule XIAMWeb.Admin.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <span data-test-id="page-title"><%= @page_title %></span>
+
     <div class="container mx-auto px-4 py-8">
       <div class="admin-header">
         <.admin_header

@@ -222,8 +222,14 @@ defmodule XIAMWeb.Admin.SettingsLive do
                             <div class="text-sm text-muted-foreground"><%= format_value(key, value) %></div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button phx-click="show_edit_modal" phx-value-section="general" phx-value-key={key} class="text-primary hover:text-primary/80 transition-colors">
-                              Edit
+                            <button 
+                              class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              phx-click="show_edit_modal" 
+                              phx-value-section="general" 
+                              phx-value-key={key}
+                            >
+                              <.icon name="hero-pencil-square" class="h-4 w-4" />
+                              <span class="ml-1">Edit</span>
                             </button>
                           </td>
                         </tr>
@@ -258,15 +264,15 @@ defmodule XIAMWeb.Admin.SettingsLive do
                             <h3 class="font-medium"><%= format_key(key) %></h3>
                             <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
                           </div>
-                          <.button 
-                            class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
-                            phx-click="show_edit_modal" 
-                            phx-value-section="oauth" 
-                            phx-value-key={key}
-                          >
-                            <.icon name="hero-pencil-square" class="h-4 w-4" />
-                            <span class="ml-1">Edit</span>
-                          </.button>
+                          <button 
+      class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      phx-click="show_edit_modal" 
+      phx-value-section="oauth" 
+      phx-value-key={key}
+    >
+      <.icon name="hero-pencil-square" class="h-4 w-4" />
+      <span class="ml-1">Edit</span>
+    </button>
                         </div>
                       <% end %>
                     </div>
@@ -294,15 +300,15 @@ defmodule XIAMWeb.Admin.SettingsLive do
                             <h3 class="font-medium"><%= format_key(key) %></h3>
                             <p class="text-sm text-muted-foreground"><%= format_value(key, @settings["oauth"][key]) %></p>
                           </div>
-                          <.button 
-                            class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
-                            phx-click="show_edit_modal" 
-                            phx-value-section="oauth" 
-                            phx-value-key={key}
-                          >
-                            <.icon name="hero-pencil-square" class="h-4 w-4" />
-                            <span class="ml-1">Edit</span>
-                          </.button>
+                          <button 
+      class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      phx-click="show_edit_modal" 
+      phx-value-section="oauth" 
+      phx-value-key={key}
+    >
+      <.icon name="hero-pencil-square" class="h-4 w-4" />
+      <span class="ml-1">Edit</span>
+    </button>
                         </div>
                       <% end %>
                     </div>
