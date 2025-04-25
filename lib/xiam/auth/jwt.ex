@@ -4,9 +4,6 @@ defmodule XIAM.Auth.JWT do
   Uses the :jose library directly for JWT operations.
   """
 
-  # REMOVED: Hardcoded signing key - DO NOT USE
-  # @signing_key "test_secret_key_for_testing_only_not_for_production"
-
   # Define token expiration (in seconds)
   @token_expiry Application.compile_env(:xiam, :jwt_token_expiry, 3600 * 24) # Default 24 hours
 

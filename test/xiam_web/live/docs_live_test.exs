@@ -82,8 +82,9 @@ defmodule XIAMWeb.DocsLiveTest do
   end
 
   test "has correct page title", %{conn: conn} do
-    # Check page title assigned in the mount function
     {:ok, _view, html} = live(conn, ~p"/docs")
-    assert html =~ ~s|<title data-default="XIAM" data-suffix=" · Phoenix Framework">\n      XIAM Documentation\n     · Phoenix Framework</title>|
+    # Assert for the current title format with suffix
+    # Robust assertion: match title content regardless of whitespace
+    assert Regex.match?(~r/<title data-default="XIAM" data-suffix=" · XIAM">\s*XIAM Documentation\s*· XIAM<\/title>/, html)
   end
 end

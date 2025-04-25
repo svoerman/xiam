@@ -18,7 +18,8 @@ api_capabilities = [
   {"manage_capabilities", "Manage capabilities via API"},
   {"view_capabilities", "View product capabilities via API"},
   {"delete_consent", "Delete consent records via API"},
-  {"view_system_status", "View system status via API"}
+  {"view_system_status", "View system status via API"},
+  {"anonymize_user", "Anonymize a user via API (GDPR-compliant)"}
 ]
 
 # Insert capabilities if missing

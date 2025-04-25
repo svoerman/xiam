@@ -4,8 +4,6 @@ defmodule XIAMWeb.PasskeyComponent do
   """
   use XIAMWeb, :live_component
 
-  alias XIAM.Users
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -140,7 +138,7 @@ defmodule XIAMWeb.PasskeyComponent do
       socket
       |> assign(assigns)
       |> assign_new(:new_passkey_name, fn -> "" end)
-      |> assign_new(:flash, fn -> %{} end)
+
       |> assign_passkeys()
 
     {:ok, socket}
@@ -155,11 +153,12 @@ defmodule XIAMWeb.PasskeyComponent do
   def handle_event("toggle_passkey_enabled", _params, socket) do
     user = socket.assigns.user
     
-    case Users.update_user_passkey_settings(user, %{passkey_enabled: !user.passkey_enabled}) do
+    case users_module().update_user_passkey_settings(user, %{passkey_enabled: !user.passkey_enabled}) do
       {:ok, updated_user} ->
-        socket = 
+        socket =
           socket
           |> assign(user: updated_user)
+          |> assign_passkeys()
           |> put_flash_message(:info, "Passkey settings updated successfully")
         
         {:noreply, socket}
@@ -174,7 +173,8 @@ defmodule XIAMWeb.PasskeyComponent do
   def handle_event("register_passkey", _params, socket) do
     # This will trigger the client-side JavaScript hook
     # The actual registration happens via API calls from the client
-    send_update(self(), :trigger_passkey_registration, %{
+    send_update(socket.assigns.id, %{
+      action: :trigger_passkey_registration,
       name: socket.assigns.new_passkey_name
     })
     
@@ -183,7 +183,7 @@ defmodule XIAMWeb.PasskeyComponent do
 
   @impl true
   def handle_event("delete_passkey", %{"id" => id}, socket) do
-    case Users.delete_user_passkey(socket.assigns.user, id) do
+    case users_module().delete_user_passkey(socket.assigns.user, id) do
       {:ok, _} ->
         socket = 
           socket
@@ -201,15 +201,17 @@ defmodule XIAMWeb.PasskeyComponent do
   # Private helper functions
   
   defp assign_passkeys(socket) do
-    passkeys = Users.list_user_passkeys(socket.assigns.user)
+    passkeys = users_module().list_user_passkeys(socket.assigns.user)
     assign(socket, passkeys: passkeys)
   end
   
   defp put_flash_message(socket, key, message) do
-    assign(socket, flash: Map.put(socket.assigns.flash, to_string(key), message))
+    Phoenix.LiveView.put_flash(socket, key, message)
   end
   
   defp format_datetime(datetime) do
     Calendar.strftime(datetime, "%Y-%m-%d %H:%M")
   end
+  
+  defp users_module, do: Application.get_env(:xiam, :users, XIAM.Users)
 end

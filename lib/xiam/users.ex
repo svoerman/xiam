@@ -1,4 +1,5 @@
 defmodule XIAM.Users do
+  @behaviour XIAM.Users.Behaviour
   @moduledoc """
   The Users context.
   Provides functions for managing users and their passkeys.

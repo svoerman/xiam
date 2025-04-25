@@ -19,6 +19,7 @@ defmodule XIAMWeb.API.UsersController do
   plug APIAuthorizePlug, :create_user when action in [:create]
   plug APIAuthorizePlug, :update_user when action in [:update]
   plug APIAuthorizePlug, :delete_user when action in [:delete]
+plug APIAuthorizePlug, :anonymize_user when action in [:anonymize]
 
   @pow_config [
     user: XIAM.Users.User,
@@ -336,6 +337,42 @@ defmodule XIAMWeb.API.UsersController do
                 error: "Failed to delete user",
                 details: error_details(changeset)
               })
+          end
+        end
+    end
+  end
+
+  @doc """
+  Anonymizes a user (GDPR-compliant).
+  Requires the "anonymize_user" capability.
+  """
+  def anonymize(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user
+    case Users.get_user(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "User not found"})
+      user ->
+        if user.id == current_user.id do
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Cannot anonymize your own account"})
+        else
+          case XIAM.GDPR.DataRemoval.anonymize_user(user.id) do
+            {:ok, _anonymized_user} ->
+              AuditLogger.log_action("api_user_anonymize", current_user.id, %{
+                "resource_type" => "user",
+                "target_user_id" => user.id,
+                "target_user_email" => user.email
+              }, current_user.email)
+              conn
+              |> put_status(:ok)
+              |> json(%{success: true, message: "User anonymized successfully"})
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed to anonymize user", reason: inspect(reason)})
           end
         end
     end

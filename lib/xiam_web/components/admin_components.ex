@@ -23,7 +23,7 @@ defmodule XIAMWeb.AdminComponents do
           ← Back to Dashboard
         </a>
       <% end %>
-      <h1 class="text-3xl font-bold text-foreground"><%= @title %></h1>
+      <h1 class="text-3xl font-bold text-foreground" data-test-id="page-title"><%= @title %></h1>
       <%= if @subtitle do %>
         <div class="text-sm text-muted-foreground">
           <%= @subtitle %>

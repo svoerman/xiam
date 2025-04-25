@@ -140,7 +140,7 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
       assert render(view) =~ "XIAM Admin Dashboard"
 
       # Get the socket assigns directly
-      assert has_element?(view, "[data-test-id='page-title']", "Admin Dashboard")
+      assert has_element?(view, "[data-test-id='page-title']", "XIAM Admin Dashboard")
     end
 
     test "admin_header component works as expected", %{conn: conn} do

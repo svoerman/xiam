@@ -175,6 +175,7 @@ defmodule XIAMWeb.Router do
     post "/users", UsersController, :create
     put "/users/:id", UsersController, :update
     delete "/users/:id", UsersController, :delete
+    post "/users/:id/anonymize", UsersController, :anonymize
 
     # Consent management routes
     get "/consents", ConsentsController, :index

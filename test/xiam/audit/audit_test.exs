@@ -133,5 +133,77 @@ defmodule XIAM.AuditTest do
       assert log.metadata.system_data == "test"
       assert log.resource_type == "system"
     end
+
+    test "list_distinct_actions/0 returns unique actions" do
+      Audit.log_action("unique_action1", nil, "res", "1", %{})
+      Audit.log_action("unique_action2", nil, "res", "2", %{})
+      Audit.log_action("unique_action1", nil, "res", "3", %{})
+      actions = Audit.list_distinct_actions()
+      assert "unique_action1" in actions
+      assert "unique_action2" in actions
+    end
+
+    test "list_distinct_resource_types/0 returns unique resource types" do
+      Audit.log_action("act", nil, "resource_type1", "1", %{})
+      Audit.log_action("act", nil, "resource_type2", "2", %{})
+      Audit.log_action("act", nil, "resource_type1", "3", %{})
+      types = Audit.list_distinct_resource_types()
+      assert "resource_type1" in types
+      assert "resource_type2" in types
+    end
+
+    test "log_action/6 extracts ip_address and user_agent from conn" do
+      conn = %Plug.Conn{remote_ip: {127, 0, 0, 1}, req_headers: [{"user-agent", "Test UA"}]}
+      {:ok, log} = Audit.log_action("conn_action", nil, "res", "id", %{}, conn)
+      assert log.ip_address == "127.0.0.1"
+      assert log.user_agent == "Test UA"
+    end
+
+    test "log_action/6 handles actor with :type field" do
+      actor = %{type: "robot"}
+      {:ok, log} = Audit.log_action("robot_action", actor, "res", "id", %{})
+      assert log.actor_type == "robot"
+    end
+
+    test "log_action/6 handles actor as integer (default branch)" do
+      {:ok, log} = Audit.log_action("int_actor", 123, "res", "id", %{})
+      assert log.actor_type == "system"
+      assert log.actor_id == nil
+    end
+
+    test "log_action/6 handles non-map metadata" do
+      {:ok, log} = Audit.log_action("nonmap_meta", nil, "res", "id", "notamap")
+      assert log.metadata == %{}
+    end
+
+    test "log_action/6 handles nil resource_id" do
+      {:ok, log} = Audit.log_action("nil_resource_id", nil, "res", nil, %{})
+      assert log.resource_id == nil
+    end
+
+    test "log_action_with_timestamp/6 handles actor as integer (default branch)" do
+      {:ok, log} = Audit.log_action_with_timestamp("int_actor_ts", 123, "res", "id", %{})
+      assert log.actor_type == "system"
+      assert log.actor_id == nil
+    end
+
+    test "log_action_with_timestamp/6 logs with and without custom timestamp" do
+      # Without timestamp (should use now)
+      {:ok, log1} = Audit.log_action_with_timestamp("ts_action", nil, "ts_res", "id1", %{foo: "bar"})
+      assert log1.action == "ts_action"
+      assert log1.resource_type == "ts_res"
+      assert log1.metadata.foo == "bar"
+      assert log1.ip_address == "127.0.0.1"
+      assert log1.user_agent == "Test Browser"
+      assert log1.inserted_at
+
+      # With custom timestamp
+      ts = ~N[2000-01-01 00:00:00]
+      {:ok, log2} = Audit.log_action_with_timestamp("ts_action2", nil, "ts_res2", "id2", %{baz: 42}, ts)
+      assert log2.action == "ts_action2"
+      assert log2.resource_type == "ts_res2"
+      assert log2.metadata.baz == 42
+      assert log2.inserted_at == ts
+    end
   end
 end

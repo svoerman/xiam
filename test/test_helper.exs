@@ -13,8 +13,9 @@ Application.put_env(:oban, :peer, false)
 Application.put_env(:xiam, :oban_testing, true)
 
 
-# Mock setup for complex behaviors would go here
-# We'll handle WebAuthn mocking directly in the test files
+# Mox setup for XIAM.Users
+Mox.defmock(XIAM.Users.Mock, for: XIAM.Users.Behaviour)
+Application.put_env(:xiam, :users, XIAM.Users.Mock)
 
 # Configure ExUnit 
 ExUnit.configure(exclude: [pending: true])
