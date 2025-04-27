@@ -17,6 +17,9 @@ Application.put_env(:xiam, :oban_testing, true)
 Mox.defmock(XIAM.Users.Mock, for: XIAM.Users.Behaviour)
 Application.put_env(:xiam, :users, XIAM.Users.Mock)
 
+# We'll simplify our testing approach for the refactored components
+# and rely on the existing test infrastructure
+
 # Configure ExUnit 
 ExUnit.configure(exclude: [pending: true])
 ExUnit.start()
