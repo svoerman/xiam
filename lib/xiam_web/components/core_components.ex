@@ -117,7 +117,7 @@ defmodule XIAMWeb.CoreComponents do
       class={[
         "fixed top-4 right-4 w-auto max-w-sm z-50 rounded-lg border shadow-lg transition-opacity duration-300",
         @kind == :info && "bg-background border-border text-foreground",
-        @kind == :error && "bg-destructive/15 border-destructive text-destructive-foreground"
+        @kind == :error && "bg-destructive border-destructive/20 text-destructive-foreground"
       ]}
       {@rest}
     >
@@ -130,7 +130,7 @@ defmodule XIAMWeb.CoreComponents do
           <p :if={@title} class="font-medium">
             {@title}
           </p>
-          <p class="text-sm text-muted-foreground mt-1">{msg}</p>
+          <p class={["text-sm mt-1", @kind == :info && "text-muted-foreground", @kind == :error && "text-destructive-foreground"]}>{msg}</p>
         </div>
         <button
           type="button"
