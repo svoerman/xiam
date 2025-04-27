@@ -7,7 +7,7 @@ Hooks.Flash = {
       return
     }
 
-    // Set timeout to remove the flash after 10 seconds
+    // Set timeout to remove the flash after 7 seconds
     setTimeout(() => {
       // Add fade out effect
       this.el.style.opacity = '0'
@@ -16,7 +16,7 @@ Hooks.Flash = {
       setTimeout(() => {
         this.el.remove()
       }, 300) // Allow time for fade out animation
-    }, 10000)
+    }, 7000)
   }
 }
 

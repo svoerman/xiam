@@ -63,6 +63,29 @@ Hooks.AdminFormDebug = {
   }
 };
 
+// Add hook for auto-hiding flash messages after 7 seconds
+Hooks.Flash = {
+  mounted() {
+    // Don't auto-hide connection error messages
+    if (this.el.id === "client-error" || this.el.id === "server-error") {
+      return;
+    }
+    
+    console.log('Flash hook mounted on', this.el);
+    
+    // Set timeout to remove the flash after 7 seconds
+    setTimeout(() => {
+      // Add fade out effect
+      this.el.style.opacity = '0';
+      
+      // Remove the element after fade animation completes
+      setTimeout(() => {
+        this.el.remove();
+      }, 300); // Allow time for fade out animation
+    }, 7000);
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,
