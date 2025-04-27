@@ -48,8 +48,18 @@ defmodule XIAMWeb.Router do
   pipeline :api_session do
     plug :accepts, ["json"]
     plug :fetch_session
-    plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
+    plug :fetch_flash
     plug :protect_from_forgery
+    plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
+  end
+
+  # Special pipeline for passkey operations that need session but bypass CSRF
+  # This is required because WebAuthn browser APIs make custom fetch requests
+  # that don't easily support adding CSRF tokens
+  pipeline :passkey_api do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug Pow.Plug.RequireAuthenticated, error_handler: Pow.Phoenix.PlugErrorHandler
   end
 
   # Pow authentication routes
@@ -149,7 +159,7 @@ defmodule XIAMWeb.Router do
 
   # Passkey API using session cookies
   scope "/api", XIAMWeb.API do
-    pipe_through [:api_session]
+    pipe_through [:passkey_api]
     get "/passkeys/registration_options", PasskeyController, :registration_options
     post "/passkeys/register", PasskeyController, :register
     get "/passkeys", PasskeyController, :list_passkeys

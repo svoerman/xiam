@@ -115,7 +115,8 @@ defmodule XIAMWeb.API.PasskeyController do
       if email == "" do
         # Get all users with passkeys and send all passkeys as allowed credentials
         IO.puts("No email provided - including ALL passkeys as allowed credentials")
-        XIAM.Auth.WebAuthn.generate_authentication_options_with_all_passkeys()
+        # Use nil to trigger usernameless authentication flow
+        XIAM.Auth.WebAuthn.generate_authentication_options(nil)
       else
         # Use regular flow with the provided email
         XIAM.Auth.WebAuthn.generate_authentication_options(email)
