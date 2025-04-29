@@ -2,15 +2,13 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
   @moduledoc """
   Manages WebAuthn credential operations for both registration and authentication.
   
-  This module handles the low-level operations of credential formatting, lookup,
-  and verification that are needed by both the registration and authentication flows.
+  This module handles the transformation and verification operations for WebAuthn,
+  while delegating data access to the PasskeyRepository module.
   """
 
-  alias XIAM.Users.User
   alias XIAM.Auth.UserPasskey
   alias XIAM.Auth.WebAuthn.Helpers
-  alias XIAM.Repo
-  import Ecto.Query
+  alias XIAM.Auth.PasskeyRepository
   require Logger
 
   @doc """
@@ -33,6 +31,9 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
   
   If email is nil, returns an empty list which allows any credential with the RP ID.
   If email is provided, fetches all user's passkeys and formats them for authentication.
+  
+  ## Returns
+  - List of formatted credentials (may be empty)
   """
   def get_allowed_credentials(nil) do
     Logger.debug("Generating usernameless authentication challenge.")
@@ -41,18 +42,16 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
 
   def get_allowed_credentials(email) when is_binary(email) do
     Logger.debug("Generating authentication challenge for user: #{email}")
-    case Repo.get_by(User, email: email) do
-      %User{} = user ->
-        # Fetch passkeys associated with this user
-        user
-        |> Ecto.assoc(:passkeys)
-        |> Repo.all()
-        |> Enum.map(&format_credential_for_challenge/1)
-        |> Enum.reject(&is_nil(&1)) # Filter out nil results from formatting
-
-      nil ->
+    
+    with {:ok, user} <- PasskeyRepository.get_user_by_email(email),
+         passkeys <- PasskeyRepository.get_user_passkeys(user) do
+      passkeys
+      |> Enum.map(&format_credential_for_challenge/1)
+      |> Enum.reject(&is_nil(&1)) # Filter out nil results from formatting
+    else
+      {:error, :user_not_found} ->
         Logger.warning("User not found for email: #{email} during auth option generation.")
-        [] # User not found, return empty list
+        []
     end
   end
 
@@ -106,34 +105,31 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
 
   @doc """
   Fetches the UserPasskey and associated User based on the BASE64 encoded credential ID.
+  
+  ## Parameters
+  - `credential_id_b64` - Base64-URL encoded credential ID
+  
+  ## Returns
+  - `{:ok, passkey, user}` if found
+  - `{:error, reason}` if not found or on error
   """
   def get_passkey_and_user(credential_id_b64) when is_binary(credential_id_b64) do
-    query =
-      from pk in UserPasskey,
-      where: pk.credential_id == ^credential_id_b64, # Query using the stored base64 ID
-      join: u in assoc(pk, :user),
-      preload: [user: u],
-      limit: 1
-
-    case Repo.one(query) do
-      %UserPasskey{user: %User{} = user} = passkey ->
-        {:ok, passkey, user}
-      nil ->
-        Logger.warning("Passkey not found for credential ID (base64): #{credential_id_b64}")
-        {:error, :credential_not_found}
-      _ ->
-         Logger.error("Unexpected result fetching passkey for credential ID (base64): #{credential_id_b64}")
-         {:error, :database_error}
-    end
+    PasskeyRepository.get_passkey_with_user(credential_id_b64)
   end
 
   @doc """
   Updates the sign count on the UserPasskey.
+  
+  ## Parameters
+  - `passkey` - UserPasskey struct to update
+  - `new_sign_count` - New sign count value
+  
+  ## Returns
+  - `{:ok, updated_passkey}` on success
+  - `{:error, changeset}` on validation error
   """
   def update_passkey_sign_count(passkey, new_sign_count) do
-    passkey
-    |> UserPasskey.changeset(%{sign_count: new_sign_count})
-    |> Repo.update()
+    PasskeyRepository.update_sign_count(passkey, new_sign_count)
   end
 
   @doc """

@@ -5,7 +5,7 @@ defmodule XIAM.GDPR.DataRemoval do
   
   alias XIAM.Repo
   alias XIAM.Users.User
-  alias Ecto.Multi
+  alias XIAM.GDPR.TransactionHelper
 
   @doc """
   Anonymizes a user's data instead of completely removing it.
@@ -14,31 +14,9 @@ defmodule XIAM.GDPR.DataRemoval do
   Returns {:ok, anonymized_user} on success, {:error, reason} on failure.
   """
   def anonymize_user(user_id) do
-    user = Repo.get(User, user_id)
-    
-    if user do
-      # Generate anonymized values
-      anonymized_email = "anonymized_#{user_id}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}@anonymous.example"
-      
-      # Create a multi operation to update user and related data
-      Multi.new()
-      |> Multi.update(:user, User.anonymize_changeset(user, %{
-        email: anonymized_email,
-        mfa_enabled: false,
-        mfa_secret: nil,
-        mfa_backup_codes: nil
-      }))
-      |> Multi.run(:audit_log, fn _repo, %{user: _user} ->
-        XIAM.Jobs.AuditLogger.log_action("user_anonymized", user_id, %{}, "N/A")
-        {:ok, true}
-      end)
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{user: anonymized_user}} -> {:ok, anonymized_user}
-        {:error, _failed_operation, failed_value, _changes} -> {:error, failed_value}
-      end
-    else
-      {:error, :user_not_found}
+    with {:ok, user} <- get_user(user_id),
+         {:ok, result} <- perform_anonymization(user) do
+      {:ok, result.user}
     end
   end
 
@@ -49,25 +27,70 @@ defmodule XIAM.GDPR.DataRemoval do
   Returns {:ok, deleted_user_id} on success, {:error, reason} on failure.
   """
   def delete_user(user_id) do
-    user = Repo.get(User, user_id)
+    with {:ok, user} <- get_user(user_id),
+         {:ok, _result} <- perform_deletion(user) do
+      {:ok, user_id}
+    end
+  end
+  
+  # Private helpers
+  
+  defp get_user(user_id) do
+    case Repo.get(User, user_id) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
+    end
+  end
+  
+  defp perform_anonymization(user) do
+    # Generate anonymized values
+    anonymized_email = "anonymized_#{user.id}_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}@anonymous.example"
     
-    if user do
-      # Create a multi operation to delete user and all related data
-      # The database cascade delete will handle most relations
-      Multi.new()
-      |> Multi.delete(:user, user)
-      |> Multi.run(:audit_log, fn _repo, _changes ->
-        # Store audit log in a separate system to maintain compliance record
-        XIAM.Jobs.AuditLogger.log_action("user_deleted", user_id, %{}, "N/A")
-        {:ok, true}
-      end)
-      |> Repo.transaction()
-      |> case do
-        {:ok, _changes} -> {:ok, user_id}
-        {:error, _failed_operation, failed_value, _changes} -> {:error, failed_value}
-      end
-    else
-      {:error, :user_not_found}
+    # Create changeset
+    changeset = User.anonymize_changeset(user, %{
+      email: anonymized_email,
+      mfa_enabled: false,
+      mfa_secret: nil,
+      mfa_backup_codes: nil
+    })
+    
+    # Execute transaction with audit logging
+    result = TransactionHelper.create_transaction(
+      "user_anonymized", 
+      user.id, 
+      :user, 
+      fn -> changeset end
+    )
+    |> Repo.transaction()
+    
+    # Process the result to match the original format
+    case result do
+      {:ok, changes} -> {:ok, changes}
+      {:error, :user, changeset, _changes} -> {:error, changeset}
+    end
+  end
+  
+  defp perform_deletion(user) do
+    # Create deletion transaction with additional metadata
+    result = TransactionHelper.create_transaction(
+      "user_deleted",
+      user.id,
+      :user,
+      fn repo, _changes -> 
+        case repo.delete(user) do
+          {:ok, deleted} -> {:ok, deleted}
+          {:error, changeset} -> {:error, changeset}
+        end
+      end,
+      run_operation: true,
+      metadata: %{email: user.email}
+    )
+    |> Repo.transaction()
+    
+    # Process the result to match the original format
+    case result do
+      {:ok, changes} -> {:ok, changes}
+      {:error, :user, changeset, _changes} -> {:error, changeset}
     end
   end
 end
