@@ -16,18 +16,22 @@ defmodule XIAM.Auth.WebAuthn.CredentialExtractor do
   ## Parameters
   - `attestation_cbor` - The parsed CBOR attestation object
   - `client_data_hash` - Hash of the client data JSON
+  - `opts` - Options map with `:suppress_log` to control error logging
   
   ## Returns
   - `{:ok, credential_info}` on success
   - `{:error, reason}` on failure
   """
-  def extract_from_attestation({:ok, attestation_cbor, _}, _client_data_hash) do
+  def extract_from_attestation(attestation, client_data_hash, opts \\ [])
+  
+  def extract_from_attestation({:ok, attestation_cbor, _}, _client_data_hash, opts) do
+    suppress_log = Keyword.get(opts, :suppress_log, false)
     try do
       with %{"fmt" => "none", "authData" => auth_data} <- attestation_cbor,
            {:ok, auth_data_parsed} <- parse_auth_data(auth_data),
            true <- auth_data_parsed.attested_credential_data? do
         
-        Logger.debug("Manual extraction successful for 'none' attestation.")
+        unless suppress_log, do: Logger.debug("Manual extraction successful for 'none' attestation.")
         {:ok, %{
           credential_id: auth_data_parsed.credential_id,
           public_key: auth_data_parsed.public_key_cbor,
@@ -42,18 +46,19 @@ defmodule XIAM.Auth.WebAuthn.CredentialExtractor do
           {:error, "Auth data does not contain attested credential data"}
           
         error ->
-          Logger.error("Manual extraction failed: #{inspect(error)}")
+          unless suppress_log, do: Logger.error("Manual extraction failed: #{inspect(error)}")
           {:error, "Failed to extract credential: invalid format"}
       end
     rescue
       e ->
-        Logger.error("Error during credential extraction: #{inspect(e)}")
+        unless suppress_log, do: Logger.error("Error during credential extraction: #{inspect(e)}")
         {:error, "Credential extraction error: #{inspect(e)}"}
     end
   end
   
-  def extract_from_attestation(error, _client_data_hash) do
-    Logger.error("Invalid attestation CBOR: #{inspect(error)}")
+  def extract_from_attestation(error, _client_data_hash, opts) do
+    suppress_log = Keyword.get(opts, :suppress_log, false)
+    unless suppress_log, do: Logger.error("Invalid attestation CBOR: #{inspect(error)}")
     {:error, "Invalid attestation format"}
   end
   

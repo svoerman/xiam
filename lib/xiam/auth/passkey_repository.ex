@@ -52,7 +52,8 @@ defmodule XIAM.Auth.PasskeyRepository do
   - `{:ok, passkey, user}` if found
   - `{:error, reason}` if not found or on error
   """
-  def get_passkey_with_user(credential_id_b64) when is_binary(credential_id_b64) do
+  def get_passkey_with_user(credential_id_b64, opts \\ []) when is_binary(credential_id_b64) do
+    suppress_log = Keyword.get(opts, :suppress_log, false)
     query =
       from pk in UserPasskey,
       where: pk.credential_id == ^credential_id_b64,
@@ -64,10 +65,14 @@ defmodule XIAM.Auth.PasskeyRepository do
       %UserPasskey{user: %User{} = user} = passkey ->
         {:ok, passkey, user}
       nil ->
-        Logger.warning("Passkey not found for credential ID (base64): #{credential_id_b64}")
+        unless suppress_log do
+          Logger.warning("Passkey not found for credential ID (base64): #{credential_id_b64}")
+        end
         {:error, :credential_not_found}
       _ ->
-        Logger.error("Unexpected result fetching passkey for credential ID (base64): #{credential_id_b64}")
+        unless suppress_log do
+          Logger.error("Unexpected result fetching passkey for credential ID (base64): #{credential_id_b64}")
+        end
         {:error, :database_error}
     end
   end
