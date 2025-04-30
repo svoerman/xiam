@@ -1,5 +1,16 @@
 # Oban test helper is loaded automatically - don't require it explicitly
 
+# Set up logger configuration to suppress specific error messages during tests
+# Suppress CBOR decoding errors by setting a higher log level during tests
+require Logger
+original_level = Logger.level()
+Logger.configure(level: :critical)
+
+# Restore the original log level when tests complete
+System.at_exit(fn _status -> 
+  Logger.configure(level: original_level)
+end)
+
 # Make sure the application is started before tests
 Application.ensure_all_started(:postgrex)
 Application.ensure_all_started(:ecto)

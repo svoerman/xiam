@@ -1,6 +1,7 @@
 defmodule XIAM.Auth.WebAuthn.RegistrationTest do
   use XIAM.DataCase, async: false
   
+  import Mock
   import Mox
   
   alias XIAM.Auth.WebAuthn.Registration
@@ -74,9 +75,7 @@ defmodule XIAM.Auth.WebAuthn.RegistrationTest do
       assert is_binary(challenge.bytes)
     end
 
-    # Instead of testing the actual implementation, we'll modify the approach to ensure
-    # our tests are robust and focus on behavior rather than implementation details
-    @tag :skip
+    # Test the verify_registration functionality with mocked dependencies
     test "verify_registration/4 creates a passkey with the right parameters", %{user: user, challenge: challenge} do
       # Let's focus on testing the key functionality - proper passkey creation
       # and attributes - by mocking at a higher level
@@ -87,81 +86,70 @@ defmodule XIAM.Auth.WebAuthn.RegistrationTest do
         "clientDataJSON" => "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIiwiY2hhbGxlbmdlIjoiQVFJREJBVUdCd2dKQ2dzTURRNFBFQSIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6NDAwMCJ9"
       }
       
-      # Next, create a mock helper to avoid decoding issues
-      :meck.new(XIAM.Auth.WebAuthn.Helpers, [:passthrough])
-      :meck.expect(XIAM.Auth.WebAuthn.Helpers, :decode_json_input, fn input ->
-        {:ok, input}
-      end)
-      
-      # Mock CBOR to bypass the actual attestation object validation
-      :meck.new(CBOR, [:passthrough])
-      :meck.expect(CBOR, :decode, fn _binary ->
-        {:ok, %{"fmt" => "none", "authData" => <<1, 2, 3, 4>>}, <<>>}
-      end)
-      
-      # Mock Wax functionality with maps that match the structure expected
-      :meck.new(Wax, [:passthrough])
-      
-      # Let's directly mock the Wax.register function to return a structure that
-      # the registration module will recognize
-      :meck.expect(Wax, :register, fn _attestation, _client_data, _challenge ->
-        # Mock a successful registration result with an auth_data object that contains:
-        # - credential_id: The ID of the created credential
-        # - public_key: The public key for the credential 
-        # - aaguid: The AAGUID of the authenticator
+      # Create mocks for all the dependencies using the Mock library
+      with_mocks([
+        {XIAM.Auth.WebAuthn.Helpers, [],
+          [
+            decode_json_input: fn input -> {:ok, input} end,
+            encode_public_key: fn input -> input end
+          ]},
         
-        mock_auth_data = %{
-          __struct__: Wax.AuthenticatorData,  # Use a fake struct tag
-          attested_credential_data: %{
-            __struct__: Wax.AttestedCredentialData,  # Use a fake struct tag
-            credential_id: <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10>>,
-            aaguid: <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>,
-            credential_public_key: <<1, 2, 3, 4>>
-          },
-          sign_count: 0
-        }
+        {CBOR, [],
+          [
+            decode: fn _binary -> {:ok, %{"fmt" => "none", "authData" => <<1, 2, 3, 4>>}, <<>>} end
+          ]},
         
-        # Return the expected structure that the verify_registration function is looking for
-        {:ok, {mock_auth_data, "none"}}
-      end)
-      
-      # Set up expectations for the passkey creation
-      :meck.new(XIAM.Auth.UserPasskey, [:passthrough])
-      :meck.expect(XIAM.Auth.UserPasskey, :changeset, fn _passkey, attrs ->
-        # Use Ecto.Changeset to properly validate the attributes
-        # but avoid actually writing to the database
-        Ecto.Changeset.change(%XIAM.Auth.UserPasskey{}, attrs)
-      end)
-      
-      # Mock the Repo.insert function to return a successful result
-      :meck.new(XIAM.Repo, [:passthrough])
-      :meck.expect(XIAM.Repo, :insert, fn changeset ->
-        # Return a passkey with the attributes from the changeset
-        {:ok, Ecto.Changeset.apply_changes(changeset)}
-      end)
-      
-      # Clean up the mocks when done
-      on_exit(fn ->
-        if :meck.validate(Wax) do
-          :meck.unload(Wax)
-        end
+        {Wax, [],
+          [
+            register: fn _attestation, _client_data, _challenge ->
+              # Mock a successful registration result
+              mock_auth_data = %{
+                __struct__: Wax.AuthenticatorData,
+                attested_credential_data: %{
+                  __struct__: Wax.AttestedCredentialData,
+                  credential_id: <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10>>,
+                  aaguid: <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>,
+                  credential_public_key: <<1, 2, 3, 4>>
+                },
+                sign_count: 0
+              }
+              
+              {:ok, {mock_auth_data, "none"}}
+            end
+          ]},
         
-        if :meck.validate(XIAM.Auth.WebAuthn.Helpers) do
-          :meck.unload(XIAM.Auth.WebAuthn.Helpers)
-        end
+        # Bypass the actual UserPasskey validation
+        # We need to use Bypass to avoid the schema validation while still returning a changeset
+        {XIAM.Auth.UserPasskey, [],
+          [
+            changeset: fn _passkey, attrs ->
+              # Create a valid changeset that doesn't validate the required fields
+              # This allows us to test the controller without hitting actual database constraints
+              cs = %Ecto.Changeset{
+                valid?: true,
+                changes: attrs,
+                data: %XIAM.Auth.UserPasskey{
+                  id: "test-id-123",
+                  user_id: attrs[:user_id],
+                  credential_id: attrs[:credential_id],
+                  public_key: attrs[:public_key],
+                  sign_count: attrs[:sign_count],
+                  friendly_name: attrs[:friendly_name]
+                },
+                types: %{}
+              }
+              cs
+            end
+          ]},
         
-        if :meck.validate(CBOR) do
-          :meck.unload(CBOR)
-        end
-        
-        if :meck.validate(XIAM.Auth.UserPasskey) do
-          :meck.unload(XIAM.Auth.UserPasskey)
-        end
-        
-        if :meck.validate(XIAM.Repo) do
-          :meck.unload(XIAM.Repo)
-        end
-      end)
+        {XIAM.Repo, [],
+          [
+            insert: fn changeset ->
+              # Return a passkey with the attributes from the changeset
+              {:ok, Ecto.Changeset.apply_changes(changeset)}
+            end
+          ]}
+      ]) do
       
       # Test registration verification and passkey creation
       result = Registration.verify_registration(user, attestation, challenge, "Test Device")
@@ -172,6 +160,7 @@ defmodule XIAM.Auth.WebAuthn.RegistrationTest do
       # Verify passkey was created with correct attributes
       assert passkey.user_id == user.id
       assert passkey.friendly_name == "Test Device"
+      end
     end
     
     test "verify_registration/4 handles invalid attestation format", %{user: user, challenge: challenge} do
