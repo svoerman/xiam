@@ -5,6 +5,52 @@
     "version": "0.1.0",
     "description": "API for XIAM user authentication and management."
   },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and session management"
+    },
+    {
+      "name": "Users",
+      "description": "User management and operations"
+    },
+    {
+      "name": "Consents",
+      "description": "User consent management"
+    },
+    {
+      "name": "Passkey",
+      "description": "Passkey/WebAuthn credential management"
+    },
+    {
+      "name": "MFA",
+      "description": "Multi-factor authentication management"
+    },
+    {
+      "name": "Debug",
+      "description": "Debugging endpoints"
+    },
+    {
+      "name": "GDPR",
+      "description": "GDPR compliance and data management"
+    },
+    {
+      "name": "Access Control",
+      "description": "Role-based access control management"
+    },
+    {
+      "name": "Products",
+      "description": "Product management endpoints"
+    },
+    {
+      "name": "System",
+      "description": "System status and health endpoints"
+    },
+    {
+      "name": "Hierarchy",
+      "description": "Hierarchical node and access control management"
+    }
+  ],
   "servers": [
     {
       "url": "http://localhost:4000",
@@ -33,74 +79,360 @@
       }
     },
     "schemas": {
+      "HierarchyNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "ltree path that represents the node's position in the hierarchy"
+          },
+          "node_type": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "node_type"
+        ]
+      },
+      "HierarchyNodeList": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HierarchyNode"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "HierarchyAccess": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "role_id": {
+            "type": "integer"
+          },
+          "access_path": {
+            "type": "string",
+            "description": "ltree path that defines the access scope"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "role_id",
+          "access_path"
+        ]
+      },
+      "HierarchyAccessList": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HierarchyAccess"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "HierarchyNodeRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "node_type": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "node_type"
+        ]
+      },
+      "HierarchyAccessRequest": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer"
+          },
+          "role_id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "integer",
+            "description": "The node to grant access to"
+          }
+        },
+        "required": [
+          "user_id",
+          "role_id",
+          "node_id"
+        ]
+      },
+      "AccessCheckResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "has_access": {
+            "type": "boolean"
+          },
+          "node": {
+            "$ref": "#/components/schemas/HierarchyNode",
+            "nullable": true
+          },
+          "role": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "success",
+          "has_access"
+        ]
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": false},
-          "error": {"type": "string"},
-          "details": {"type": "object", "nullable": true, "description": "Validation errors"}
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "nullable": true,
+            "description": "Validation errors"
+          }
         },
-        "required": ["success", "error"]
+        "required": [
+          "success",
+          "error"
+        ]
       },
       "SuccessMessageResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "message": {"type": "string"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string"
+          }
         },
-        "required": ["success", "message"]
+        "required": [
+          "success",
+          "message"
+        ]
       },
       "PaginationMeta": {
         "type": "object",
         "properties": {
-          "page": {"type": "integer"},
-          "per_page": {"type": "integer"},
-          "total": {"type": "integer"},
-          "total_pages": {"type": "integer"}
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          }
         }
       },
       "HealthResponse": {
         "type": "object",
         "properties": {
-          "status": {"type": "string", "example": "ok"},
-          "version": {"type": "string", "example": "0.1.0"},
-          "environment": {"type": "string", "example": "dev"},
-          "timestamp": {"type": "string", "format": "date-time"}
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "version": {
+            "type": "string",
+            "example": "0.1.0"
+          },
+          "environment": {
+            "type": "string",
+            "example": "dev"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "DetailedStatusResponse": {
         "type": "object",
         "description": "Detailed system status",
         "properties": {
-          "db_status": {"type": "string", "example": "ok"},
+          "db_status": {
+            "type": "string",
+            "example": "ok"
+          },
           "memory": {
             "type": "object",
             "properties": {
-              "total": {"type": "number", "format": "float", "description": "Total memory in MB"},
-              "allocated": {"type": "number", "format": "float", "description": "Allocated memory in MB"},
-              "atom": {"type": "number", "format": "float", "description": "Atom memory in MB"},
-              "binary": {"type": "number", "format": "float", "description": "Binary memory in MB"},
-              "code": {"type": "number", "format": "float", "description": "Code memory in MB"},
-              "ets": {"type": "number", "format": "float", "description": "ETS memory in MB"},
-              "processes": {"type": "number", "format": "float", "description": "Processes memory in MB"}
+              "total": {
+                "type": "number",
+                "format": "float",
+                "description": "Total memory in MB"
+              },
+              "allocated": {
+                "type": "number",
+                "format": "float",
+                "description": "Allocated memory in MB"
+              },
+              "atom": {
+                "type": "number",
+                "format": "float",
+                "description": "Atom memory in MB"
+              },
+              "binary": {
+                "type": "number",
+                "format": "float",
+                "description": "Binary memory in MB"
+              },
+              "code": {
+                "type": "number",
+                "format": "float",
+                "description": "Code memory in MB"
+              },
+              "ets": {
+                "type": "number",
+                "format": "float",
+                "description": "ETS memory in MB"
+              },
+              "processes": {
+                "type": "number",
+                "format": "float",
+                "description": "Processes memory in MB"
+              }
             }
           },
-          "version": {"type": "string", "example": "0.1.0"},
-          "environment": {"type": "string", "example": "dev"},
-          "timestamp": {"type": "string", "format": "date-time"}
+          "version": {
+            "type": "string",
+            "example": "0.1.0"
+          },
+          "environment": {
+            "type": "string",
+            "example": "dev"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "SystemStatusResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "status": {"type": "string", "example": "ok"},
-          "uptime": {"type": "string", "example": "3 days, 2 hours, 1 minute"},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "uptime": {
+            "type": "string",
+            "example": "3 days, 2 hours, 1 minute"
+          },
           "stats": {
             "type": "object",
             "properties": {
-              "users": {"type": "integer", "example": 1250},
-              "active_sessions": {"type": "integer", "example": 48}
+              "users": {
+                "type": "integer",
+                "example": 1250
+              },
+              "active_sessions": {
+                "type": "integer",
+                "example": 48
+              }
             }
           }
         }
@@ -108,214 +440,460 @@
       "LoginRequest": {
         "type": "object",
         "properties": {
-          "email": {"type": "string", "format": "email"},
-          "password": {"type": "string", "format": "password"}
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          }
         },
-        "required": ["email", "password"]
+        "required": [
+          "email",
+          "password"
+        ]
       },
       "LoginSuccessResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "mfa_required": {"type": "boolean", "example": false, "nullable": true, "description": "Indicates if MFA verification step is required"},
-          "partial_token": {"type": "string", "description": "Partial JWT token issued if mfa_required is true", "nullable": true},
-          "token": {"type": "string", "description": "Full JWT token if login is complete (no MFA or MFA verified)", "nullable": true},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "mfa_required": {
+            "type": "boolean",
+            "example": false,
+            "nullable": true,
+            "description": "Indicates if MFA verification step is required"
+          },
+          "partial_token": {
+            "type": "string",
+            "description": "Partial JWT token issued if mfa_required is true",
+            "nullable": true
+          },
+          "token": {
+            "type": "string",
+            "description": "Full JWT token if login is complete (no MFA or MFA verified)",
+            "nullable": true
+          },
           "user": {
             "type": "object",
             "properties": {
-              "id": {"type": "integer"},
-              "email": {"type": "string"}
+              "id": {
+                "type": "integer"
+              },
+              "email": {
+                "type": "string"
+              }
             }
           }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
       "TokenResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "token": {"type": "string", "description": "JWT token"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "description": "JWT token"
+          }
         },
-        "required": ["success", "token"]
+        "required": [
+          "success",
+          "token"
+        ]
       },
       "VerifyResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "valid": {"type": "boolean", "example": true},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
           "user": {
             "type": "object",
             "properties": {
-              "id": {"type": "integer"},
-              "email": {"type": "string"},
-              "mfa_enabled": {"type": "boolean"},
+              "id": {
+                "type": "integer"
+              },
+              "email": {
+                "type": "string"
+              },
+              "mfa_enabled": {
+                "type": "boolean"
+              },
               "role": {
                 "type": "object",
                 "nullable": true,
                 "properties": {
-                  "id": {"type": "integer"},
-                  "name": {"type": "string"},
-                  "capabilities": {"type": "array", "items": {"type": "string"}}
+                  "id": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "required": ["success", "valid", "user"]
+        "required": [
+          "success",
+          "valid",
+          "user"
+        ]
       },
       "LogoutResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "message": {"type": "string", "example": "Logged out successfully"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Logged out successfully"
+          }
         },
-        "required": ["success", "message"]
+        "required": [
+          "success",
+          "message"
+        ]
       },
       "MfaChallengeResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "message": {"type": "string", "example": "Please enter the code from your authenticator app"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Please enter the code from your authenticator app"
+          }
         },
-        "required": ["success", "message"]
+        "required": [
+          "success",
+          "message"
+        ]
       },
       "MfaVerifyRequest": {
         "type": "object",
         "properties": {
-          "code": {"type": "string", "description": "The TOTP code from the authenticator app"}
+          "code": {
+            "type": "string",
+            "description": "The TOTP code from the authenticator app"
+          }
         },
-        "required": ["code"]
+        "required": [
+          "code"
+        ]
       },
       "UserBase": {
         "type": "object",
         "properties": {
-          "id": {"type": "integer"},
-          "email": {"type": "string"},
-          "mfa_enabled": {"type": "boolean"},
+          "id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "mfa_enabled": {
+            "type": "boolean"
+          },
           "role": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "id": {"type": "integer"},
-              "name": {"type": "string"}
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
             }
           },
-          "inserted_at": {"type": "string", "format": "date-time"},
-          "updated_at": {"type": "string", "format": "date-time"}
+          "inserted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "UserListResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"type": "array", "items": {"$ref": "#/components/schemas/UserBase"}},
-          "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserBase"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
         }
       },
       "UserResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"$ref": "#/components/schemas/UserBase"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserBase"
+          }
         }
       },
       "UserCreateRequest": {
         "type": "object",
         "properties": {
-          "email": {"type": "string", "format": "email"},
-          "password": {"type": "string", "format": "password"},
-          "password_confirmation": {"type": "string", "format": "password"},
-          "role_id": {"type": "integer", "nullable": true}
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          },
+          "password_confirmation": {
+            "type": "string",
+            "format": "password"
+          },
+          "role_id": {
+            "type": "integer",
+            "nullable": true
+          }
         },
-        "required": ["email", "password", "password_confirmation"]
+        "required": [
+          "email",
+          "password",
+          "password_confirmation"
+        ]
       },
       "UserUpdateRequest": {
         "type": "object",
         "properties": {
-          "email": {"type": "string", "format": "email"},
-          "current_password": {"type": "string", "format": "password"},
-          "password": {"type": "string", "format": "password", "nullable": true},
-          "password_confirmation": {"type": "string", "format": "password", "nullable": true},
-          "role_id": {"type": "integer", "nullable": true},
-          "mfa_enabled": {"type": "boolean", "nullable": true}
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "current_password": {
+            "type": "string",
+            "format": "password"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "nullable": true
+          },
+          "password_confirmation": {
+            "type": "string",
+            "format": "password",
+            "nullable": true
+          },
+          "role_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "mfa_enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
         }
       },
       "ConsentBase": {
         "type": "object",
         "properties": {
-          "id": {"type": "integer"},
-          "user_id": {"type": "integer"},
-          "type": {"type": "string", "enum": ["marketing", "data_processing", "terms_and_conditions"]},
-          "granted": {"type": "boolean"},
-          "data": {"type": "object", "nullable": true},
-          "inserted_at": {"type": "string", "format": "date-time"},
-          "updated_at": {"type": "string", "format": "date-time"}
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "marketing",
+              "data_processing",
+              "terms_and_conditions"
+            ]
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          },
+          "inserted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "ConsentListResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"type": "array", "items": {"$ref": "#/components/schemas/ConsentBase"}},
-          "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentBase"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          }
         }
       },
       "ConsentCreateRequest": {
         "type": "object",
         "properties": {
-          "user_id": {"type": "integer"},
-          "type": {"type": "string", "enum": ["marketing", "data_processing", "terms_and_conditions"]},
-          "granted": {"type": "boolean"},
-          "data": {"type": "object", "nullable": true}
+          "user_id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "marketing",
+              "data_processing",
+              "terms_and_conditions"
+            ]
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          }
         },
-        "required": ["user_id", "type", "granted"]
+        "required": [
+          "user_id",
+          "type",
+          "granted"
+        ]
       },
       "ConsentUpdateRequest": {
         "type": "object",
         "properties": {
-          "granted": {"type": "boolean"},
-          "data": {"type": "object", "nullable": true}
+          "granted": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          }
         },
-        "required": ["granted"]
+        "required": [
+          "granted"
+        ]
       },
       "UserAccessRequest": {
         "type": "object",
         "properties": {
-          "user_id": {"type": "integer"},
-          "product_id": {"type": "integer"},
-          "role_id": {"type": "integer"}
+          "user_id": {
+            "type": "integer"
+          },
+          "product_id": {
+            "type": "integer"
+          },
+          "role_id": {
+            "type": "integer"
+          }
         },
-        "required": ["user_id", "product_id", "role_id"]
+        "required": [
+          "user_id",
+          "product_id",
+          "role_id"
+        ]
       },
       "UserAccessResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
           "data": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "id": {"type": "integer"},
-                "user_id": {"type": "integer"},
-                "product_id": {"type": "integer"},
-                "role_id": {"type": "integer"},
+                "id": {
+                  "type": "integer"
+                },
+                "user_id": {
+                  "type": "integer"
+                },
+                "product_id": {
+                  "type": "integer"
+                },
+                "role_id": {
+                  "type": "integer"
+                },
                 "product": {
                   "type": "object",
                   "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "description": {"type": "string", "nullable": true}
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    }
                   }
                 },
                 "role": {
                   "type": "object",
                   "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
                     "capabilities": {
                       "type": "array",
-                      "items": {"type": "string"}
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -327,81 +905,164 @@
       "ProductBase": {
         "type": "object",
         "properties": {
-          "id": {"type": "integer"},
-          "name": {"type": "string"},
-          "description": {"type": "string", "nullable": true},
-          "inserted_at": {"type": "string", "format": "date-time"},
-          "updated_at": {"type": "string", "format": "date-time"}
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "inserted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "ProductListResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"type": "array", "items": {"$ref": "#/components/schemas/ProductBase"}}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductBase"
+            }
+          }
         }
       },
       "ProductCreateRequest": {
         "type": "object",
         "properties": {
-          "name": {"type": "string"},
-          "description": {"type": "string", "nullable": true}
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["name"]
+        "required": [
+          "name"
+        ]
       },
       "CapabilityBase": {
         "type": "object",
         "properties": {
-          "id": {"type": "integer"},
-          "name": {"type": "string"},
-          "product_id": {"type": "integer"},
-          "inserted_at": {"type": "string", "format": "date-time"},
-          "updated_at": {"type": "string", "format": "date-time"}
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "integer"
+          },
+          "inserted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "CapabilityListResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"type": "array", "items": {"$ref": "#/components/schemas/CapabilityBase"}}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityBase"
+            }
+          }
         }
       },
       "CapabilityCreateRequest": {
         "type": "object",
         "properties": {
-          "name": {"type": "string"},
-          "product_id": {"type": "integer"}
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "integer"
+          }
         },
-        "required": ["name", "product_id"]
+        "required": [
+          "name",
+          "product_id"
+        ]
       },
       "AuthenticationOptionsRequest": {
         "type": "object",
         "properties": {
-          "email": {"type": "string", "format": "email"}
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
         },
-        "required": ["email"]
+        "required": [
+          "email"
+        ]
       },
       "AuthenticationOptionsResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
           "options": {
             "type": "object",
             "properties": {
-              "challenge": {"type": "string"},
-              "timeout": {"type": "integer"},
-              "rpId": {"type": "string"},
+              "challenge": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "integer"
+              },
+              "rpId": {
+                "type": "string"
+              },
               "allowCredentials": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {"type": "string"},
-                    "type": {"type": "string", "enum": ["public-key"]}
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "public-key"
+                      ]
+                    }
                   }
                 }
               },
-              "userVerification": {"type": "string", "enum": ["preferred", "required", "discouraged"]}
+              "userVerification": {
+                "type": "string",
+                "enum": [
+                  "preferred",
+                  "required",
+                  "discouraged"
+                ]
+              }
             }
           }
         }
@@ -409,42 +1070,80 @@
       "AuthenticationRequest": {
         "type": "object",
         "properties": {
-          "id": {"type": "string"},
-          "rawId": {"type": "string"},
+          "id": {
+            "type": "string"
+          },
+          "rawId": {
+            "type": "string"
+          },
           "response": {
             "type": "object",
             "properties": {
-              "clientDataJSON": {"type": "string"},
-              "authenticatorData": {"type": "string"},
-              "signature": {"type": "string"},
-              "userHandle": {"type": "string", "nullable": true}
+              "clientDataJSON": {
+                "type": "string"
+              },
+              "authenticatorData": {
+                "type": "string"
+              },
+              "signature": {
+                "type": "string"
+              },
+              "userHandle": {
+                "type": "string",
+                "nullable": true
+              }
             }
           },
-          "type": {"type": "string", "enum": ["public-key"]}
+          "type": {
+            "type": "string",
+            "enum": [
+              "public-key"
+            ]
+          }
         },
-        "required": ["id", "rawId", "response", "type"]
+        "required": [
+          "id",
+          "rawId",
+          "response",
+          "type"
+        ]
       },
       "RegistrationOptionsResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
           "options": {
             "type": "object",
             "properties": {
-              "challenge": {"type": "string"},
+              "challenge": {
+                "type": "string"
+              },
               "rp": {
                 "type": "object",
                 "properties": {
-                  "name": {"type": "string"},
-                  "id": {"type": "string"}
+                  "name": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
                 }
               },
               "user": {
                 "type": "object",
                 "properties": {
-                  "id": {"type": "string"},
-                  "name": {"type": "string"},
-                  "displayName": {"type": "string"}
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  }
                 }
               },
               "pubKeyCredParams": {
@@ -452,29 +1151,67 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "type": {"type": "string", "enum": ["public-key"]},
-                    "alg": {"type": "integer"}
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "public-key"
+                      ]
+                    },
+                    "alg": {
+                      "type": "integer"
+                    }
                   }
                 }
               },
-              "timeout": {"type": "integer"},
-              "attestation": {"type": "string", "enum": ["none", "direct", "indirect"]},
+              "timeout": {
+                "type": "integer"
+              },
+              "attestation": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "direct",
+                  "indirect"
+                ]
+              },
               "excludeCredentials": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": {"type": "string"},
-                    "type": {"type": "string", "enum": ["public-key"]}
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "public-key"
+                      ]
+                    }
                   }
                 }
               },
               "authenticatorSelection": {
                 "type": "object",
                 "properties": {
-                  "authenticatorAttachment": {"type": "string", "enum": ["platform", "cross-platform"]},
-                  "requireResidentKey": {"type": "boolean"},
-                  "userVerification": {"type": "string", "enum": ["preferred", "required", "discouraged"]}
+                  "authenticatorAttachment": {
+                    "type": "string",
+                    "enum": [
+                      "platform",
+                      "cross-platform"
+                    ]
+                  },
+                  "requireResidentKey": {
+                    "type": "boolean"
+                  },
+                  "userVerification": {
+                    "type": "string",
+                    "enum": [
+                      "preferred",
+                      "required",
+                      "discouraged"
+                    ]
+                  }
                 }
               }
             }
@@ -484,35 +1221,80 @@
       "RegistrationRequest": {
         "type": "object",
         "properties": {
-          "name": {"type": "string"},
-          "id": {"type": "string"},
-          "rawId": {"type": "string"},
+          "name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "rawId": {
+            "type": "string"
+          },
           "response": {
             "type": "object",
             "properties": {
-              "clientDataJSON": {"type": "string"},
-              "attestationObject": {"type": "string"},
-              "transports": {"type": "array", "items": {"type": "string"}}
+              "clientDataJSON": {
+                "type": "string"
+              },
+              "attestationObject": {
+                "type": "string"
+              },
+              "transports": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
-          "type": {"type": "string", "enum": ["public-key"]}
+          "type": {
+            "type": "string",
+            "enum": [
+              "public-key"
+            ]
+          }
         },
-        "required": ["name", "id", "rawId", "response", "type"]
+        "required": [
+          "name",
+          "id",
+          "rawId",
+          "response",
+          "type"
+        ]
       },
       "PasskeyBase": {
         "type": "object",
         "properties": {
-          "id": {"type": "string"},
-          "name": {"type": "string"},
-          "created_at": {"type": "string", "format": "date-time"},
-          "last_used_at": {"type": "string", "format": "date-time", "nullable": true}
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         }
       },
       "PasskeyListResponse": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean", "example": true},
-          "data": {"type": "array", "items": {"$ref": "#/components/schemas/PasskeyBase"}}
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyBase"
+            }
+          }
         }
       }
     }
@@ -523,7 +1305,9 @@
         "summary": "User login",
         "description": "Authenticate a user with email and password",
         "operationId": "login",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -563,7 +1347,9 @@
         "summary": "Basic Health Check",
         "description": "Get basic system health status",
         "operationId": "basicHealth",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "responses": {
           "200": {
             "description": "Basic health status",
@@ -583,7 +1369,9 @@
         "summary": "Detailed Health Check",
         "description": "Get detailed system health metrics",
         "operationId": "detailedHealth",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "security": [
           {
             "jwt": []
@@ -618,7 +1406,9 @@
         "summary": "System Health",
         "description": "Get system health status",
         "operationId": "systemHealth",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "security": [
           {
             "jwt": []
@@ -653,7 +1443,10 @@
         "summary": "Get Passkey Authentication Options",
         "description": "Get challenge and options for passkey authentication",
         "operationId": "passkeyAuthenticationOptions",
-        "tags": ["Authentication", "Passkey"],
+        "tags": [
+          "Authentication",
+          "Passkey"
+        ],
         "parameters": [
           {
             "name": "email",
@@ -695,7 +1488,10 @@
         "summary": "Authenticate with Passkey",
         "description": "Authenticate a user with passkey credentials",
         "operationId": "passkeyAuthenticate",
-        "tags": ["Authentication", "Passkey"],
+        "tags": [
+          "Authentication",
+          "Passkey"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -735,7 +1531,10 @@
         "summary": "Request MFA Challenge",
         "description": "Request a challenge for MFA verification",
         "operationId": "mfaChallenge",
-        "tags": ["Authentication", "MFA"],
+        "tags": [
+          "Authentication",
+          "MFA"
+        ],
         "security": [
           {
             "partialJwt": []
@@ -770,7 +1569,10 @@
         "summary": "Verify MFA Code",
         "description": "Verify the MFA code to complete login",
         "operationId": "mfaVerify",
-        "tags": ["Authentication", "MFA"],
+        "tags": [
+          "Authentication",
+          "MFA"
+        ],
         "security": [
           {
             "partialJwt": []
@@ -815,7 +1617,9 @@
         "summary": "Get Passkey Registration Options",
         "description": "Get challenge and options for registering a new passkey",
         "operationId": "passkeyRegistrationOptions",
-        "tags": ["Passkey"],
+        "tags": [
+          "Passkey"
+        ],
         "security": [
           {
             "jwt": []
@@ -850,7 +1654,9 @@
         "summary": "Register Passkey",
         "description": "Register a new passkey for the authenticated user",
         "operationId": "registerPasskey",
-        "tags": ["Passkey"],
+        "tags": [
+          "Passkey"
+        ],
         "security": [
           {
             "jwt": []
@@ -905,7 +1711,9 @@
         "summary": "List User Passkeys",
         "description": "Get a list of passkeys registered for the authenticated user",
         "operationId": "listPasskeys",
-        "tags": ["Passkey"],
+        "tags": [
+          "Passkey"
+        ],
         "security": [
           {
             "jwt": []
@@ -940,7 +1748,10 @@
         "summary": "Debug Passkeys",
         "description": "Get debug information about passkeys (development only)",
         "operationId": "debugPasskeys",
-        "tags": ["Passkey", "Debug"],
+        "tags": [
+          "Passkey",
+          "Debug"
+        ],
         "security": [
           {
             "jwt": []
@@ -975,7 +1786,9 @@
         "summary": "Delete Passkey",
         "description": "Delete a passkey by ID",
         "operationId": "deletePasskey",
-        "tags": ["Passkey"],
+        "tags": [
+          "Passkey"
+        ],
         "security": [
           {
             "jwt": []
@@ -1031,7 +1844,9 @@
         "summary": "Refresh Token",
         "description": "Refresh an authentication token",
         "operationId": "refreshToken",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "security": [
           {
             "jwt": []
@@ -1066,7 +1881,9 @@
         "summary": "Verify Token",
         "description": "Verify an authentication token and get user information",
         "operationId": "verifyToken",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "security": [
           {
             "jwt": []
@@ -1101,7 +1918,9 @@
         "summary": "Logout",
         "description": "Log out a user and invalidate their token",
         "operationId": "logout",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "security": [
           {
             "jwt": []
@@ -1136,7 +1955,9 @@
         "summary": "System Status",
         "description": "Get detailed system status and statistics",
         "operationId": "systemStatus",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "security": [
           {
             "jwt": []
@@ -1171,7 +1992,9 @@
         "summary": "List Users",
         "description": "Get a paginated list of users",
         "operationId": "listUsers",
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "security": [
           {
             "jwt": []
@@ -1227,7 +2050,9 @@
         "summary": "Create User",
         "description": "Create a new user",
         "operationId": "createUser",
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "security": [
           {
             "jwt": []
@@ -1282,7 +2107,9 @@
         "summary": "Get User",
         "description": "Get a user by ID",
         "operationId": "getUser",
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "security": [
           {
             "jwt": []
@@ -1336,7 +2163,9 @@
         "summary": "Update User",
         "description": "Update a user by ID",
         "operationId": "updateUser",
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "security": [
           {
             "jwt": []
@@ -1410,7 +2239,9 @@
         "summary": "Delete User",
         "description": "Delete a user by ID",
         "operationId": "deleteUser",
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "security": [
           {
             "jwt": []
@@ -1466,7 +2297,10 @@
         "summary": "Anonymize User",
         "description": "Anonymize a user's data for GDPR compliance",
         "operationId": "anonymizeUser",
-        "tags": ["Users", "GDPR"],
+        "tags": [
+          "Users",
+          "GDPR"
+        ],
         "security": [
           {
             "jwt": []
@@ -1542,7 +2376,9 @@
         "summary": "List Consents",
         "description": "Get a paginated list of consents",
         "operationId": "listConsents",
-        "tags": ["Consents"],
+        "tags": [
+          "Consents"
+        ],
         "security": [
           {
             "jwt": []
@@ -1606,7 +2442,9 @@
         "summary": "Create Consent",
         "description": "Create a new consent record",
         "operationId": "createConsent",
-        "tags": ["Consents"],
+        "tags": [
+          "Consents"
+        ],
         "security": [
           {
             "jwt": []
@@ -1661,7 +2499,9 @@
         "summary": "Update Consent",
         "description": "Update a consent record by ID",
         "operationId": "updateConsent",
-        "tags": ["Consents"],
+        "tags": [
+          "Consents"
+        ],
         "security": [
           {
             "jwt": []
@@ -1735,7 +2575,9 @@
         "summary": "Delete Consent",
         "description": "Delete a consent record by ID",
         "operationId": "deleteConsent",
-        "tags": ["Consents"],
+        "tags": [
+          "Consents"
+        ],
         "security": [
           {
             "jwt": []
@@ -1791,7 +2633,9 @@
         "summary": "Set User Access",
         "description": "Assign a role to a user for a specific product",
         "operationId": "setUserAccess",
-        "tags": ["Access Control"],
+        "tags": [
+          "Access Control"
+        ],
         "security": [
           {
             "jwt": []
@@ -1844,7 +2688,9 @@
         "summary": "Get User Access",
         "description": "Get a user's access permissions across products",
         "operationId": "getUserAccess",
-        "tags": ["Access Control"],
+        "tags": [
+          "Access Control"
+        ],
         "security": [
           {
             "jwt": []
@@ -1890,7 +2736,9 @@
         "summary": "List Products",
         "description": "Get a list of all products",
         "operationId": "listProducts",
-        "tags": ["Products"],
+        "tags": [
+          "Products"
+        ],
         "security": [
           {
             "jwt": []
@@ -1923,7 +2771,9 @@
         "summary": "Create Product",
         "description": "Create a new product",
         "operationId": "createProduct",
-        "tags": ["Products"],
+        "tags": [
+          "Products"
+        ],
         "security": [
           {
             "jwt": []
@@ -1978,7 +2828,10 @@
         "summary": "Get Product Capabilities",
         "description": "Get a list of capabilities for a specific product",
         "operationId": "getProductCapabilities",
-        "tags": ["Products", "Access Control"],
+        "tags": [
+          "Products",
+          "Access Control"
+        ],
         "security": [
           {
             "jwt": []
@@ -2034,7 +2887,9 @@
         "summary": "Create Capability",
         "description": "Create a new capability for a product",
         "operationId": "createCapability",
-        "tags": ["Access Control"],
+        "tags": [
+          "Access Control"
+        ],
         "security": [
           {
             "jwt": []
@@ -2073,6 +2928,905 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/nodes": {
+      "get": {
+        "summary": "List Hierarchy Nodes",
+        "description": "Get a list of all hierarchy nodes",
+        "operationId": "listHierarchyNodes",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyNodeList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Hierarchy Node",
+        "description": "Create a new hierarchy node",
+        "operationId": "createHierarchyNode",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HierarchyNodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HierarchyNode"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/nodes/{id}": {
+      "get": {
+        "summary": "Get Hierarchy Node",
+        "description": "Get a hierarchy node by ID",
+        "operationId": "getHierarchyNode",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HierarchyNode"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Hierarchy Node",
+        "description": "Update a hierarchy node by ID",
+        "operationId": "updateHierarchyNode",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HierarchyNodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HierarchyNode"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Hierarchy Node",
+        "description": "Delete a hierarchy node by ID",
+        "operationId": "deleteHierarchyNode",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/nodes/{id}/children": {
+      "get": {
+        "summary": "Get Node Children",
+        "description": "Get all direct children of a hierarchy node",
+        "operationId": "getNodeChildren",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyNodeList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/nodes/{id}/descendants": {
+      "get": {
+        "summary": "Get Node Descendants",
+        "description": "Get all descendants of a hierarchy node",
+        "operationId": "getNodeDescendants",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyNodeList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/access": {
+      "get": {
+        "summary": "List Hierarchy Access Grants",
+        "description": "Get a list of all hierarchy access grants",
+        "operationId": "listHierarchyAccess",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyAccessList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Grant Hierarchy Access",
+        "description": "Grant access to a hierarchy node for a user with a specific role",
+        "operationId": "grantHierarchyAccess",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HierarchyAccessRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HierarchyAccess"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/access/{id}": {
+      "delete": {
+        "summary": "Revoke Hierarchy Access",
+        "description": "Revoke an existing hierarchy access grant",
+        "operationId": "revokeHierarchyAccess",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Access grant ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/access/node/{node_id}": {
+      "get": {
+        "summary": "List Node Access Grants",
+        "description": "Get all access grants for a specific node",
+        "operationId": "listNodeAccessGrants",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Node ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyAccessList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/access/user/{user_id}": {
+      "get": {
+        "summary": "List User Access Grants",
+        "description": "Get all access grants for a specific user",
+        "operationId": "listUserAccessGrants",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HierarchyAccessList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hierarchy/check-access": {
+      "post": {
+        "summary": "Check User Access",
+        "description": "Check if a user has access to a specific node",
+        "operationId": "checkUserAccess",
+        "tags": [
+          "Hierarchy"
+        ],
+        "security": [
+          {
+            "jwt": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "integer"
+                  },
+                  "node_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "node_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

@@ -1,0 +1,338 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Hierarchy Management</h1>
+    <.button phx-click="show_new_node_modal">
+      <.icon name="hero-plus" class="w-5 h-5 mr-1" />
+      Add Root Node
+    </.button>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Hierarchy Tree View -->
+    <div class="bg-white shadow-md rounded-lg p-4 col-span-1">
+      <h2 class="text-lg font-semibold mb-4">Hierarchy</h2>
+      
+      <div class="overflow-y-auto max-h-[70vh]">
+        <ul class="space-y-2">
+          <%= for node <- Enum.filter(@nodes, fn n -> is_nil(n.parent_id) end) do %>
+            <li>
+              <div class={[
+                "flex items-center p-2 rounded cursor-pointer",
+                @selected_node && @selected_node.id == node.id && "bg-blue-100"
+              ]}>
+                <span phx-click="select_node" phx-value-id={node.id} class="flex-grow font-medium">
+                  <%= node.name %>
+                </span>
+                <span class="text-xs text-gray-500 px-2">
+                  <%= node.node_type %>
+                </span>
+                <div class="flex items-center space-x-1">
+                  <button phx-click="show_edit_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
+                    <.icon name="hero-pencil-square" class="w-4 h-4" />
+                  </button>
+                  <button phx-click="show_move_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
+                    <.icon name="hero-arrow-path" class="w-4 h-4" />
+                  </button>
+                  <button phx-click="delete_node" phx-value-id={node.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-500">
+                    <.icon name="hero-trash" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Recursive rendering of child nodes -->
+              <.render_children parent={node} all_nodes={@nodes} selected_node={@selected_node} />
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+    
+    <!-- Node Details -->
+    <div class="bg-white shadow-md rounded-lg p-4 col-span-2">
+      <%= if @selected_node do %>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Node Details</h2>
+          <div class="space-x-2">
+            <.button phx-click="show_new_node_modal" variant="outline">
+              <.icon name="hero-plus" class="w-4 h-4 mr-1" />
+              Add Child
+            </.button>
+            <.button phx-click="show_grant_access_modal" phx-value-id={@selected_node.id} variant="outline">
+              <.icon name="hero-key" class="w-4 h-4 mr-1" />
+              Grant Access
+            </.button>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500">Name</h3>
+            <p><%= @selected_node.name %></p>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500">Type</h3>
+            <p><%= @selected_node.node_type %></p>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500">Path</h3>
+            <p class="text-sm font-mono overflow-x-auto"><%= @selected_node.path %></p>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500">Created</h3>
+            <p><%= @selected_node.inserted_at %></p>
+          </div>
+          <%= if @selected_node.metadata && map_size(@selected_node.metadata) > 0 do %>
+            <div class="col-span-2">
+              <h3 class="text-sm font-semibold text-gray-500">Metadata</h3>
+              <pre class="bg-gray-50 p-2 rounded text-xs overflow-x-auto"><%= Jason.encode!(@selected_node.metadata, pretty: true) %></pre>
+            </div>
+          <% end %>
+        </div>
+        
+        <!-- Children List -->
+        <%= if assigns[:children] && length(@children) > 0 do %>
+          <div class="mb-6">
+            <h3 class="text-md font-semibold mb-2">Direct Children</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  <%= for child <- @children do %>
+                    <tr>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= child.name %></td>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= child.node_type %></td>
+                      <td class="px-4 py-2 whitespace-nowrap flex items-center space-x-2">
+                        <button phx-click="select_node" phx-value-id={child.id} class="text-blue-600 hover:text-blue-800">
+                          <.icon name="hero-eye" class="w-4 h-4" />
+                        </button>
+                        <button phx-click="show_edit_node_modal" phx-value-id={child.id} class="text-gray-600 hover:text-blue-600">
+                          <.icon name="hero-pencil-square" class="w-4 h-4" />
+                        </button>
+                        <button phx-click="delete_node" phx-value-id={child.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-600">
+                          <.icon name="hero-trash" class="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% end %>
+        
+        <!-- Access Grants -->
+        <div>
+          <h3 class="text-md font-semibold mb-2">Access Grants</h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <%= if assigns[:node_access] && length(@node_access) > 0 do %>
+                  <%= for access <- @node_access do %>
+                    <tr>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= access.user.email %></td>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= access.role.name %></td>
+                      <td class="px-4 py-2 whitespace-nowrap">
+                        <button phx-click="revoke_access" phx-value-user-id={access.user_id} data-confirm="Are you sure you want to revoke this access?" class="text-gray-600 hover:text-red-600">
+                          <.icon name="hero-trash" class="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  <% end %>
+                <% else %>
+                  <tr>
+                    <td colspan="3" class="px-4 py-2 text-center text-sm text-gray-500">No access grants found</td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% else %>
+        <div class="flex flex-col items-center justify-center h-64">
+          <p class="text-gray-500 mb-4">Select a node to view details</p>
+          <.button phx-click="show_new_node_modal">
+            <.icon name="hero-plus" class="w-5 h-5 mr-1" />
+            Create Root Node
+          </.button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <%= if @show_modal do %>
+    <%= case @modal_type do %>
+      <% :new_node -> %>
+        <.modal id="new-node-modal" show>
+          <:title>Create New Node</:title>
+          <:content>
+          <.form for={@node_changeset} phx-submit="save_node" class="space-y-4">
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <.input field={:name} label="Name" required />
+              </div>
+              <div>
+                <.input
+                  field={:node_type}
+                  label="Node Type"
+                  type="text"
+                  list="node-type-suggestions"
+                  placeholder="Enter node type or choose from suggestions"
+                  required
+                />
+                <datalist id="node-type-suggestions">
+                  <%= for type <- @suggested_node_types do %>
+                    <option value={type}></option>
+                  <% end %>
+                </datalist>
+              </div>
+              <div>
+                <.input
+                  field={:parent_id}
+                  label="Parent Node"
+                  type="select"
+                  options={[{"None (Root Node)", ""}] ++ Enum.map(@nodes, fn n -> {n.name, n.id} end)}
+                />
+              </div>
+              <div>
+                <.input
+                  field={:metadata}
+                  label="Metadata (JSON)"
+                  type="textarea"
+                  placeholder="{ }"
+                />
+              </div>
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+              <.button type="submit">Create Node</.button>
+            </div>
+          </.form>
+          </:content>
+        </.modal>
+
+      <% :edit_node -> %>
+        <.modal id="edit-node-modal" show>
+          <:title>Edit Node</:title>
+          <:content>
+          <.form for={@node_changeset} phx-submit="save_node" class="space-y-4">
+            <.input type="hidden" field={:id} />
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <.input field={:name} label="Name" required />
+              </div>
+              <div>
+                <.input
+                  field={:node_type}
+                  label="Node Type"
+                  type="text"
+                  list="node-type-suggestions-edit"
+                  placeholder="Enter node type or choose from suggestions"
+                  required
+                />
+                <datalist id="node-type-suggestions-edit">
+                  <%= for type <- @suggested_node_types do %>
+                    <option value={type}></option>
+                  <% end %>
+                </datalist>
+              </div>
+              <div>
+                <.input
+                  field={:metadata}
+                  label="Metadata (JSON)"
+                  type="textarea"
+                  placeholder="{ }"
+                />
+              </div>
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+              <.button type="submit">Update Node</.button>
+            </div>
+          </.form>
+          </:content>
+        </.modal>
+
+      <% :move_node -> %>
+        <.modal id="move-node-modal" show>
+          <:title>Move Node</:title>
+          <:content>
+          <.form for={%{}} phx-submit="move_node" class="space-y-4">
+            <div>
+              <p class="mb-4">Moving node: <strong><%= @selected_node.name %></strong></p>
+              <p class="text-sm text-gray-600 mb-4">This will move the node and all its descendants to a new parent.</p>
+              
+              <.input
+                field={%{}}
+                name="move[parent_id]"
+                label="New Parent"
+                type="select"
+                options={[{"None (Make Root)", ""}] ++ Enum.map(@potential_parents, fn n -> {n.name, n.id} end)}
+                required
+              />
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+              <.button type="submit">Move Node</.button>
+            </div>
+          </.form>
+          </:content>
+        </.modal>
+
+      <% :grant_access -> %>
+        <.modal id="grant-access-modal" show>
+          <:title>Grant Access</:title>
+          <:content>
+          <.form for={@access_changeset} phx-submit="grant_access" class="space-y-4">
+            <div class="grid grid-cols-1 gap-4">
+              <p class="mb-2">Granting access to: <strong><%= @selected_node.name %></strong></p>
+              <p class="text-xs text-gray-600 mb-2">Access will be granted to this node and all its descendants.</p>
+              
+              <div>
+                <.input
+                  field={:user_id}
+                  name="access[user_id]"
+                  label="User"
+                  type="select"
+                  options={Enum.map(@users, fn u -> {u.email, u.id} end)}
+                  required
+                />
+              </div>
+              <div>
+                <.input
+                  field={:role_id}
+                  name="access[role_id]"
+                  label="Role"
+                  type="select"
+                  options={Enum.map(@roles, fn r -> {r.name, r.id} end)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="flex justify-end space-x-2">
+              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+              <.button type="submit">Grant Access</.button>
+            </div>
+          </.form>
+          </:content>
+        </.modal>
+    <% end %>
+  <% end %>
+</div>

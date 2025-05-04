@@ -132,6 +132,7 @@ defmodule XIAMWeb.Router do
       live "/audit-logs", AuditLogsLive, :index
       live "/status", StatusLive, :index
       live "/consents", ConsentRecordsLive, :index
+      live "/hierarchy", HierarchyLive, :index
     end
   end
 
@@ -198,7 +199,54 @@ defmodule XIAMWeb.Router do
     get "/access", AccessControlController, :get_user_access
     resources "/products", ProductController, only: [:index, :create]
     get "/products/:product_id/capabilities", AccessControlController, :get_product_capabilities
+    
+    # Hierarchy Routes
+    get "/hierarchy/nodes", HierarchyController, :list_nodes
+    post "/hierarchy/nodes", HierarchyController, :create_node
+    get "/hierarchy/nodes/:id", HierarchyController, :get_node
+    put "/hierarchy/nodes/:id", HierarchyController, :update_node
+    delete "/hierarchy/nodes/:id", HierarchyController, :delete_node
+    get "/hierarchy/nodes/:id/children", HierarchyController, :get_node_children
+    get "/hierarchy/nodes/:id/descendants", HierarchyController, :get_node_descendants
+    
+    # Hierarchy Access Routes
+    get "/hierarchy/access", HierarchyController, :list_access_grants
+    post "/hierarchy/access", HierarchyController, :create_access_grant
+    delete "/hierarchy/access/:id", HierarchyController, :delete_access_grant
+    get "/hierarchy/access/node/:node_id", HierarchyController, :list_node_access_grants
+    get "/hierarchy/access/user/:user_id", HierarchyController, :list_user_access_grants
+    post "/hierarchy/check-access", HierarchyController, :check_user_access
+
+    # Hierarchy Access Control Routes
+    scope "/v1" do
+      # Basic hierarchy node management
+      get "/hierarchy", HierarchyController, :index
+      get "/hierarchy/:id", HierarchyController, :show
+      post "/hierarchy", HierarchyController, :create
+      put "/hierarchy/:id", HierarchyController, :update
+      delete "/hierarchy/:id", HierarchyController, :delete
+      
+      # Hierarchy relationships
+      get "/hierarchy/:id/descendants", HierarchyController, :descendants
+      get "/hierarchy/:id/ancestry", HierarchyController, :ancestry
+      post "/hierarchy/:id/move", HierarchyController, :move
+      
+      # Batch operations
+      post "/hierarchy/batch/move", HierarchyController, :batch_move
+      post "/hierarchy/batch/delete", HierarchyController, :batch_delete
+      
+      # Access management
+      get "/hierarchy/access/check/:id", HierarchyController, :check_access
+      post "/hierarchy/access/batch/check", HierarchyController, :batch_check_access
+      post "/hierarchy/access/grant", HierarchyController, :grant_access
+      post "/hierarchy/access/batch/grant", HierarchyController, :batch_grant_access
+      delete "/hierarchy/access/revoke", HierarchyController, :revoke_access
+      post "/hierarchy/access/batch/revoke", HierarchyController, :batch_revoke_access
+    end
     post "/capabilities", AccessControlController, :create_capability
+    
+    # Hierarchy Access Routes
+    get "/hierarchy/access/:node_id", HierarchyAccessController, :check_access
   end
 
   # Enable Swoosh mailbox preview in development

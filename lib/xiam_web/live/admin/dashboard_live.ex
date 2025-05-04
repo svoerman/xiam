@@ -52,6 +52,15 @@ defmodule XIAMWeb.Admin.DashboardLive do
           </.link>
         </div>
 
+        <!-- Hierarchy Management Card -->
+        <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
+          <h2 class="text-xl font-semibold mb-4 text-foreground">Hierarchy Management</h2>
+          <p class="text-muted-foreground mb-4">Manage hierarchical access control for large-scale organizational structures.</p>
+          <.link patch={~p"/admin/hierarchy"} class="text-primary hover:text-primary/80 font-medium transition-colors">
+            Manage Hierarchy →
+          </.link>
+        </div>
+
         <!-- Products & Capabilities Card -->
         <div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6">
           <h2 class="text-xl font-semibold mb-4 text-foreground">Products & Capabilities</h2>

@@ -42,6 +42,8 @@ defmodule XIAM.Application do
       {Cluster.Supervisor, [topologies, [name: XIAM.ClusterSupervisor]]},
       # Start the passkey token replay protection GenServer
       XIAM.Auth.PasskeyTokenReplay,
+      # Start the hierarchy access cache for improved performance
+      XIAM.Hierarchy.AccessCache,
       # Start to serve requests, typically the last entry
       XIAMWeb.Endpoint
     ]

@@ -21,6 +21,16 @@ defmodule XIAM.Users do
   def get_user_by_email(email), do: Repo.get_by(User, email: email)
 
   @doc """
+  Lists all users.
+  Returns a list of all users in the system ordered by email.
+  """
+  def list_users do
+    User
+    |> order_by([u], u.email)
+    |> Repo.all()
+  end
+
+  @doc """
   Updates a user's passkey settings.
   """
   def update_user_passkey_settings(%User{} = user, attrs) do

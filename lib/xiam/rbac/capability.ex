@@ -18,7 +18,7 @@ defmodule Xiam.Rbac.Capability do
   def changeset(capability, attrs) do
     capability
     |> cast(attrs, [:name, :description, :product_id])
-    |> validate_required([:name, :product_id])
+    |> validate_required([:name])
     |> unique_constraint([:product_id, :name])
   end
 

@@ -2,15 +2,26 @@ defmodule XIAM.Repo.Migrations.CreateRolesAndCapabilities do
   use Ecto.Migration
 
   def change do
-    # Create capabilities table
-    create table(:capabilities) do
-      add :name, :string, null: false
-      add :description, :text
-
-      timestamps()
-    end
-
-    create unique_index(:capabilities, [:name])
+    # Skip creating capabilities table if it already exists
+    # We'll use execute to run SQL that safely checks if table exists
+    execute("""    
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'capabilities') THEN
+        CREATE TABLE capabilities (
+          id BIGSERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+      END IF;
+    END
+    $$;
+    """)
+    
+    # Create unique index on name if it doesn't exist
+    execute("CREATE INDEX IF NOT EXISTS capabilities_name_index ON capabilities(name);")
 
     # Create roles table
     create table(:roles) do
