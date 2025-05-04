@@ -44,6 +44,8 @@ defmodule XIAM.Application do
       XIAM.Auth.PasskeyTokenReplay,
       # Start the hierarchy access cache for improved performance
       XIAM.Hierarchy.AccessCache,
+      # Start the hierarchy data cache for large hierarchies
+      XIAM.Cache.HierarchyCache,
       # Start to serve requests, typically the last entry
       XIAMWeb.Endpoint
     ]

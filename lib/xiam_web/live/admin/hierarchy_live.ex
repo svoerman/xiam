@@ -5,6 +5,7 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   import XIAMWeb.Components.UI.Modal
   import XIAMWeb.CoreComponents, except: [button: 1, modal: 1]
   import XIAMWeb.Components.UI
+  import XIAMWeb.AdminComponents
   
   alias XIAM.Hierarchy
   alias XIAM.Hierarchy.Node
@@ -13,7 +14,8 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   
   @impl true
   def mount(_params, _session, socket) do
-    nodes = Hierarchy.list_nodes()
+    # Only load root nodes initially instead of all nodes
+    root_nodes = Hierarchy.list_root_nodes()
     roles = Xiam.Rbac.Role |> Repo.all()
     
     # Prepare some common node type suggestions
@@ -33,7 +35,9 @@ defmodule XIAMWeb.Admin.HierarchyLive do
     
     socket = assign(socket,
       page_title: "Hierarchy Management",
-      nodes: nodes,
+      root_nodes: root_nodes,
+      expanded_nodes: %{},  # Tracks which nodes are expanded in UI
+      loading_count: Repo.aggregate(Node, :count, :id),  # Total node count for UI feedback
       roles: roles,
       suggested_node_types: suggested_node_types,
       selected_node: nil,
@@ -41,7 +45,10 @@ defmodule XIAMWeb.Admin.HierarchyLive do
       access_changeset: Access.changeset(%Access{}, %{}),
       show_modal: false,
       modal_type: nil,
-      users: []  # Will be populated when granting access
+      users: [],  # Will be populated when granting access
+      page: 1,
+      per_page: 50,
+      search_term: nil
     )
     
     {:ok, socket}
@@ -289,6 +296,58 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   
   def handle_event("select_node", %{"id" => id}, socket) do
     {:noreply, push_patch(socket, to: ~p"/admin/hierarchy?node_id=#{id}")}
+  end
+  
+  @doc """
+  Toggle node expansion in the tree view - when a user clicks the expand/collapse icon
+  """
+  def handle_event("toggle_node", %{"id" => id}, socket) do
+    expanded_nodes = socket.assigns.expanded_nodes
+    
+    # Toggle the expanded state for this node
+    expanded_nodes = if Map.has_key?(expanded_nodes, id) do
+      Map.delete(expanded_nodes, id)
+    else
+      # Load children when expanding
+      node_id = String.to_integer(id)
+      children = Hierarchy.get_direct_children(node_id)
+      Map.put(expanded_nodes, id, children)
+    end
+    
+    {:noreply, assign(socket, expanded_nodes: expanded_nodes)}
+  end
+  
+  # Handle search for nodes to find them quickly in a large hierarchy
+  def handle_event("search", %{"search" => %{"term" => term}}, socket) when term != "" do
+    # Search for nodes that contain the term in their name or path
+    nodes = Hierarchy.search_nodes(term)
+    
+    {:noreply, assign(socket, 
+      search_results: nodes,
+      search_term: term
+    )}
+  end
+  
+  def handle_event("search", %{"search" => %{"term" => ""}}, socket) do
+    # Clear search
+    {:noreply, assign(socket,
+      search_results: nil,
+      search_term: nil
+    )}
+  end
+  
+  # Handle pagination for the flat node list view
+  def handle_event("paginate", %{"page" => page}, socket) do
+    page = String.to_integer(page)
+    per_page = socket.assigns.per_page
+    
+    paginated_results = Hierarchy.paginate_nodes(page, per_page)
+    
+    {:noreply, assign(socket,
+      paginated_nodes: paginated_results.nodes,
+      page: page,
+      total_pages: paginated_results.total_pages
+    )}
   end
   
   def handle_event("revoke_access", %{"user_id" => user_id}, socket) do

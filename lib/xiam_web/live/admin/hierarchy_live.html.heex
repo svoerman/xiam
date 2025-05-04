@@ -1,50 +1,165 @@
-<div class="container mx-auto px-4 py-6">
+<div class="container mx-auto px-4 py-8 bg-background text-foreground">
+  <.admin_header
+    title="Hierarchy Management"
+    subtitle="Manage hierarchical organization structure"
+  />
+  
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Hierarchy Management</h1>
+    <div class="text-sm text-gray-500">Total nodes: <%= @loading_count %></div>
     <.button phx-click="show_new_node_modal">
       <.icon name="hero-plus" class="w-5 h-5 mr-1" />
       Add Root Node
     </.button>
   </div>
+  
+  <!-- Search Box -->
+  <div class="mb-6">
+    <div class="relative">
+      <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      <form phx-change="search">
+        <input
+          type="text"
+          name="search[term]"
+          value={@search_term || ""}
+          placeholder="Search nodes by name or path..."
+          class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        />
+      </form>
+    </div>
+  </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <!-- Hierarchy Tree View -->
+    <!-- Hierarchy Tree View with Lazy Loading -->
     <div class="bg-white shadow-md rounded-lg p-4 col-span-1">
       <h2 class="text-lg font-semibold mb-4">Hierarchy</h2>
       
-      <div class="overflow-y-auto max-h-[70vh]">
-        <ul class="space-y-2">
-          <%= for node <- Enum.filter(@nodes, fn n -> is_nil(n.parent_id) end) do %>
-            <li>
-              <div class={[
-                "flex items-center p-2 rounded cursor-pointer",
-                @selected_node && @selected_node.id == node.id && "bg-blue-100"
-              ]}>
-                <span phx-click="select_node" phx-value-id={node.id} class="flex-grow font-medium">
-                  <%= node.name %>
-                </span>
-                <span class="text-xs text-gray-500 px-2">
-                  <%= node.node_type %>
-                </span>
-                <div class="flex items-center space-x-1">
-                  <button phx-click="show_edit_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
-                    <.icon name="hero-pencil-square" class="w-4 h-4" />
-                  </button>
-                  <button phx-click="show_move_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
-                    <.icon name="hero-arrow-path" class="w-4 h-4" />
-                  </button>
-                  <button phx-click="delete_node" phx-value-id={node.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-500">
-                    <.icon name="hero-trash" class="w-4 h-4" />
-                  </button>
+      <!-- Search Results (shown when search is active) -->
+      <%= if @search_term && assigns[:search_results] do %>
+        <div class="mb-4 p-2 bg-blue-50 text-sm rounded">
+          <p>Found <%= length(@search_results) %> results for "<%= @search_term %>"</p>
+        </div>
+        
+        <div class="overflow-y-auto max-h-[70vh]">
+          <ul class="space-y-2">
+            <%= for node <- @search_results do %>
+              <li>
+                <div class={[
+                  "flex items-center p-2 rounded cursor-pointer",
+                  @selected_node && @selected_node.id == node.id && "bg-blue-100"
+                ]}>
+                  <span phx-click="select_node" phx-value-id={node.id} class="flex-grow font-medium">
+                    <%= node.name %>
+                  </span>
+                  <span class="text-xs text-gray-500 px-2">
+                    <%= node.node_type %>
+                  </span>
                 </div>
-              </div>
-              
-              <!-- Recursive rendering of child nodes -->
-              <.render_children parent={node} all_nodes={@nodes} selected_node={@selected_node} />
-            </li>
-          <% end %>
-        </ul>
-      </div>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+        
+      <% else %>
+        <!-- Tree View (shown when no search is active) -->
+        <div class="overflow-y-auto max-h-[70vh]">
+          <ul class="space-y-2">
+            <%= for node <- @root_nodes do %>
+              <li>
+                <div class="flex items-center p-2 rounded cursor-pointer hover:bg-gray-50"
+                     class={@selected_node && @selected_node.id == node.id && "bg-blue-100"}>
+                  <!-- Expand/Collapse Button -->
+                  <button phx-click="toggle_node" phx-value-id={node.id} class="mr-2 text-gray-500">
+                    <%= if Map.has_key?(@expanded_nodes, "#{node.id}") do %>
+                      <.icon name="hero-chevron-down" class="w-4 h-4" />
+                    <% else %>
+                      <.icon name="hero-chevron-right" class="w-4 h-4" />
+                    <% end %>
+                  </button>
+                  
+                  <span phx-click="select_node" phx-value-id={node.id} class="flex-grow font-medium">
+                    <%= node.name %>
+                  </span>
+                  <span class="text-xs text-gray-500 px-2">
+                    <%= node.node_type %>
+                  </span>
+                  <div class="flex items-center space-x-1">
+                    <button phx-click="show_edit_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
+                      <.icon name="hero-pencil-square" class="w-4 h-4" />
+                    </button>
+                    <button phx-click="show_move_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
+                      <.icon name="hero-arrow-path" class="w-4 h-4" />
+                    </button>
+                    <button phx-click="delete_node" phx-value-id={node.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-500">
+                      <.icon name="hero-trash" class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- Children (loaded on demand) -->
+                <%= if children = Map.get(@expanded_nodes, "#{node.id}") do %>
+                  <ul class="pl-6 mt-1 space-y-1">
+                    <%= for child <- children do %>
+                      <li>
+                        <div class="flex items-center p-2 rounded cursor-pointer hover:bg-gray-50"
+                             class={@selected_node && @selected_node.id == child.id && "bg-blue-100"}>
+                          <!-- Nested expand/collapse button -->
+                          <button phx-click="toggle_node" phx-value-id={child.id} class="mr-2 text-gray-500">
+                            <%= if Map.has_key?(@expanded_nodes, "#{child.id}") do %>
+                              <.icon name="hero-chevron-down" class="w-4 h-4" />
+                            <% else %>
+                              <.icon name="hero-chevron-right" class="w-4 h-4" />
+                            <% end %>
+                          </button>
+                          
+                          <span phx-click="select_node" phx-value-id={child.id} class="flex-grow font-medium">
+                            <%= child.name %>
+                          </span>
+                          <span class="text-xs text-gray-500 px-2">
+                            <%= child.node_type %>
+                          </span>
+                          <div class="flex items-center space-x-1">
+                            <button phx-click="show_edit_node_modal" phx-value-id={child.id} class="text-gray-600 hover:text-blue-500">
+                              <.icon name="hero-pencil-square" class="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <!-- Recursive rendering for nested children -->
+                        <%= if nested_children = Map.get(@expanded_nodes, "#{child.id}") do %>
+                          <ul class="pl-6 mt-1 space-y-1">
+                            <%= for nested_child <- nested_children do %>
+                              <li>
+                                <div class="flex items-center p-2 rounded cursor-pointer hover:bg-gray-50"
+                                     class={@selected_node && @selected_node.id == nested_child.id && "bg-blue-100"}>
+                                  <button phx-click="toggle_node" phx-value-id={nested_child.id} class="mr-2 text-gray-500">
+                                    <%= if Map.has_key?(@expanded_nodes, "#{nested_child.id}") do %>
+                                      <.icon name="hero-chevron-down" class="w-4 h-4" />
+                                    <% else %>
+                                      <.icon name="hero-chevron-right" class="w-4 h-4" />
+                                    <% end %>
+                                  </button>
+                                  
+                                  <span phx-click="select_node" phx-value-id={nested_child.id} class="flex-grow font-medium">
+                                    <%= nested_child.name %>
+                                  </span>
+                                </div>
+                              </li>
+                            <% end %>
+                          </ul>
+                        <% end %>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
     </div>
     
     <!-- Node Details -->
