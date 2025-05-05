@@ -90,9 +90,6 @@
                     <button phx-click="show_edit_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
                       <.icon name="hero-pencil-square" class="w-4 h-4" />
                     </button>
-                    <button phx-click="show_move_node_modal" phx-value-id={node.id} class="text-gray-600 hover:text-blue-500">
-                      <.icon name="hero-arrow-path" class="w-4 h-4" />
-                    </button>
                     <button phx-click="delete_node" phx-value-id={node.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-500">
                       <.icon name="hero-trash" class="w-4 h-4" />
                     </button>
@@ -168,10 +165,10 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Node Details</h2>
           <div class="space-x-2">
-            <.button phx-click="show_new_node_modal" variant="outline">
+            <button phx-click="show_new_node_modal" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
               <.icon name="hero-plus" class="w-4 h-4 mr-1" />
               Add Child
-            </.button>
+            </button>
             <.button phx-click="show_grant_access_modal" phx-value-id={@selected_node.id} variant="outline">
               <.icon name="hero-key" class="w-4 h-4 mr-1" />
               Grant Access
@@ -288,6 +285,48 @@
   </div>
 
   <!-- Modals -->
+  <%= if assigns[:modal_visible] do %>
+    <!-- Direct inline modal for debugging -->
+    <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500 bg-opacity-75">
+      <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Create New Node (Debug Modal)</h3>
+          <button phx-click="close_modal" class="text-gray-400 hover:text-gray-500">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="debug-info text-sm bg-gray-100 p-2 mb-4 rounded">
+          <p>Debug info: <%= assigns[:debug_message] %></p>
+          <p>Show modal: <%= @show_modal %></p>
+          <p>Modal type: <%= @modal_type %></p>
+        </div>
+        
+        <.form :let={f} for={@node_changeset} phx-submit="save_node" class="space-y-4">
+          <div>
+            <.input field={f[:name]} label="Name" required />
+          </div>
+          <div>
+            <.input
+              field={f[:node_type]}
+              label="Node Type"
+              type="text"
+              placeholder="Enter node type"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-2 mt-4">
+            <button type="button" phx-click="close_modal" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded">Create Node</button>
+          </div>
+        </.form>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Original modal code (keeping for reference) -->
   <%= if @show_modal do %>
     <%= case @modal_type do %>
       <% :new_node -> %>
@@ -314,14 +353,7 @@
                   <% end %>
                 </datalist>
               </div>
-              <div>
-                <.input
-                  field={f[:parent_id]}
-                  label="Parent Node"
-                  type="select"
-                  options={[{"None (Root Node)", ""}] ++ Enum.map(@nodes, fn n -> {n.name, n.id} end)}
-                />
-              </div>
+              <!-- Parent ID is pre-filled with the selected node and passed as a hidden field -->              <input type="hidden" name="node[parent_id]" value={if assigns[:selected_node], do: @selected_node.id, else: ""} />
               <div>
                 <.input
                   field={f[:metadata]}
@@ -383,32 +415,7 @@
           </:content>
         </.modal>
 
-      <% :move_node -> %>
-        <.modal id="move-node-modal" show>
-          <:title>Move Node</:title>
-          <:content>
-          <.form for={%{}} phx-submit="move_node" class="space-y-4">
-            <div>
-              <p class="mb-4">Moving node: <strong><%= @selected_node.name %></strong></p>
-              <p class="text-sm text-gray-600 mb-4">This will move the node and all its descendants to a new parent.</p>
-              
-              <.input
-                field={%{}}
-                name="move[parent_id]"
-                label="New Parent"
-                type="select"
-                options={[{"None (Make Root)", ""}] ++ Enum.map(@potential_parents, fn n -> {n.name, n.id} end)}
-                required
-              />
-            </div>
-
-            <div class="flex justify-end space-x-2">
-              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
-              <.button type="submit">Move Node</.button>
-            </div>
-          </.form>
-          </:content>
-        </.modal>
+      <!-- Move node functionality removed -->
 
       <% :grant_access -> %>
         <.modal id="grant-access-modal" show>

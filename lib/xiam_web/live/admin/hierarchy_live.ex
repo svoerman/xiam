@@ -4,6 +4,9 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   import XIAMWeb.Components.UI.Button
   import XIAMWeb.Components.UI.Modal
   import XIAMWeb.CoreComponents, except: [button: 1, modal: 1]
+  import Ecto.Query
+  alias XIAM.Repo
+  alias XIAM.Hierarchy.Node
   import XIAMWeb.Components.UI
   import XIAMWeb.AdminComponents
   
@@ -78,19 +81,25 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   
   @impl true
   def handle_event("show_new_node_modal", _params, socket) do
+    # Create a minimal changeset with just the essentials
     changeset = Node.changeset(%Node{}, %{})
     
-    # If a node is selected, pre-fill parent_id
-    changeset = case socket.assigns.selected_node do
-      nil -> changeset
-      node -> Ecto.Changeset.put_change(changeset, :parent_id, node.id)
+    # If we have a selected node, pre-fill parent ID
+    changeset = if socket.assigns.selected_node do
+      Ecto.Changeset.put_change(changeset, :parent_id, socket.assigns.selected_node.id)
+    else
+      changeset
     end
     
-    {:noreply, assign(socket,
-      show_modal: true,
-      modal_type: :new_node,
-      node_changeset: changeset
-    )}
+    # Only load the minimal data needed for the modal
+    # Instead of loading all nodes, we'll limit to a smaller set 
+    # or use a different approach for node selection
+    
+    {:noreply, socket
+      |> assign(:show_modal, true)
+      |> assign(:modal_type, :new_node)
+      |> assign(:node_changeset, changeset)
+    }
   end
   
   def handle_event("show_edit_node_modal", %{"id" => id}, socket) do
@@ -103,30 +112,6 @@ defmodule XIAMWeb.Admin.HierarchyLive do
           show_modal: true,
           modal_type: :edit_node,
           node_changeset: changeset
-        )}
-    end
-  end
-  
-  def handle_event("show_move_node_modal", %{"id" => id}, socket) do
-    # Get all nodes that could be potential parents (cannot move to own descendants)
-    case Hierarchy.get_node(id) do
-      nil ->
-        {:noreply, socket |> put_flash(:error, "Node not found")}
-      node ->
-        # Get all nodes except this one and its descendants
-        all_nodes = Hierarchy.list_nodes()
-        descendants = Hierarchy.get_descendants(node.id)
-        descendant_ids = Enum.map(descendants, & &1.id) ++ [node.id]
-        
-        potential_parents = Enum.reject(all_nodes, fn n -> 
-          Enum.member?(descendant_ids, n.id)
-        end)
-        
-        {:noreply, assign(socket,
-          show_modal: true,
-          modal_type: :move_node,
-          selected_node: node,
-          potential_parents: potential_parents
         )}
     end
   end
@@ -165,19 +150,43 @@ defmodule XIAMWeb.Admin.HierarchyLive do
         node_params = convert_node_params(node_params)
         
         case Hierarchy.create_node(node_params) do
-          {:ok, _node} ->
-            nodes = Hierarchy.list_nodes()
+          {:ok, node} ->
+            # Explicitly invalidate all relevant caches
+            Hierarchy.invalidate_node_caches(node)
             
-            # If we have a selected node, refresh its children
-            socket = case socket.assigns.selected_node do
-              nil -> socket
-              selected_node -> 
-                children = Hierarchy.get_direct_children(selected_node.id)
-                assign(socket, children: children)
+            # Refresh the appropriate parts of the UI with fresh data
+            is_root = node.parent_id == nil
+            socket = cond do
+              # If we created a root node, refresh the root nodes list (from DB not cache)
+              is_root ->
+                root_nodes = Node |> where([n], is_nil(n.parent_id)) |> order_by([n], n.path) |> Repo.all()
+                assign(socket, root_nodes: root_nodes)
+                
+              # If we added a child to the selected node, refresh its children
+              # and make sure it's expanded in the UI
+              socket.assigns.selected_node && node.parent_id == socket.assigns.selected_node.id ->
+                # Get fresh children data directly from the database
+                children = Node |> where([n], n.parent_id == ^socket.assigns.selected_node.id) |> order_by([n], n.path) |> Repo.all()
+                # Ensure the parent is expanded to show the new child
+                expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
+                
+                socket
+                |> assign(children: children)
+                |> assign(expanded_nodes: expanded_nodes)
+                
+              # If we added a node somewhere else in the hierarchy
+              true ->
+                # Expand the parent to show the new node
+                _parent = Hierarchy.get_node(node.parent_id)
+                # Get fresh children data directly from the database
+                children = Node |> where([n], n.parent_id == ^node.parent_id) |> order_by([n], n.path) |> Repo.all()
+                expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
+                
+                assign(socket, expanded_nodes: expanded_nodes)
             end
             
             {:noreply, socket
-              |> assign(nodes: nodes, show_modal: false)
+              |> assign(show_modal: false, modal_type: nil)
               |> put_flash(:info, "Node created successfully")}
               
           {:error, %Ecto.Changeset{} = changeset} ->
@@ -218,34 +227,6 @@ defmodule XIAMWeb.Admin.HierarchyLive do
     end
   end
   
-  def handle_event("move_node", %{"move" => %{"parent_id" => parent_id}}, socket) do
-    node = socket.assigns.selected_node
-    parent_id = String.to_integer(parent_id)
-    
-    case Hierarchy.move_subtree(node, parent_id) do
-      {:ok, _} ->
-        nodes = Hierarchy.list_nodes()
-        
-        socket = case socket.assigns.selected_node do
-          nil -> socket
-          selected_node -> 
-            # Get the moved node to update the selection
-            updated_node = Hierarchy.get_node(selected_node.id)
-            children = Hierarchy.get_direct_children(updated_node.id)
-            assign(socket, selected_node: updated_node, children: children)
-        end
-        
-        {:noreply, socket
-          |> assign(nodes: nodes, show_modal: false)
-          |> put_flash(:info, "Node moved successfully")}
-          
-      {:error, reason} ->
-        {:noreply, socket
-          |> put_flash(:error, "Error moving node: #{inspect(reason)}")
-          |> assign(show_modal: false)}
-    end
-  end
-  
   def handle_event("grant_access", %{"access" => access_params}, socket) do
     node = socket.assigns.selected_node
     
@@ -254,7 +235,10 @@ defmodule XIAMWeb.Admin.HierarchyLive do
     
     case Hierarchy.grant_access(user_id, node.id, role_id) do
       {:ok, _} ->
-        {:noreply, socket
+        # Reload the node access data to reflect the changes
+        updated_socket = load_node_access(socket, node)
+        
+        {:noreply, updated_socket
           |> assign(show_modal: false)
           |> put_flash(:info, "Access granted successfully")}
           
@@ -275,7 +259,30 @@ defmodule XIAMWeb.Admin.HierarchyLive do
       node ->
         case Hierarchy.delete_node(node) do
           {:ok, _} ->
-            nodes = Hierarchy.list_nodes()
+            # Use our new comprehensive cache invalidation function
+            Hierarchy.invalidate_node_caches(node)
+            
+            # If node has a parent, get fresh data directly from the database
+            socket = if node.parent_id do
+              # Get fresh children of the parent directly from the database
+              parent_children = Node |> where([n], n.parent_id == ^node.parent_id) |> order_by([n], n.path) |> Repo.all()
+              
+              # Update the expanded nodes map
+              updated_expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", parent_children)
+              
+              # Also update the children assign if we're viewing the parent of the deleted node
+              socket = if socket.assigns.selected_node && socket.assigns.selected_node.id == node.parent_id do
+                assign(socket, children: parent_children)
+              else
+                socket
+              end
+              
+              assign(socket, expanded_nodes: updated_expanded_nodes)
+            else
+              # For root nodes, refresh the root nodes list directly from the database
+              root_nodes = Node |> where([n], is_nil(n.parent_id)) |> order_by([n], n.path) |> Repo.all()
+              assign(socket, root_nodes: root_nodes)
+            end
             
             # If we deleted the selected node, clear selection
             socket = if socket.assigns.selected_node && socket.assigns.selected_node.id == node.id do
@@ -285,7 +292,6 @@ defmodule XIAMWeb.Admin.HierarchyLive do
             end
             
             {:noreply, socket
-              |> assign(nodes: nodes)
               |> put_flash(:info, "Node and all descendants deleted successfully")}
               
           {:error, reason} ->
@@ -350,13 +356,15 @@ defmodule XIAMWeb.Admin.HierarchyLive do
     )}
   end
   
-  def handle_event("revoke_access", %{"user_id" => user_id}, socket) do
+  def handle_event("revoke_access", %{"user-id" => user_id}, socket) do
     node = socket.assigns.selected_node
     user_id = String.to_integer(user_id)
     
     case Hierarchy.revoke_access(user_id, node.id) do
       {:ok, _} ->
-        {:noreply, socket |> put_flash(:info, "Access revoked successfully")}
+        # Reload the node access data to reflect the changes
+        updated_socket = load_node_access(socket, node)
+        {:noreply, updated_socket |> put_flash(:info, "Access revoked successfully")}
         
       {:error, reason} ->
         {:noreply, socket |> put_flash(:error, "Error revoking access: #{inspect(reason)}")}

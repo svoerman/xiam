@@ -120,6 +120,25 @@ defmodule XIAM.Hierarchy do
       |> Repo.all()
     end, 60_000) # 1 minute TTL for root nodes
   end
+  
+  @doc """
+  Invalidate cache entries related to a node and its relationships.
+  Use this after creating, updating, or deleting a node to ensure UI consistency.
+  """
+  def invalidate_node_caches(node) do
+    # If node has a parent, invalidate parent's children cache
+    if node.parent_id do
+      HierarchyCache.invalidate("children:#{node.parent_id}")
+    end
+    
+    # Always invalidate root nodes cache to ensure consistency
+    HierarchyCache.invalidate("root_nodes")
+    
+    # Invalidate node's own children cache if it might have children
+    HierarchyCache.invalidate("children:#{node.id}")
+    
+    :ok
+  end
 
   @doc """
   Paginates nodes for more efficient loading of large hierarchies.

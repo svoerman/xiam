@@ -249,8 +249,10 @@ defmodule XIAMWeb.API.HierarchyController do
 
   @doc """
   POST /api/hierarchy/check-access
-  Checks if a user has access to a node.
+  Checks if a user has access to a node. Can accept either node_id or path parameter.
   """
+  def check_user_access(conn, params)
+  
   def check_user_access(conn, %{"user_id" => user_id, "node_id" => node_id}) do
     # Using an existing function that performs this check
     {has_access, node, role} = case Hierarchy.get_node(node_id) do
@@ -324,6 +326,95 @@ defmodule XIAMWeb.API.HierarchyController do
     end
     
     json(conn, response)
+  end
+
+  def check_user_access(conn, %{"user_id" => user_id, "path" => path}) do
+    # First get the node by path
+    node = Hierarchy.get_node_by_path(path)
+    
+    {has_access, node, role} = case node do
+      nil -> {false, nil, nil}
+      node ->
+        # Check if user has any access to this node or its ancestors
+        access_records = 
+          XIAM.Hierarchy.Access
+          |> where(user_id: ^user_id)
+          |> preload(:role)
+          |> Repo.all()
+        
+        access_paths = Enum.map(access_records, & &1.access_path)
+        
+        if Enum.empty?(access_paths) do
+          {false, node, nil}
+        else
+          # Using a direct SQL query to check access using ltree
+          query = """
+            SELECT EXISTS (
+              SELECT 1 FROM unnest($1::ltree[]) AS access_path
+              WHERE $2::ltree <@ access_path
+            )
+          """
+          
+          result = Repo.query!(query, [access_paths, node.path])
+          has_access = Enum.at(result.rows, 0) |> Enum.at(0)
+          
+          # Find the applicable role if access is granted
+          role = if has_access do
+            # Get the role from the first applicable access grant
+            # This could be enhanced to choose the most specific role if needed
+            matching_access = Enum.find(access_records, fn access -> 
+              String.starts_with?(node.path, access.access_path)
+            end)
+            matching_access && matching_access.role
+          end
+          
+          {has_access, node, role}
+        end
+    end
+    
+    response = %{
+      "success" => true,
+      "has_access" => has_access
+    }
+    
+    # Add node and role details if they're available
+    response = if node do
+      node_map = %{
+        "id" => node.id,
+        "name" => node.name,
+        "path" => node.path,
+        "node_type" => node.node_type,
+        "metadata" => node.metadata || %{},
+        "parent_id" => node.parent_id
+      }
+      Map.put(response, "node", node_map)
+    else
+      response
+    end
+    
+    response = if role do
+      role_map = %{
+        "id" => role.id,
+        "name" => role.name
+      }
+      Map.put(response, "role", role_map)
+    else
+      response
+    end
+    
+    json(conn, response)
+  end
+
+  def check_user_access(conn, %{"user_id" => _user_id} = params) do
+    if not Map.has_key?(params, "node_id") and not Map.has_key?(params, "path") do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{"error" => "Missing required parameter. Either 'node_id' or 'path' must be provided"})
+    else
+      conn
+      |> put_status(:bad_request)
+      |> json(%{"error" => "Invalid parameters"})
+    end
   end
   
   # Original functions below
