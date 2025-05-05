@@ -165,7 +165,7 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Node Details</h2>
           <div class="space-x-2">
-            <button phx-click="show_new_node_modal" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <button phx-click="show_new_node_modal" phx-value-parent-id={@selected_node.id} class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
               <.icon name="hero-plus" class="w-4 h-4 mr-1" />
               Add Child
             </button>
@@ -254,10 +254,10 @@
                 <%= if assigns[:node_access] && length(@node_access) > 0 do %>
                   <%= for access <- @node_access do %>
                     <tr>
-                      <td class="px-4 py-2 whitespace-nowrap"><%= access.user.email %></td>
-                      <td class="px-4 py-2 whitespace-nowrap"><%= access.role.name %></td>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= access["email"] %></td>
+                      <td class="px-4 py-2 whitespace-nowrap"><%= access["role_name"] %></td>
                       <td class="px-4 py-2 whitespace-nowrap">
-                        <button phx-click="revoke_access" phx-value-user-id={access.user_id} data-confirm="Are you sure you want to revoke this access?" class="text-gray-600 hover:text-red-600">
+                        <button phx-click="revoke_access" phx-value-user-id={access["user_id"]} data-confirm="Are you sure you want to revoke this access?" class="text-gray-600 hover:text-red-600">
                           <.icon name="hero-trash" class="w-4 h-4" />
                         </button>
                       </td>
@@ -326,133 +326,142 @@
     </div>
   <% end %>
 
-  <!-- Original modal code (keeping for reference) -->
-  <%= if @show_modal do %>
-    <%= case @modal_type do %>
-      <% :new_node -> %>
-        <.modal id="new-node-modal" show>
-          <:title>Create New Node</:title>
-          <:content>
-          <.form :let={f} for={@node_changeset} phx-submit="save_node" class="space-y-4">
-            <div class="grid grid-cols-1 gap-4">
-              <div>
-                <.input field={f[:name]} label="Name" required />
-              </div>
-              <div>
-                <.input
-                  field={f[:node_type]}
-                  label="Node Type"
-                  type="text"
-                  list="node-type-suggestions"
-                  placeholder="Enter node type or choose from suggestions"
-                  required
-                />
-                <datalist id="node-type-suggestions">
-                  <%= for type <- @suggested_node_types do %>
-                    <option value={type}></option>
-                  <% end %>
-                </datalist>
-              </div>
-              <!-- Parent ID is pre-filled with the selected node and passed as a hidden field -->              <input type="hidden" name="node[parent_id]" value={if assigns[:selected_node], do: @selected_node.id, else: ""} />
-              <div>
-                <.input
-                  field={f[:metadata]}
-                  label="Metadata (JSON)"
-                  type="textarea"
-                  placeholder="{ }"
-                />
-              </div>
-            </div>
+  <!-- New Node Modal -->  
+  <.modal 
+    :if={@show_modal && @modal_type == :new_node}
+    id="new-node-modal" 
+    show={true} 
+    on_close={JS.push("close_modal")}
+  >
+    <:title>Create New Node</:title>
+    <:content>
+      <.form :let={f} for={@node_changeset} phx-submit="save_node" id="new-node-form" class="space-y-4">
+        <div class="grid grid-cols-1 gap-4">
+          <div>
+            <.input field={f[:name]} label="Name" required />
+          </div>
+          <div>
+            <.input
+              field={f[:node_type]}
+              label="Node Type"
+              type="text"
+              list="node-type-suggestions"
+              placeholder="Enter node type or choose from suggestions"
+              required
+            />
+            <datalist id="node-type-suggestions">
+              <%= for type <- @suggested_node_types do %>
+                <option value={type}></option>
+              <% end %>
+            </datalist>
+          </div>
+          <!-- Parent ID is set based on the modal's context (root or child node) -->
+          <input type="hidden" name="node[parent_id]" value={if Map.get(f.source.changes, :parent_id), do: f.source.changes.parent_id, else: ""} />
+          <div>
+            <.input
+              field={f[:metadata]}
+              label="Metadata (JSON)"
+              type="textarea"
+              placeholder="{ }"
+            />
+          </div>
+        </div>
+      </.form>
+    </:content>
+    <:footer>
+      <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+      <.button type="submit" form="new-node-form">Create Node</.button>
+    </:footer>
+  </.modal>
 
-            <div class="flex justify-end space-x-2">
-              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
-              <.button type="submit">Create Node</.button>
-            </div>
-          </.form>
-          </:content>
-        </.modal>
+  <!-- Edit Node Modal -->    
+  <.modal 
+    :if={@show_modal && @modal_type == :edit_node}
+    id="edit-node-modal" 
+    show={true} 
+    on_close={JS.push("close_modal")}
+  >
+    <:title>Edit Node</:title>
+    <:content>
+      <.form :let={f} for={@node_changeset} phx-submit="save_node" id="edit-node-form" class="space-y-4">
+        <.input type="hidden" field={f[:id]} />
+        <div class="grid grid-cols-1 gap-4">
+          <div>
+            <.input field={f[:name]} label="Name" required />
+          </div>
+          <div>
+            <.input
+              field={f[:node_type]}
+              label="Node Type"
+              type="text"
+              list="node-type-suggestions-edit"
+              placeholder="Enter node type or choose from suggestions"
+              required
+            />
+            <datalist id="node-type-suggestions-edit">
+              <%= for type <- @suggested_node_types do %>
+                <option value={type}></option>
+              <% end %>
+            </datalist>
+          </div>
+          <div>
+            <.input
+              field={f[:metadata]}
+              label="Metadata (JSON)"
+              type="textarea"
+              placeholder="{ }"
+            />
+          </div>
+        </div>
+      </.form>
+    </:content>
+    <:footer>
+      <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+      <.button type="submit" form="edit-node-form">Update Node</.button>
+    </:footer>
+  </.modal>
 
-      <% :edit_node -> %>
-        <.modal id="edit-node-modal" show>
-          <:title>Edit Node</:title>
-          <:content>
-          <.form :let={f} for={@node_changeset} phx-submit="save_node" class="space-y-4">
-            <.input type="hidden" field={f[:id]} />
-            <div class="grid grid-cols-1 gap-4">
-              <div>
-                <.input field={f[:name]} label="Name" required />
-              </div>
-              <div>
-                <.input
-                  field={f[:node_type]}
-                  label="Node Type"
-                  type="text"
-                  list="node-type-suggestions-edit"
-                  placeholder="Enter node type or choose from suggestions"
-                  required
-                />
-                <datalist id="node-type-suggestions-edit">
-                  <%= for type <- @suggested_node_types do %>
-                    <option value={type}></option>
-                  <% end %>
-                </datalist>
-              </div>
-              <div>
-                <.input
-                  field={f[:metadata]}
-                  label="Metadata (JSON)"
-                  type="textarea"
-                  placeholder="{ }"
-                />
-              </div>
-            </div>
-
-            <div class="flex justify-end space-x-2">
-              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
-              <.button type="submit">Update Node</.button>
-            </div>
-          </.form>
-          </:content>
-        </.modal>
-
-      <!-- Move node functionality removed -->
-
-      <% :grant_access -> %>
-        <.modal id="grant-access-modal" show>
-          <:title>Grant Access</:title>
-          <:content>
-          <.form :let={f} for={@access_changeset} phx-submit="grant_access" class="space-y-4">
-            <div class="grid grid-cols-1 gap-4">
-              <p class="mb-2">Granting access to: <strong><%= @selected_node.name %></strong></p>
-              <p class="text-xs text-gray-600 mb-2">Access will be granted to this node and all its descendants.</p>
-              
-              <div>
-                <.input
-                  field={f[:user_id]}
-                  label="User"
-                  type="select"
-                  options={Enum.map(@users, fn u -> {u.email, u.id} end)}
-                  required
-                />
-              </div>
-              <div>
-                <.input
-                  field={f[:role_id]}
-                  label="Role"
-                  type="select"
-                  options={Enum.map(@roles, fn r -> {r.name, r.id} end)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="flex justify-end space-x-2">
-              <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
-              <.button type="submit">Grant Access</.button>
-            </div>
-          </.form>
-          </:content>
-        </.modal>
-    <% end %>
-  <% end %>
+  <!-- Grant Access Modal -->    
+  <.modal 
+    :if={@show_modal && @modal_type == :grant_access}
+    id="grant-access-modal" 
+    show={true} 
+    on_close={JS.push("close_modal")}
+  >
+    <:title>Grant Access</:title>
+    <:content>
+      <.form :let={f} for={@access_changeset} phx-submit="grant_access" id="grant-access-form" class="space-y-4">
+        <div class="grid grid-cols-1 gap-4">
+          <p class="mb-2">Granting access to: <strong><%= @selected_node.name %></strong></p>
+          <p class="text-xs text-gray-600 mb-2">Access will be granted to this node and all its descendants.</p>
+          
+          <!-- Hidden field for node_id -->
+          <input type="hidden" name="access[node_id]" value={@selected_node.id} />
+          
+          <div>
+            <.input
+              field={f[:user_id]}
+              label="User"
+              type="select"
+              options={Enum.map(@users, fn u -> {u.email, u.id} end)}
+              required
+            />
+          </div>
+          <div>
+            <.input
+              field={f[:role_id]}
+              label="Role"
+              type="select"
+              options={Enum.map(@roles, fn r -> {r.name, r.id} end)}
+              required
+            />
+          </div>
+        </div>
+      </.form>
+    </:content>
+    <:footer>
+      <.button type="button" phx-click="close_modal" variant="outline">Cancel</.button>
+      <.button type="submit" form="grant-access-form">Grant Access</.button>
+    </:footer>
+  </.modal>
 </div>

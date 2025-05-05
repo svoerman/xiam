@@ -22,22 +22,30 @@ defmodule XIAM.Cache.HierarchyCache do
   Also tracks metrics for cache hit rate monitoring.
   """
   def get_or_store(key, compute_fun, ttl \\ @default_ttl) do
-    prefix = get_key_prefix(key)
-    
-    case lookup(key) do
-      {:ok, value} -> 
-        # Cache hit - record metric and return the value
-        increment_counter(:hits, prefix)
-        increment_counter(:total_accesses, prefix)
-        value
-        
-      {:error, :not_found} ->
-        # Cache miss - compute, store, record metric, and return value
-        increment_counter(:misses, prefix)
-        increment_counter(:total_accesses, prefix)
-        value = compute_fun.()
-        store(key, value, ttl)
-        value
+    try do
+      prefix = get_key_prefix(key)
+      
+      case lookup(key) do
+        {:ok, value} -> 
+          # Cache hit - record metric and return the value
+          increment_counter(:hits, prefix)
+          increment_counter(:total_accesses, prefix)
+          value
+          
+        {:error, :not_found} ->
+          # Cache miss - compute, store, record metric, and return value
+          increment_counter(:misses, prefix)
+          increment_counter(:total_accesses, prefix)
+          value = compute_fun.()
+          store(key, value, ttl)
+          value
+      end
+    catch
+      # Handle the case where ETS tables or the GenServer are not available (e.g., in tests)
+      _, _ ->
+        Logger.debug("HierarchyCache not available, falling back to direct function call")
+        # Just execute the function directly
+        compute_fun.()
     end
   end
   
@@ -75,14 +83,21 @@ defmodule XIAM.Cache.HierarchyCache do
   end
   
   @doc """
-  Invalidate a specific cache entry.
+  Invalidate a cache entry.
   """
   def invalidate(key) do
-    prefix = get_key_prefix(key)
-    increment_counter(:invalidations, prefix)
-    
-    :ets.delete(@table_name, key)
-    :ok
+    try do
+      prefix = get_key_prefix(key)
+      increment_counter(:invalidations, prefix)
+      
+      :ets.delete(@table_name, key)
+      :ok
+    catch
+      # Handle the case where ETS tables are not available (e.g., in tests)
+      _, _ ->
+        Logger.debug("HierarchyCache not available for invalidation")
+        :ok
+    end
   end
   
   @doc """

@@ -5,6 +5,9 @@ defmodule XIAM.Hierarchy.Node do
   """
   use Ecto.Schema
   import Ecto.Changeset
+  
+  # Make the Node struct encodable to JSON for API responses
+  @derive {Jason.Encoder, only: [:id, :path, :node_type, :name, :metadata, :parent_id, :inserted_at, :updated_at]}
 
   schema "hierarchy_nodes" do
     field :path, :string  # ltree stored as string
@@ -27,6 +30,7 @@ defmodule XIAM.Hierarchy.Node do
     |> cast(attrs, [:name, :node_type, :parent_id, :metadata])
     |> validate_required([:name, :node_type])
     |> foreign_key_constraint(:parent_id)
+    |> unique_constraint(:path, name: "hierarchy_nodes_path_index")
   end
   
   @doc """

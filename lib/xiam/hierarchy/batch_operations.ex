@@ -8,8 +8,7 @@ defmodule XIAM.Hierarchy.BatchOperations do
   
   import Ecto.Query
   alias XIAM.Repo
-  alias XIAM.Hierarchy
-  alias XIAM.Hierarchy.{Node, Access, AccessCache}
+  alias XIAM.Hierarchy.{Node, Access, AccessCache, NodeManager, AccessManager, PathCalculator}
   
   @doc """
   Grants access to multiple nodes for a user with specified role.
@@ -25,10 +24,8 @@ defmodule XIAM.Hierarchy.BatchOperations do
   def grant_batch_access(user_id, node_ids, role_id) do
     results = 
       Enum.map(node_ids, fn node_id ->
-        case Hierarchy.grant_access(user_id, node_id, role_id) do
+        case AccessManager.grant_access(user_id, node_id, role_id) do
           {:ok, access} -> 
-            # Invalidate cache for this user+node combination
-            AccessCache.invalidate_node(node_id)
             %{node_id: node_id, status: :success, access_id: access.id}
           {:error, reason} -> 
             %{node_id: node_id, status: :error, reason: reason}
@@ -51,13 +48,18 @@ defmodule XIAM.Hierarchy.BatchOperations do
   def revoke_batch_access(user_id, node_ids) do
     results = 
       Enum.map(node_ids, fn node_id ->
-        case Hierarchy.revoke_access(user_id, node_id) do
-          {:ok, _} -> 
-            # Invalidate cache
-            AccessCache.invalidate_node(node_id)
-            %{node_id: node_id, status: :success}
-          {:error, reason} -> 
-            %{node_id: node_id, status: :error, reason: reason}
+        # First get the access record
+        access = Repo.get_by(Access, user_id: user_id, node_id: node_id)
+        
+        if access do
+          case AccessManager.revoke_access(access.id) do
+            {:ok, _} -> 
+              %{node_id: node_id, status: :success}
+            {:error, reason} -> 
+              %{node_id: node_id, status: :error, reason: reason}
+          end
+        else
+          %{node_id: node_id, status: :error, reason: :access_not_found}
         end
       end)
     
@@ -76,19 +78,17 @@ defmodule XIAM.Hierarchy.BatchOperations do
   def delete_batch_nodes(node_ids) do
     Repo.transaction(fn ->
       Enum.map(node_ids, fn node_id ->
-        case Hierarchy.get_node(node_id) do
+        case NodeManager.get_node(node_id) do
           nil -> 
             %{node_id: node_id, status: :error, reason: :not_found}
           node ->
             # Get descendants before deletion for cache invalidation
-            descendants = Hierarchy.get_descendants(node_id)
-            descendant_ids = Enum.map(descendants, & &1.id)
+            descendants = NodeManager.get_descendants(node_id)
+            _descendant_ids = Enum.map(descendants, & &1.id)
             
-            case Hierarchy.delete_node(node) do
+            case NodeManager.delete_node(node) do
               {:ok, _} -> 
-                # Invalidate cache for this node and all descendants
-                AccessCache.invalidate_node(node_id)
-                Enum.each(descendant_ids, &AccessCache.invalidate_node/1)
+                # Cache invalidation is handled by NodeManager.delete_node
                 %{node_id: node_id, status: :success, descendant_count: length(descendants)}
               {:error, reason} ->
                 %{node_id: node_id, status: :error, reason: reason}
@@ -110,14 +110,14 @@ defmodule XIAM.Hierarchy.BatchOperations do
   """
   def move_batch_nodes(node_ids, new_parent_id) do
     # Verify the new parent exists
-    new_parent = Hierarchy.get_node(new_parent_id)
+    new_parent = NodeManager.get_node(new_parent_id)
     
     if is_nil(new_parent) and new_parent_id != nil do
       {:error, :parent_not_found}
     else
       Repo.transaction(fn ->
         Enum.map(node_ids, fn node_id ->
-          case Hierarchy.get_node(node_id) do
+          case NodeManager.get_node(node_id) do
             nil -> 
               %{node_id: node_id, status: :error, reason: :not_found}
             node ->
@@ -126,14 +126,14 @@ defmodule XIAM.Hierarchy.BatchOperations do
                 %{node_id: node_id, status: :skipped, reason: :already_at_destination}
               else
                 # Check for cycles - can't move a node to its own descendant
-                if new_parent_id != nil && (node_id == new_parent_id || Hierarchy.is_descendant?(new_parent_id, node_id)) do
+                if new_parent_id != nil && (node_id == new_parent_id || is_descendant?(new_parent_id, node_id)) do
                   %{node_id: node_id, status: :error, reason: :would_create_cycle}
                 else
                   # Get descendants before move for cache invalidation
-                  descendants = Hierarchy.get_descendants(node_id)
+                  descendants = NodeManager.get_descendants(node_id)
                   descendant_ids = Enum.map(descendants, & &1.id)
                   
-                  case Hierarchy.move_subtree(node, new_parent_id) do
+                  case NodeManager.move_node(node, new_parent_id) do
                     {:ok, moved_node} ->
                       # Invalidate cache for this node and all descendants
                       AccessCache.invalidate_node(node_id)
@@ -147,6 +147,15 @@ defmodule XIAM.Hierarchy.BatchOperations do
           end
         end)
       end)
+    end
+  end
+  
+  defp is_descendant?(ancestor_id, node_id) do
+    node = NodeManager.get_node(node_id)
+    if is_nil(node) do
+      false
+    else
+      PathCalculator.is_descendant?(node.path, ancestor_id)
     end
   end
   
@@ -169,10 +178,12 @@ defmodule XIAM.Hierarchy.BatchOperations do
       |> Repo.all()
       |> Map.new(fn n -> {n.id, n.path} end)
       
-      # Get all access paths for this user
-      access_paths = from(a in Access, where: a.user_id == ^user_id)
-      |> select([a], a.access_path)
-      |> Repo.all()
+      # Get all access grants for this user
+      access_grants = AccessManager.list_user_access(user_id)
+      access_paths = Enum.map(access_grants, fn access ->
+        node = NodeManager.get_node(access.node_id)
+        node && node.path
+      end) |> Enum.reject(&is_nil/1)
       
       if Enum.empty?(access_paths) do
         # No access grants, so no access to any nodes
@@ -186,11 +197,7 @@ defmodule XIAM.Hierarchy.BatchOperations do
             {id, false}
           else
             has_access = Enum.any?(access_paths, fn access_path ->
-              # SQL equivalent: access_path @> node_path
-              # In Elixir, check if access_path is a prefix of node_path
-              String.starts_with?(path, access_path) || 
-              (path == access_path) || 
-              (String.starts_with?(path, access_path <> "."))
+              PathCalculator.is_ancestor?(access_path, path) || path == access_path
             end)
             
             {id, has_access}

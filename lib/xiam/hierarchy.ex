@@ -1,577 +1,224 @@
 defmodule XIAM.Hierarchy do
   @moduledoc """
   The Hierarchy context provides functions for managing hierarchical entities and access control.
-  It uses PostgreSQL's ltree extension for efficient traversal and access checking.
+  This module serves as a facade for the specialized sub-modules that handle specific aspects
+  of the hierarchy system.
   """
-  import Ecto.Query
-  alias XIAM.Repo
-  alias XIAM.Hierarchy.{Node, Access}
-  alias XIAM.Cache.HierarchyCache
 
-  #
-  # Node Management
-  #
+  alias XIAM.Hierarchy.NodeManager
+  alias XIAM.Hierarchy.AccessManager
+  alias XIAM.Hierarchy.PathCalculator
+
+  # Node Management delegations
 
   @doc """
   Creates a new node. If parent_id is provided, it will be created as a child of that node.
   If no parent_id is provided, it will be created as a root node.
   """
-  def create_node(%{parent_id: parent_id} = attrs) when not is_nil(parent_id) do
-    # Handle both string and atom keys consistently
-    attrs = for {key, val} <- attrs, into: %{}, do: {to_string(key), val}
-    name = attrs["name"]
-
-    # Build path from parent's path
-    parent = get_node(parent_id)
-
-    if is_nil(parent) do
-      {:error, :parent_not_found}
-    else
-      path = build_child_path(parent.path, name)
-
-      %Node{}
-      |> Node.changeset(attrs)
-      |> Ecto.Changeset.put_change(:path, path)
-      |> Repo.insert()
-    end
-  end
-
-  def create_node(attrs) do
-    # Handle both string and atom keys
-    attrs = for {key, val} <- attrs, into: %{}, do: {to_string(key), val}
-
-    # Get name from attrs using string key
-    name = attrs["name"]
-
-    # Check if there's a parent_id (could be as string key)
-    parent_id = attrs["parent_id"]
-
-    if parent_id do
-      # If there's a parent, delegate to the parent version
-      create_node(%{parent_id: parent_id, name: name, node_type: attrs["node_type"], metadata: attrs["metadata"]})
-    else
-      # Create root node
-      path = sanitize_name(name)
-
-      %Node{}
-      |> Node.changeset(attrs)
-      |> Ecto.Changeset.put_change(:path, path)
-      |> Repo.insert()
-    end
-  end
+  defdelegate create_node(attrs), to: NodeManager
 
   @doc """
   Gets a node by ID with caching for improved performance.
-  In test environment, this bypasses the cache to ensure consistent test behavior.
   """
-  def get_node(id) do
-    if Mix.env() == :test do
-      # In test environment, always go directly to the database
-      Repo.get(Node, id)
-    else
-      cache_key = "node:#{id}"
-
-      HierarchyCache.get_or_store(cache_key, fn ->
-        Repo.get(Node, id)
-      end)
-    end
-  end
+  defdelegate get_node(id), to: NodeManager
 
   @doc """
-  Gets a node by ID without using the cache. Used internally for operations
-  that need to bypass the cache, such as deleting nodes.
+  Gets a node by ID without using the cache.
   """
-  def get_node_raw(id) do
-    Repo.get(Node, id)
-  end
+  defdelegate get_node_raw(id), to: NodeManager
 
   @doc """
   Gets a node by its path with caching for improved performance.
   """
-  def get_node_by_path(path) do
-    cache_key = "node_path:#{path}"
-
-    HierarchyCache.get_or_store(cache_key, fn ->
-      Repo.get_by(Node, path: path)
-    end)
-  end
+  defdelegate get_node_by_path(path), to: NodeManager
 
   @doc """
   Lists all nodes, ordered by path.
   """
-  def list_nodes do
-    Node
-    |> order_by([n], n.path)
-    |> Repo.all()
-  end
+  defdelegate list_nodes, to: NodeManager
 
   @doc """
   Lists only root nodes (nodes without parents).
-  Much more efficient than loading all nodes when dealing with large hierarchies.
-  Uses caching for improved performance.
   """
-  def list_root_nodes do
-    cache_key = "root_nodes"
-
-    HierarchyCache.get_or_store(cache_key, fn ->
-      Node
-      |> where([n], is_nil(n.parent_id))
-      |> order_by([n], n.path)
-      |> Repo.all()
-    end, 60_000) # 1 minute TTL for root nodes
-  end
-  
-  @doc """
-  Invalidate cache entries related to a node and its relationships.
-  Use this after creating, updating, or deleting a node to ensure UI consistency.
-  """
-  def invalidate_node_caches(node) do
-    # If node has a parent, invalidate parent's children cache
-    if node.parent_id do
-      HierarchyCache.invalidate("children:#{node.parent_id}")
-    end
-    
-    # Always invalidate root nodes cache to ensure consistency
-    HierarchyCache.invalidate("root_nodes")
-    
-    # Invalidate node's own children cache if it might have children
-    HierarchyCache.invalidate("children:#{node.id}")
-    
-    :ok
-  end
+  defdelegate list_root_nodes, to: NodeManager
 
   @doc """
   Paginates nodes for more efficient loading of large hierarchies.
   """
-  def paginate_nodes(page \\ 1, per_page \\ 50) do
-    total_count = Node |> Repo.aggregate(:count, :id)
-    total_pages = ceil(total_count / per_page)
-
-    nodes = Node
-    |> order_by([n], n.path)
-    |> limit(^per_page)
-    |> offset(^((page - 1) * per_page))
-    |> Repo.all()
-
-    %{
-      nodes: nodes,
-      page: page,
-      per_page: per_page,
-      total_count: total_count,
-      total_pages: total_pages
-    }
-  end
+  defdelegate paginate_nodes(page \\ 1, per_page \\ 50), to: NodeManager
 
   @doc """
   Search for nodes by name or path, limit results to improve performance.
-  This is much more efficient than loading all nodes when searching in large hierarchies.
   """
-  def search_nodes(term, limit \\ 100) do
-    search_term = "%#{term}%"
-
-    Node
-    |> where([n], ilike(n.name, ^search_term) or ilike(n.path, ^search_term))
-    |> order_by([n], n.path)
-    |> limit(^limit)
-    |> Repo.all()
-  end
+  defdelegate search_nodes(term, limit \\ 100), to: NodeManager
 
   @doc """
   Gets direct children of a node with caching for improved performance.
   """
-  def get_direct_children(parent_id) do
-    cache_key = "children:#{parent_id}"
-
-    HierarchyCache.get_or_store(cache_key, fn ->
-      Node
-      |> where([n], n.parent_id == ^parent_id)
-      |> order_by([n], n.path)
-      |> Repo.all()
-    end)
-  end
+  defdelegate get_direct_children(parent_id), to: NodeManager
 
   @doc """
   Gets all descendants of a node (children, grandchildren, etc).
   """
-  def get_descendants(parent_id) do
-    parent = get_node(parent_id)
-
-    if is_nil(parent) do
-      []
-    else
-      query = """
-      SELECT * FROM hierarchy_nodes
-      WHERE path::ltree <@ $1::ltree
-      AND id != $2
-      ORDER BY path
-      """
-
-      result = Repo.query!(query, [parent.path, parent.id])
-
-      Enum.map(result.rows, fn row ->
-        # Map row data to Node struct
-        id = Enum.at(row, 0)
-        path = Enum.at(row, 1)
-        parent_id = Enum.at(row, 2)
-        node_type = Enum.at(row, 3)
-        name = Enum.at(row, 4)
-        metadata = Enum.at(row, 5)
-        inserted_at = Enum.at(row, 6)
-        updated_at = Enum.at(row, 7)
-
-        %Node{
-          id: id,
-          path: path,
-          parent_id: parent_id,
-          node_type: node_type,
-          name: name,
-          metadata: metadata,
-          inserted_at: inserted_at,
-          updated_at: updated_at
-        }
-      end)
-    end
-  end
+  defdelegate get_descendants(parent_id), to: NodeManager
 
   @doc """
-  Gets the ancestry path of a node (all parents up to root).
+  Updates a node's attributes.
   """
-  def get_ancestry(node_id) do
-    node = get_node(node_id)
-
-    if is_nil(node) do
-      []
-    else
-      query = """
-      SELECT * FROM hierarchy_nodes
-      WHERE $1::ltree <@ path::ltree
-      AND id != $2
-      ORDER BY path
-      """
-
-      result = Repo.query!(query, [node.path, node.id])
-
-      Enum.map(result.rows, fn row ->
-        # Map row data to Node struct
-        id = Enum.at(row, 0)
-        path = Enum.at(row, 1)
-        parent_id = Enum.at(row, 2)
-        node_type = Enum.at(row, 3)
-        name = Enum.at(row, 4)
-        metadata = Enum.at(row, 5)
-        inserted_at = Enum.at(row, 6)
-        updated_at = Enum.at(row, 7)
-
-        %Node{
-          id: id,
-          path: path,
-          parent_id: parent_id,
-          node_type: node_type,
-          name: name,
-          metadata: metadata,
-          inserted_at: inserted_at,
-          updated_at: updated_at
-        }
-      end)
-    end
-  end
+  defdelegate update_node(node, attrs), to: NodeManager
 
   @doc """
-  Updates a node's attributes. Note that this doesn't change the node's position
-  in the hierarchy. Use move_subtree/2 for that.
+  Deletes a node and all its descendants.
   """
-  def update_node(%Node{} = node, attrs) do
-    result = node
-    |> Node.changeset(attrs)
-    |> Repo.update()
-
-    # Invalidate caches for this node
-    case result do
-      {:ok, updated_node} ->
-        invalidate_node_cache(updated_node.id)
-        {:ok, updated_node}
-      error -> error
-    end
-  end
-
-  @doc """
-  Invalidate all caches related to a specific node.
-  """
-  def invalidate_node_cache(node_id) do
-    # Invalidate direct node cache
-    HierarchyCache.invalidate("node:#{node_id}")
-
-    # Get the node to invalidate path cache
-    node = Repo.get(Node, node_id)
-    if node do
-      HierarchyCache.invalidate("node_path:#{node.path}")
-
-      # Also invalidate parent's children cache
-      if node.parent_id do
-        HierarchyCache.invalidate("children:#{node.parent_id}")
-      else
-        # If it's a root node, invalidate root nodes list
-        HierarchyCache.invalidate("root_nodes")
-      end
-    end
-  end
+  defdelegate delete_node(node), to: NodeManager
 
   @doc """
   Moves a node and all its descendants to a new parent.
   """
-  def move_subtree(%Node{} = node, new_parent_id) do
-    new_parent = get_node(new_parent_id)
-
-    if is_nil(new_parent) do
-      {:error, :parent_not_found}
-    else
-      # Verify we're not creating a cycle by moving a node to its own descendant
-      # Check if new_parent is a descendant of the node we're trying to move
-      if node.id == new_parent_id or is_descendant?(new_parent_id, node.id) do
-        {:error, :would_create_cycle}
-      else
-        # In a transaction, update the node and all descendants
-        Repo.transaction(fn ->
-          new_path = build_child_path(new_parent.path, node.name)
-          old_path = node.path
-
-          # Update the moved node
-          changeset = Node.changeset(node, %{parent_id: new_parent_id})
-          node = Ecto.Changeset.put_change(changeset, :path, new_path) |> Repo.update!()
-
-          # Update all descendants
-          Repo.query!("""
-            UPDATE hierarchy_nodes
-            SET path = text2ltree($1 || subltree(path::ltree, nlevel($2::ltree) - 1, nlevel(path::ltree) - nlevel($2::ltree) + 1)::text)
-            WHERE path::ltree <@ $2::ltree
-            AND id != $3
-          """, [new_path, old_path, node.id])
-
-          node
-        end)
-      end
-    end
-  end
+  defdelegate move_node(node, new_parent_id), to: NodeManager
 
   @doc """
-  Deletes a node and all its descendants.
-  Also deletes any hierarchy_access records that reference the deleted nodes.
+  Batch creates nodes with parent-child relationships.
   """
-  def delete_node(%Node{} = node) do
-    # Get all descendants first so we can invalidate their caches
-    descendants = get_descendants(node.id)
+  defdelegate batch_create_nodes(nodes_params), to: NodeManager
 
-    result = Repo.transaction(fn ->
-      # Delete all related access records first to avoid orphaned references
-      # This uses LIKE for string matching as access_path is stored as a string
-      # The pattern match ensures we delete access to this node and any descendants
-      Repo.query!("""
-        DELETE FROM hierarchy_access
-        WHERE access_path = $1 OR access_path LIKE $1 || '.%'
-      """, [node.path])
+  @doc """
+  Invalidate cache entries related to a node and its relationships.
+  """
+  defdelegate invalidate_node_caches(node), to: NodeManager
 
-      # Then delete all node descendants
-      Repo.query!("""
-        DELETE FROM hierarchy_nodes
-        WHERE path::ltree <@ $1::ltree
-      """, [node.path])
+  # Access Management delegations
 
-      {:ok, node}
-    end)
+  @doc """
+  Grants access to a user for a specific node with a specified role.
+  """
+  defdelegate grant_access(user_id, node_id, role_id), to: AccessManager
 
-    # Invalidate caches for this node and all its descendants
-    invalidate_node_cache(node.id)
-    Enum.each(descendants, fn desc -> invalidate_node_cache(desc.id) end)
+  @doc """
+  Revokes access for a user to a specific node.
+  """
+  defdelegate revoke_access(access_id), to: AccessManager
 
-    # Invalidate the parent's children cache if applicable
-    if node.parent_id do
-      HierarchyCache.invalidate("children:#{node.parent_id}")
-    else
-      # If it's a root node, invalidate root nodes list
-      HierarchyCache.invalidate("root_nodes")
-    end
+  @doc """
+  Lists all access grants for a specific node.
+  """
+  defdelegate list_node_access(node_id), to: AccessManager
 
-    result
-  end
+  @doc """
+  Lists all access grants for a user across all nodes.
+  """
+  defdelegate list_user_access(user_id), to: AccessManager
 
-  # Note: list_nodes/0 and update_node/2 functions already exist elsewhere in this file
+  @doc """
+  Lists all accessible nodes for a user.
+  """
+  defdelegate list_accessible_nodes(user_id), to: AccessManager
 
+  @doc """
+  Checks if a user has access to a specific node.
+  """
+  defdelegate check_access(user_id, node_id), to: AccessManager
+
+  @doc """
+  Checks if a user has access to a node at a specific path.
+  """
+  defdelegate check_access_by_path(user_id, path), to: AccessManager
+
+  @doc """
+  Bulk grants access to multiple users for multiple nodes.
+  """
+  defdelegate batch_grant_access(access_list), to: AccessManager
+
+  @doc """
+  Bulk revokes access for multiple access grants.
+  """
+  defdelegate batch_revoke_access(access_ids), to: AccessManager
+
+  @doc """
+  Invalidates all access caches for a user.
+  """
+  defdelegate invalidate_user_access_cache(user_id), to: AccessManager
+
+  @doc """
+  Invalidates all access caches for a node.
+  """
+  defdelegate invalidate_node_access_cache(node_id), to: AccessManager
+
+  # Path Calculator delegations
+  
+  @doc """
+  Builds a child path by appending a sanitized name to the parent path.
+  """
+  defdelegate build_child_path(parent_path, name), to: PathCalculator
+
+  @doc """
+  Sanitizes a name for use in a path.
+  """
+  defdelegate sanitize_name(name), to: PathCalculator
+
+  @doc """
+  Gets the parent path from a given path by removing the last label.
+  """
+  defdelegate parent_path(path), to: PathCalculator
+
+  @doc """
+  Gets the last label from a path (the node's own name part).
+  """
+  defdelegate path_label(path), to: PathCalculator
+  
+  # Functions added for backward compatibility with tests
+  
   @doc """
   Checks if a node is a descendant of another node.
+  Used by tests.
   """
   def is_descendant?(descendant_id, ancestor_id) do
-    descendant = get_node(descendant_id)
-    ancestor = get_node(ancestor_id)
-
-    if is_nil(descendant) or is_nil(ancestor) do
+    descendant = NodeManager.get_node(descendant_id)
+    ancestor = NodeManager.get_node(ancestor_id)
+    
+    if is_nil(descendant) || is_nil(ancestor) do
       false
     else
-      result = Repo.query!("SELECT $1::ltree <@ $2::ltree", [descendant.path, ancestor.path])
-      Enum.at(result.rows, 0) |> Enum.at(0)
+      PathCalculator.is_ancestor?(ancestor.path, descendant.path)
     end
   end
-
-  #
-  # Access Management
-  #
-
+  
   @doc """
-  Grants a user access to a node (and implicitly to all its descendants).
+  Moves a node and its descendants to a new parent.
+  Renamed to move_node in the NodeManager but keeping for backward compatibility.
   """
-  def grant_access(user_id, node_id, role_id) do
-    node = get_node(node_id)
-
-    if is_nil(node) do
-      {:error, :node_not_found}
-    else
-      %Access{}
-      |> Access.changeset(%{
-        user_id: user_id,
-        access_path: node.path,
-        role_id: role_id
-      })
-      |> Repo.insert(on_conflict: :replace_all, conflict_target: [:user_id, :access_path])
-    end
+  def move_subtree(node, new_parent_id) do
+    NodeManager.move_node(node, new_parent_id)
   end
-
+  
   @doc """
-  Revokes a user's access to a specific node.
-  """
-  def revoke_access(user_id, node_id) do
-    node = get_node(node_id)
-
-    if is_nil(node) do
-      {:error, :node_not_found}
-    else
-      {count, _} =
-        Access
-        |> where(user_id: ^user_id, access_path: ^node.path)
-        |> Repo.delete_all()
-
-      # Invalidate access caches
-      HierarchyCache.invalidate("access_check:#{user_id}:#{node_id}")
-      HierarchyCache.invalidate("accessible_nodes:#{user_id}")
-
-      {:ok, count}
-    end
-  end
-
-  @doc """
-  Checks if a user has access to a specific node with caching for improved performance.
-  Handles both string and integer IDs for user_id and node_id.
+  Checks if a user has access to a specific node.
+  Used by tests.
   """
   def can_access?(user_id, node_id) do
-    # Convert IDs to integers if they're strings
-    user_id = if is_binary(user_id), do: String.to_integer(user_id), else: user_id
-    node_id = if is_binary(node_id), do: String.to_integer(node_id), else: node_id
-
-    if Mix.env() == :test do
-      # In test environment, always go directly to the database for consistent test behavior
-      result = Repo.query!("SELECT can_user_access($1::integer, $2::integer)", [user_id, node_id])
-      [[has_access]] = result.rows
-      has_access
-    else
-      cache_key = "access_check:#{user_id}:#{node_id}"
-
-      HierarchyCache.get_or_store(cache_key, fn ->
-        result = Repo.query!("SELECT can_user_access($1::integer, $2::integer)", [user_id, node_id])
-        [[has_access]] = result.rows
-        has_access
-      end, 30_000) # 30 second TTL for access checks
+    {has_access, _, _} = AccessManager.check_access(user_id, node_id)
+    has_access
+  end
+  
+  @doc """
+  Revokes user access from a node.
+  Used by tests with a different parameter pattern than the AccessManager version.
+  """
+  def revoke_access(user_id, node_id) do
+    # First find the node to get its path
+    case NodeManager.get_node(node_id) do
+      nil -> 
+        {:error, :node_not_found}
+      
+      node ->
+        # Then find the access record using user_id and the node's path
+        access = XIAM.Repo.get_by(XIAM.Hierarchy.Access, user_id: user_id, access_path: node.path)
+        
+        if access do
+          AccessManager.revoke_access(access.id)
+        else
+          {:error, :access_not_found}
+        end
     end
-  end
-
-  @doc """
-  Lists all nodes a user has access to with caching for improved performance.
-  """
-  def list_accessible_nodes(user_id) do
-    # Function to fetch accessible nodes directly from the database
-    fetch_accessible_nodes = fn ->
-      # First get all access records for the user
-      access_paths =
-        Access
-        |> where(user_id: ^user_id)
-        |> select([a], a.access_path)
-        |> Repo.all()
-
-      if Enum.empty?(access_paths) do
-        []
-      else
-        # Convert to a condition that matches any node that is a descendant of any access path
-        paths_condition = Enum.map_join(access_paths, " OR ", fn path ->
-          "path::ltree <@ '#{path}'::ltree"
-        end)
-
-        query = "SELECT * FROM hierarchy_nodes WHERE #{paths_condition} ORDER BY path"
-        result = Repo.query!(query, [])
-
-        Enum.map(result.rows, fn row ->
-          # Map row data to Node struct
-          id = Enum.at(row, 0)
-          path = Enum.at(row, 1)
-          parent_id = Enum.at(row, 2)
-          node_type = Enum.at(row, 3)
-          name = Enum.at(row, 4)
-          metadata = Enum.at(row, 5)
-          inserted_at = Enum.at(row, 6)
-          updated_at = Enum.at(row, 7)
-
-          %Node{
-            id: id,
-            path: path,
-            parent_id: parent_id,
-            node_type: node_type,
-            name: name,
-            metadata: metadata,
-            inserted_at: inserted_at,
-            updated_at: updated_at
-          }
-        end)
-      end
-    end
-
-    if Mix.env() == :test do
-      # In test environment, always go directly to the database
-      fetch_accessible_nodes.()
-    else
-      cache_key = "accessible_nodes:#{user_id}"
-      HierarchyCache.get_or_store(cache_key, fetch_accessible_nodes, 60_000) # 1 minute TTL
-    end
-  end
-
-  @doc """
-  Lists all access grants for a specific user.
-  """
-  def list_user_access(user_id) do
-    Access
-    |> where(user_id: ^user_id)
-    |> Repo.all()
-  end
-
-  #
-  # Helper Functions
-  #
-
-  @doc """
-  Builds a child path by concatenating the parent path with the sanitized name.
-  """
-  def build_child_path(parent_path, name) do
-    sanitized = sanitize_name(name)
-    "#{parent_path}.#{sanitized}"
-  end
-
-  @doc """
-  Sanitizes a name to be used in an ltree path.
-  Replaces non-alphanumeric characters with underscores.
-  """
-  def sanitize_name(name) when is_binary(name) do
-    name
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9_]/, "_")
-  end
-
-  def sanitize_name(name) do
-    to_string(name)
-    |> sanitize_name()
   end
 end

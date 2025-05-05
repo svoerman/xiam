@@ -5,11 +5,11 @@ defmodule XIAM.Hierarchy.AccessCache do
   This module provides caching for frequently used access checks to reduce database load.
   It automatically expires cache entries after a configurable TTL and has protection
   against cache poisoning with a maximum cache size.
+  
+  Used by the AccessManager for efficient access checks.
   """
   use GenServer
   require Logger
-  
-  alias XIAM.Hierarchy
   
   # Default TTL for cache entries (5 minutes)
   @default_ttl 300_000
@@ -26,18 +26,33 @@ defmodule XIAM.Hierarchy.AccessCache do
   end
   
   @doc """
-  Checks if a user has access to a node, using the cache if available.
+  Gets a value from the cache or stores it if not present.
+  Similar to XIAM.Cache.HierarchyCache.get_or_store/3 but specialized for access checks.
   """
-  def can_access?(user_id, node_id) do
-    case GenServer.call(__MODULE__, {:check_cache, user_id, node_id}) do
-      {:miss} ->
-        # Not in cache, check database
-        has_access = Hierarchy.can_access?(user_id, node_id)
-        GenServer.cast(__MODULE__, {:cache, user_id, node_id, has_access})
-        has_access
-      {:hit, has_access} ->
-        # Cache hit
-        has_access
+  def get_or_store(key, fun, ttl \\ @default_ttl) do
+    # Try to use the cache server, but gracefully handle the case where it's not available (e.g. in tests)
+    try do
+      case GenServer.call(__MODULE__, {:check, key}) do
+        {:miss} ->
+          # Not in cache, call the function
+          value = fun.()
+          GenServer.cast(__MODULE__, {:store, key, value, ttl})
+          value
+        {:hit, value} ->
+          # Cache hit
+          value
+      end
+    catch
+      # Gracefully handle the case where the GenServer is not running (e.g. during tests)
+      :exit, _ ->
+        if Process.alive?(self()) do 
+          Logger.debug("AccessCache not available, falling back to direct function call")
+          # Just call the function directly without caching
+          fun.()
+        else
+          # Re-raise if we're not actually alive
+          exit(:normal)
+        end
     end
   end
   
@@ -74,18 +89,16 @@ defmodule XIAM.Hierarchy.AccessCache do
   end
   
   @impl true
-  def handle_call({:check_cache, user_id, node_id}, _from, state) do
-    key = {user_id, node_id}
-    
+  def handle_call({:check, key}, _from, state) do
     case Map.get(state.cache, key) do
       nil ->
         # Cache miss
         {:reply, {:miss}, state}
-      {has_access, timestamp} ->
+      {value, timestamp, ttl} ->
         # Check if entry is still valid
-        if :os.system_time(:millisecond) - timestamp < state.ttl do
+        if :os.system_time(:millisecond) - timestamp < ttl do
           # Valid cache hit
-          {:reply, {:hit, has_access}, state}
+          {:reply, {:hit, value}, state}
         else
           # Expired entry
           {:reply, {:miss}, %{state | cache: Map.delete(state.cache, key)}}
@@ -94,8 +107,7 @@ defmodule XIAM.Hierarchy.AccessCache do
   end
   
   @impl true
-  def handle_cast({:cache, user_id, node_id, has_access}, state) do
-    key = {user_id, node_id}
+  def handle_cast({:store, key, value, ttl}, state) do
     timestamp = :os.system_time(:millisecond)
     
     # If at max size, remove oldest entries before adding new one
@@ -104,15 +116,15 @@ defmodule XIAM.Hierarchy.AccessCache do
         # Sort by timestamp and keep the newest entries
         cache_list = 
           state.cache
-          |> Enum.sort_by(fn {_k, {_v, ts}} -> ts end, :desc)
+          |> Enum.sort_by(fn {_k, {_v, ts, _ttl}} -> ts end, :desc)
           |> Enum.take(state.max_size - 1)
           |> Map.new()
           
         # Add new entry
-        Map.put(cache_list, key, {has_access, timestamp})
+        Map.put(cache_list, key, {value, timestamp, ttl})
       else
         # Simply add new entry
-        Map.put(state.cache, key, {has_access, timestamp})
+        Map.put(state.cache, key, {value, timestamp, ttl})
       end
     
     {:noreply, %{state | cache: cache}}
@@ -152,8 +164,8 @@ defmodule XIAM.Hierarchy.AccessCache do
     
     cache = 
       state.cache
-      |> Enum.reject(fn {_, {_, timestamp}} -> 
-        current_time - timestamp >= state.ttl
+      |> Enum.reject(fn {_, {_, timestamp, ttl}} -> 
+        current_time - timestamp >= ttl
       end)
       |> Map.new()
     

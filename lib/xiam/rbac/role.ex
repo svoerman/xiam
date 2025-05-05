@@ -2,6 +2,9 @@ defmodule Xiam.Rbac.Role do
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query, warn: false
+  
+  # Make the Role struct encodable to JSON for API responses
+  @derive {Jason.Encoder, only: [:id, :name, :description, :inserted_at, :updated_at]}
 
   schema "roles" do
     field :name, :string

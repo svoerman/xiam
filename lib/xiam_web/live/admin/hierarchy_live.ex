@@ -1,19 +1,18 @@
 defmodule XIAMWeb.Admin.HierarchyLive do
+  @moduledoc false
   use XIAMWeb, :live_view
   
+  # Import specific UI components needed for modals
   import XIAMWeb.Components.UI.Button
   import XIAMWeb.Components.UI.Modal
   import XIAMWeb.CoreComponents, except: [button: 1, modal: 1]
-  import Ecto.Query
-  alias XIAM.Repo
-  alias XIAM.Hierarchy.Node
   import XIAMWeb.Components.UI
-  import XIAMWeb.AdminComponents
   
+  # Import business logic modules
   alias XIAM.Hierarchy
-  alias XIAM.Hierarchy.Node
-  alias XIAM.Hierarchy.Access
+  alias XIAM.Hierarchy.{Node, Access, AccessManager}
   alias XIAM.Repo
+  alias XIAMWeb.Admin.Components.NodeFormComponent
   
   @impl true
   def mount(_params, _session, socket) do
@@ -51,7 +50,8 @@ defmodule XIAMWeb.Admin.HierarchyLive do
       users: [],  # Will be populated when granting access
       page: 1,
       per_page: 50,
-      search_term: nil
+      search_term: nil,
+      access_grants: nil
     )
     
     {:ok, socket}
@@ -80,25 +80,28 @@ defmodule XIAMWeb.Admin.HierarchyLive do
   end
   
   @impl true
-  def handle_event("show_new_node_modal", _params, socket) do
-    # Create a minimal changeset with just the essentials
-    changeset = Node.changeset(%Node{}, %{})
-    
-    # If we have a selected node, pre-fill parent ID
-    changeset = if socket.assigns.selected_node do
-      Ecto.Changeset.put_change(changeset, :parent_id, socket.assigns.selected_node.id)
-    else
-      changeset
-    end
-    
-    # Only load the minimal data needed for the modal
-    # Instead of loading all nodes, we'll limit to a smaller set 
-    # or use a different approach for node selection
+  def handle_event("show_new_node_modal", %{"parent-id" => parent_id}, socket) do
+    # Create node with parent ID
+    changeset = Node.changeset(%Node{}, %{parent_id: parent_id})
     
     {:noreply, socket
       |> assign(:show_modal, true)
       |> assign(:modal_type, :new_node)
       |> assign(:node_changeset, changeset)
+      |> assign(:node, nil)
+    }
+  end
+  
+  @impl true
+  def handle_event("show_new_node_modal", _params, socket) do
+    # Create a root node (no parent)
+    changeset = Node.changeset(%Node{}, %{})
+    
+    {:noreply, socket
+      |> assign(:show_modal, true)
+      |> assign(:modal_type, :new_node)
+      |> assign(:node_changeset, changeset)
+      |> assign(:node, nil)
     }
   end
   
@@ -107,11 +110,28 @@ defmodule XIAMWeb.Admin.HierarchyLive do
       nil ->
         {:noreply, socket |> put_flash(:error, "Node not found")}
       node ->
-        changeset = Node.changeset(node, %{})
+        # Convert the metadata map to JSON string for the form
+        metadata_json = case node.metadata do
+          nil -> ""
+          map when is_map(map) -> Jason.encode!(map, pretty: true)
+          other -> inspect(other) # Handle any other unexpected type
+        end
+        
+        # Create a modified node with metadata as a string for the changeset
+        node_params = %{
+          "id" => node.id,
+          "name" => node.name,
+          "node_type" => node.node_type,
+          "metadata" => metadata_json
+        }
+        
+        # Create a changeset with the stringified metadata
+        changeset = Node.changeset(node, node_params)
         {:noreply, assign(socket,
           show_modal: true,
           modal_type: :edit_node,
-          node_changeset: changeset
+          node_changeset: changeset,
+          node: node
         )}
     end
   end
@@ -124,7 +144,7 @@ defmodule XIAMWeb.Admin.HierarchyLive do
         # Get a list of users to potentially grant access to
         users = XIAM.Users.list_users()
         
-        changeset = Access.changeset(%Access{}, %{})
+        changeset = Access.changeset(%Access{}, %{node_id: node.id})
         
         {:noreply, assign(socket,
           show_modal: true,
@@ -143,6 +163,14 @@ defmodule XIAMWeb.Admin.HierarchyLive do
     )}
   end
   
+  def handle_event("validate_node", %{"node" => node_params}, socket) do
+    socket = 
+      socket
+      |> NodeFormComponent.validate_changeset(node_params)
+      
+    {:noreply, socket}
+  end
+  
   def handle_event("save_node", %{"node" => node_params}, socket) do
     case socket.assigns.modal_type do
       :new_node ->
@@ -151,39 +179,7 @@ defmodule XIAMWeb.Admin.HierarchyLive do
         
         case Hierarchy.create_node(node_params) do
           {:ok, node} ->
-            # Explicitly invalidate all relevant caches
-            Hierarchy.invalidate_node_caches(node)
-            
-            # Refresh the appropriate parts of the UI with fresh data
-            is_root = node.parent_id == nil
-            socket = cond do
-              # If we created a root node, refresh the root nodes list (from DB not cache)
-              is_root ->
-                root_nodes = Node |> where([n], is_nil(n.parent_id)) |> order_by([n], n.path) |> Repo.all()
-                assign(socket, root_nodes: root_nodes)
-                
-              # If we added a child to the selected node, refresh its children
-              # and make sure it's expanded in the UI
-              socket.assigns.selected_node && node.parent_id == socket.assigns.selected_node.id ->
-                # Get fresh children data directly from the database
-                children = Node |> where([n], n.parent_id == ^socket.assigns.selected_node.id) |> order_by([n], n.path) |> Repo.all()
-                # Ensure the parent is expanded to show the new child
-                expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
-                
-                socket
-                |> assign(children: children)
-                |> assign(expanded_nodes: expanded_nodes)
-                
-              # If we added a node somewhere else in the hierarchy
-              true ->
-                # Expand the parent to show the new node
-                _parent = Hierarchy.get_node(node.parent_id)
-                # Get fresh children data directly from the database
-                children = Node |> where([n], n.parent_id == ^node.parent_id) |> order_by([n], n.path) |> Repo.all()
-                expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
-                
-                assign(socket, expanded_nodes: expanded_nodes)
-            end
+            socket = refresh_ui_after_node_change(socket, node)
             
             {:noreply, socket
               |> assign(show_modal: false, modal_type: nil)
@@ -199,23 +195,17 @@ defmodule XIAMWeb.Admin.HierarchyLive do
         end
         
       :edit_node ->
+        node = socket.assigns.node
+        
+        # Convert string params to proper types
         node_params = convert_node_params(node_params)
-        node = Repo.get(Node, node_params.id)
         
         case Hierarchy.update_node(node, node_params) do
-          {:ok, _node} ->
-            nodes = Hierarchy.list_nodes()
-            
-            # If we have a selected node, refresh its children
-            socket = case socket.assigns.selected_node do
-              nil -> socket
-              selected_node -> 
-                children = Hierarchy.get_direct_children(selected_node.id)
-                assign(socket, children: children)
-            end
+          {:ok, updated_node} ->
+            socket = refresh_ui_after_node_change(socket, updated_node)
             
             {:noreply, socket
-              |> assign(nodes: nodes, show_modal: false)
+              |> assign(show_modal: false, modal_type: nil)
               |> put_flash(:info, "Node updated successfully")}
               
           {:error, %Ecto.Changeset{} = changeset} ->
@@ -223,32 +213,49 @@ defmodule XIAMWeb.Admin.HierarchyLive do
         end
         
       _ ->
-        {:noreply, socket |> put_flash(:error, "Invalid action")}
+        {:noreply, socket}
     end
   end
   
-  def handle_event("grant_access", %{"access" => access_params}, socket) do
-    node = socket.assigns.selected_node
+  def handle_event("toggle_node", %{"id" => id}, socket) do
+    node_id = id
     
-    user_id = String.to_integer(access_params["user_id"])
-    role_id = String.to_integer(access_params["role_id"])
+    socket = 
+      if Map.has_key?(socket.assigns.expanded_nodes, node_id) do
+        # Node is expanded, collapse it by removing it from expanded_nodes
+        expanded_nodes = Map.delete(socket.assigns.expanded_nodes, node_id)
+        assign(socket, expanded_nodes: expanded_nodes)
+      else
+        # Node is collapsed, expand it by loading its children
+        children = Hierarchy.get_direct_children(node_id)
+        expanded_nodes = Map.put(socket.assigns.expanded_nodes, node_id, children)
+        assign(socket, expanded_nodes: expanded_nodes)
+      end
+      
+    {:noreply, socket}
+  end
+  
+  def handle_event("select_node", %{"id" => id}, socket) do
+    node = Hierarchy.get_node(id)
     
-    case Hierarchy.grant_access(user_id, node.id, role_id) do
-      {:ok, _} ->
-        # Reload the node access data to reflect the changes
-        updated_socket = load_node_access(socket, node)
+    if node do
+      children = Hierarchy.get_direct_children(node.id)
+      socket = assign(socket, selected_node: node, children: children)
+      socket = load_node_access(socket, node)
+      
+      # If not already expanded, expand this node
+      socket = 
+        if not Map.has_key?(socket.assigns.expanded_nodes, id) do
+          expanded_nodes = Map.put(socket.assigns.expanded_nodes, id, children)
+          assign(socket, expanded_nodes: expanded_nodes)
+        else
+          socket
+        end
         
-        {:noreply, updated_socket
-          |> assign(show_modal: false)
-          |> put_flash(:info, "Access granted successfully")}
-          
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, access_changeset: changeset)}
-        
-      {:error, reason} ->
-        {:noreply, socket
-          |> put_flash(:error, "Error granting access: #{inspect(reason)}")
-          |> assign(show_modal: false)}
+      # Navigate to the node's page to make it bookmarkable
+      {:noreply, push_patch(socket, to: "/admin/hierarchy?node_id=#{node.id}")}
+    else
+      {:noreply, socket |> put_flash(:error, "Node not found")}
     end
   end
   
@@ -257,214 +264,233 @@ defmodule XIAMWeb.Admin.HierarchyLive do
       nil ->
         {:noreply, socket |> put_flash(:error, "Node not found")}
       node ->
+        parent_id = node.parent_id
+        
         case Hierarchy.delete_node(node) do
           {:ok, _} ->
-            # Use our new comprehensive cache invalidation function
-            Hierarchy.invalidate_node_caches(node)
-            
-            # If node has a parent, get fresh data directly from the database
-            socket = if node.parent_id do
-              # Get fresh children of the parent directly from the database
-              parent_children = Node |> where([n], n.parent_id == ^node.parent_id) |> order_by([n], n.path) |> Repo.all()
-              
-              # Update the expanded nodes map
-              updated_expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", parent_children)
-              
-              # Also update the children assign if we're viewing the parent of the deleted node
-              socket = if socket.assigns.selected_node && socket.assigns.selected_node.id == node.parent_id do
-                assign(socket, children: parent_children)
-              else
-                socket
+            socket = 
+              cond do
+                # If the deleted node was selected, clear selection
+                socket.assigns.selected_node && socket.assigns.selected_node.id == id ->
+                  assign(socket, selected_node: nil, children: nil, access_grants: nil)
+                
+                # If the parent of the deleted node is selected, refresh its children list
+                socket.assigns.selected_node && socket.assigns.selected_node.id == parent_id ->
+                  children = Hierarchy.get_direct_children(parent_id)
+                  assign(socket, children: children)
+                
+                # No updates needed
+                true ->
+                  socket
               end
               
-              assign(socket, expanded_nodes: updated_expanded_nodes)
-            else
-              # For root nodes, refresh the root nodes list directly from the database
-              root_nodes = Node |> where([n], is_nil(n.parent_id)) |> order_by([n], n.path) |> Repo.all()
-              assign(socket, root_nodes: root_nodes)
-            end
+            # Update expanded_nodes to remove the deleted node
+            expanded_nodes = Map.delete(socket.assigns.expanded_nodes, id)
             
-            # If we deleted the selected node, clear selection
-            socket = if socket.assigns.selected_node && socket.assigns.selected_node.id == node.id do
-              assign(socket, selected_node: nil)
-            else
-              socket
-            end
-            
-            {:noreply, socket
-              |> put_flash(:info, "Node and all descendants deleted successfully")}
+            # If this was a child node, refresh its parent's children
+            socket = 
+              if parent_id do
+                # Get fresh data for parent's children
+                parent_children = Hierarchy.get_direct_children(parent_id)
+                expanded_nodes = Map.put(expanded_nodes, "#{parent_id}", parent_children)
+                assign(socket, expanded_nodes: expanded_nodes)
+              else
+                # This was a root node, refresh root nodes
+                root_nodes = Hierarchy.list_root_nodes()
+                assign(socket, root_nodes: root_nodes, expanded_nodes: expanded_nodes)
+              end
               
+            # Update total count
+            loading_count = Repo.aggregate(Node, :count, :id)
+            socket = assign(socket, loading_count: loading_count)
+            
+            {:noreply, socket |> put_flash(:info, "Node deleted successfully")}
+            
           {:error, reason} ->
             {:noreply, socket |> put_flash(:error, "Error deleting node: #{inspect(reason)}")}
         end
     end
   end
   
-  def handle_event("select_node", %{"id" => id}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/admin/hierarchy?node_id=#{id}")}
-  end
-  
-  @doc """
-  Toggle node expansion in the tree view - when a user clicks the expand/collapse icon
-  """
-  def handle_event("toggle_node", %{"id" => id}, socket) do
-    expanded_nodes = socket.assigns.expanded_nodes
+  def handle_event("grant_access", %{"access" => access_params}, socket) do
+    node_id = access_params["node_id"]
+    user_id = access_params["user_id"]
+    role_id = access_params["role_id"]
     
-    # Toggle the expanded state for this node
-    expanded_nodes = if Map.has_key?(expanded_nodes, id) do
-      Map.delete(expanded_nodes, id)
-    else
-      # Load children when expanding
-      node_id = String.to_integer(id)
-      children = Hierarchy.get_direct_children(node_id)
-      Map.put(expanded_nodes, id, children)
+    # Convert IDs to integers
+    node_id = if is_binary(node_id), do: String.to_integer(node_id), else: node_id
+    user_id = if is_binary(user_id), do: String.to_integer(user_id), else: user_id
+    role_id = if is_binary(role_id), do: String.to_integer(role_id), else: role_id
+    
+    # First check if access already exists
+    node = Hierarchy.get_node(node_id)
+    existing_access = Repo.get_by(Access, user_id: user_id, access_path: node.path)
+    
+    case AccessManager.grant_access(user_id, node_id, role_id) do
+      {:ok, _access} ->
+        # Reload access grants for the selected node
+        socket = 
+          if socket.assigns.selected_node && socket.assigns.selected_node.id == node_id do
+            load_node_access(socket, socket.assigns.selected_node)
+          else
+            socket
+          end
+        
+        # Create appropriate message based on whether this was a new or updated access
+        message = if existing_access, do: "Access role updated successfully", else: "Access granted successfully"
+          
+        {:noreply, socket
+          |> assign(show_modal: false, modal_type: nil)
+          |> put_flash(:info, message)}
+          
+      {:error, reason} ->
+        {:noreply, socket |> put_flash(:error, "Error granting access: #{inspect(reason)}")}
     end
-    
-    {:noreply, assign(socket, expanded_nodes: expanded_nodes)}
-  end
-  
-  # Handle search for nodes to find them quickly in a large hierarchy
-  def handle_event("search", %{"search" => %{"term" => term}}, socket) when term != "" do
-    # Search for nodes that contain the term in their name or path
-    nodes = Hierarchy.search_nodes(term)
-    
-    {:noreply, assign(socket, 
-      search_results: nodes,
-      search_term: term
-    )}
-  end
-  
-  def handle_event("search", %{"search" => %{"term" => ""}}, socket) do
-    # Clear search
-    {:noreply, assign(socket,
-      search_results: nil,
-      search_term: nil
-    )}
-  end
-  
-  # Handle pagination for the flat node list view
-  def handle_event("paginate", %{"page" => page}, socket) do
-    page = String.to_integer(page)
-    per_page = socket.assigns.per_page
-    
-    paginated_results = Hierarchy.paginate_nodes(page, per_page)
-    
-    {:noreply, assign(socket,
-      paginated_nodes: paginated_results.nodes,
-      page: page,
-      total_pages: paginated_results.total_pages
-    )}
   end
   
   def handle_event("revoke_access", %{"user-id" => user_id}, socket) do
-    node = socket.assigns.selected_node
-    user_id = String.to_integer(user_id)
+    # Convert to integer
+    user_id = if is_binary(user_id), do: String.to_integer(user_id), else: user_id
     
-    case Hierarchy.revoke_access(user_id, node.id) do
-      {:ok, _} ->
-        # Reload the node access data to reflect the changes
-        updated_socket = load_node_access(socket, node)
-        {:noreply, updated_socket |> put_flash(:info, "Access revoked successfully")}
+    # First get the access record based on the user_id and node path
+    node_path = socket.assigns.selected_node.path
+    case Repo.get_by(Access, user_id: user_id, access_path: node_path) do
+      nil ->
+        {:noreply, socket |> put_flash(:error, "Access not found")}
         
-      {:error, reason} ->
-        {:noreply, socket |> put_flash(:error, "Error revoking access: #{inspect(reason)}")}
+      access ->
+        # Now revoke the access by ID
+        case AccessManager.revoke_access(access.id) do
+          {:ok, _} ->
+            # Reload access grants for the selected node
+            socket = 
+              if socket.assigns.selected_node do
+                load_node_access(socket, socket.assigns.selected_node)
+              else
+                socket
+              end
+              
+            {:noreply, socket |> put_flash(:info, "Access revoked successfully")}
+            
+          {:error, reason} ->
+            {:noreply, socket |> put_flash(:error, "Error revoking access: #{inspect(reason)}")}
+        end
     end
   end
   
-  # Helper to load node access for the view
+  def handle_event("search_nodes", %{"search" => %{"term" => term}}, socket) do
+    if String.trim(term) == "" do
+      {:noreply, assign(socket, search_term: nil)}
+    else
+      search_results = Hierarchy.search_nodes(term)
+      {:noreply, assign(socket, search_term: term, search_results: search_results)}
+    end
+  end
+  
+  def handle_event("search", %{"search" => %{"term" => term}}, socket) do
+    if String.trim(term) == "" do
+      {:noreply, assign(socket, search_term: nil, search_results: nil)}
+    else
+      search_results = Hierarchy.search_nodes(term)
+      {:noreply, assign(socket, search_term: term, search_results: search_results)}
+    end
+  end
+  
+  def handle_event("clear_search", _, socket) do
+    {:noreply, assign(socket, search_term: nil, search_results: nil)}
+  end
+  
+  # Private functions
+
+  defp convert_node_params(params) do
+    # Handle metadata conversion from JSON
+    params = 
+      if params["metadata"] && params["metadata"] != "" do
+        try do
+          metadata = Jason.decode!(params["metadata"])
+          Map.put(params, "metadata", metadata)
+        rescue
+          _ -> params
+        end
+      else
+        params
+      end
+      
+    # Handle empty string for parent_id (convert to nil for root nodes)
+    params =
+      if Map.has_key?(params, "parent_id") && params["parent_id"] == "" do
+        Map.put(params, "parent_id", nil)
+      else
+        params
+      end
+      
+    params
+  end
+  
+  defp refresh_ui_after_node_change(socket, node) do
+    # Refresh the appropriate parts of the UI with fresh data
+    is_root = node.parent_id == nil
+    
+    socket = cond do
+      # If we created/updated a root node, refresh the root nodes list
+      is_root ->
+        root_nodes = Hierarchy.list_root_nodes()
+        assign(socket, root_nodes: root_nodes)
+        
+      # If we added/updated a child to the selected node, refresh its children
+      socket.assigns.selected_node && node.parent_id == socket.assigns.selected_node.id ->
+        # Get fresh children data
+        children = Hierarchy.get_direct_children(socket.assigns.selected_node.id)
+        # Ensure the parent is expanded to show the new/updated child
+        expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
+        
+        socket
+        |> assign(children: children)
+        |> assign(expanded_nodes: expanded_nodes)
+        
+      # If we added/updated a node somewhere else in the hierarchy
+      true ->
+        # Expand the parent to show the new/updated node
+        # Get fresh children data
+        children = Hierarchy.get_direct_children(node.parent_id)
+        expanded_nodes = Map.put(socket.assigns.expanded_nodes, "#{node.parent_id}", children)
+        
+        assign(socket, expanded_nodes: expanded_nodes)
+    end
+    
+    # Update the node count
+    loading_count = Repo.aggregate(Node, :count, :id)
+    assign(socket, loading_count: loading_count)
+  end
+  
   defp load_node_access(socket, node) do
-    # Get all access grants for this node - using string interpolation to avoid pin operator issues
+    # Execute direct SQL query to get access info with email and role name
     query = """
     SELECT ha.*, u.email, r.name as role_name 
     FROM hierarchy_access ha 
     JOIN users u ON ha.user_id = u.id
     JOIN roles r ON ha.role_id = r.id
     WHERE ha.access_path = $1
+    ORDER BY ha.inserted_at DESC
     """
-    result = Repo.query!(query, [node.path])
     
-    # Map the results to a simple structure
-    accesses = Enum.map(result.rows, fn [id, user_id, _access_path, role_id, _inserted_at, _updated_at, email, role_name] -> 
-      %{
-        id: id,
-        user_id: user_id,
-        user: %{email: email},
-        role: %{name: role_name, id: role_id}
-      }
-    end)
-    
-    assign(socket, node_access: accesses)
-  end
-
-  # Helper function to recursively render children in the template
-  def render_children(assigns) do
-    children = Enum.filter(assigns.all_nodes, fn n -> n.parent_id == assigns.parent.id end)
-    
-    assigns = assign(assigns, :children, children)
-    
-    ~H"""
-    <%= if length(@children) > 0 do %>
-      <ul class="pl-6 mt-1 space-y-1">
-        <%= for child <- @children do %>
-          <li>
-            <div class={[
-              "flex items-center p-2 rounded cursor-pointer",
-              @selected_node && @selected_node.id == child.id && "bg-blue-100"
-            ]}>
-              <span phx-click="select_node" phx-value-id={child.id} class="flex-grow font-medium">
-                <%= child.name %>
-              </span>
-              <span class="text-xs text-gray-500 px-2">
-                <%= XIAM.Hierarchy.Node.node_type_name(child.node_type) %>
-              </span>
-              <div class="flex items-center space-x-1">
-                <button phx-click="show_edit_node_modal" phx-value-id={child.id} class="text-gray-600 hover:text-blue-500">
-                  <.icon name="hero-pencil-square" class="w-4 h-4" />
-                </button>
-                <button phx-click="show_move_node_modal" phx-value-id={child.id} class="text-gray-600 hover:text-blue-500">
-                  <.icon name="hero-arrow-path" class="w-4 h-4" />
-                </button>
-                <button phx-click="delete_node" phx-value-id={child.id} data-confirm="Are you sure? This will delete this node and ALL descendants." class="text-gray-600 hover:text-red-500">
-                  <.icon name="hero-trash" class="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            
-            <.render_children
-              parent={child}
-              all_nodes={@all_nodes}
-              selected_node={@selected_node}
-            />
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
-    """
+    case Ecto.Adapters.SQL.query(Repo, query, [node.path]) do
+      {:ok, %{rows: rows, columns: columns}} ->
+        # Convert rows to maps with proper keys
+        access_grants = Enum.map(rows, fn row ->
+          columns
+          |> Enum.zip(row)
+          |> Map.new(fn {col, val} -> {col, val} end)
+        end)
+        
+        assign(socket, node_access: access_grants)
+        
+      _ ->
+        # Fallback to regular access list
+        access_grants = AccessManager.list_node_access(node.id)
+        assign(socket, node_access: access_grants)
+    end
   end
   
-  # Convert string params to the proper types
-  defp convert_node_params(params) do
-    params
-    |> Map.new(fn {k, v} -> {String.to_atom(k), v} end)
-    # No longer converting node_type to integer since it's now a string
-    |> Map.update(:parent_id, nil, fn
-      "" -> nil
-      id -> String.to_integer(id)
-    end)
-    |> Map.update(:id, nil, fn
-      nil -> nil
-      "" -> nil
-      id -> String.to_integer(id)
-    end)
-    |> Map.update(:metadata, %{}, fn
-      nil -> %{}
-      "" -> %{}
-      json when is_binary(json) ->
-        case Jason.decode(json) do
-          {:ok, map} -> map
-          _ -> %{}
-        end
-      map -> map
-    end)
-  end
+
 end
