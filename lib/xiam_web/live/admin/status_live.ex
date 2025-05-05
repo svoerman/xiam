@@ -3,6 +3,7 @@ defmodule XIAMWeb.Admin.StatusLive do
   
   alias XIAM.Repo
   alias XIAM.System.Health
+  alias XIAM.Cache.HierarchyCache
   
   @refresh_interval 15_000 # 15 seconds
   
@@ -19,6 +20,7 @@ defmodule XIAMWeb.Admin.StatusLive do
       |> assign(db_stats: get_db_stats())
       |> assign(cluster_nodes: get_cluster_nodes())
       |> assign(oban_stats: get_oban_stats())
+      |> assign(cache_metrics: get_cache_metrics())
       |> assign(last_updated: DateTime.utc_now())
       |> assign(show_node_details: false)
       |> assign(selected_node: nil)}
@@ -34,6 +36,7 @@ defmodule XIAMWeb.Admin.StatusLive do
       |> assign(db_stats: get_db_stats())
       |> assign(cluster_nodes: get_cluster_nodes())
       |> assign(oban_stats: get_oban_stats())
+      |> assign(cache_metrics: get_cache_metrics())
       |> assign(last_updated: DateTime.utc_now())}
   end
   
@@ -54,6 +57,61 @@ defmodule XIAMWeb.Admin.StatusLive do
     {:noreply, socket}
   end
   
+  # Helper function for fetching cache metrics
+  defp get_cache_metrics do
+    # Get all cache metrics data
+    hits_by_prefix = HierarchyCache.get_counter_value(:hits)
+    misses_by_prefix = HierarchyCache.get_counter_value(:misses)
+    total_by_prefix = HierarchyCache.get_counter_value(:total_accesses)
+    invalidations_by_prefix = HierarchyCache.get_counter_value(:invalidations)
+    
+    # Create a list of all prefixes (keys) used in the cache
+    all_prefixes = MapSet.new()
+                  |> MapSet.union(MapSet.new(Map.keys(hits_by_prefix)))
+                  |> MapSet.union(MapSet.new(Map.keys(misses_by_prefix)))
+                  |> MapSet.union(MapSet.new(Map.keys(total_by_prefix)))
+                  |> MapSet.union(MapSet.new(Map.keys(invalidations_by_prefix)))
+                  |> MapSet.to_list()
+    
+    # Create metrics for each prefix
+    metrics = Enum.map(all_prefixes, fn prefix -> 
+      hits = Map.get(hits_by_prefix, prefix, 0)
+      misses = Map.get(misses_by_prefix, prefix, 0)
+      total = Map.get(total_by_prefix, prefix, 0)
+      invalidations = Map.get(invalidations_by_prefix, prefix, 0)
+      
+      hit_rate = if total > 0, do: Float.round(hits / total * 100, 2), else: 0.0
+      
+      # Return a map with all relevant metrics for this prefix
+      %{
+        prefix: prefix || "unknown",
+        hits: hits,
+        misses: misses,
+        total: total,
+        invalidations: invalidations,
+        hit_rate: hit_rate
+      }
+    end)
+    
+    # Calculate overall metrics
+    total_hits = Enum.sum(for {_, v} <- hits_by_prefix, do: v)
+    total_misses = Enum.sum(for {_, v} <- misses_by_prefix, do: v)
+    total_accesses = Enum.sum(for {_, v} <- total_by_prefix, do: v)
+    total_invalidations = Enum.sum(for {_, v} <- invalidations_by_prefix, do: v)
+    
+    overall_hit_rate = if total_accesses > 0, do: Float.round(total_hits / total_accesses * 100, 2), else: 0.0
+    
+    # Return all cache metrics
+    %{
+      metrics_by_prefix: metrics,
+      total_hits: total_hits,
+      total_misses: total_misses,
+      total_accesses: total_accesses,
+      total_invalidations: total_invalidations,
+      overall_hit_rate: overall_hit_rate
+    }
+  end
+
   # Private functions to gather system metrics
   
   defp get_system_stats do
@@ -335,6 +393,66 @@ defmodule XIAMWeb.Admin.StatusLive do
         </div>
       </div>
       
+      <!-- Cache Metrics Section -->
+      <div class="bg-card text-card-foreground rounded-lg border shadow-sm overflow-hidden mb-8">
+        <div class="p-4 border-b bg-muted/50">
+          <h3 class="font-medium flex items-center text-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+            </svg>
+            Hierarchy Cache Metrics
+          </h3>
+        </div>
+        <div class="p-5">
+          <div class="flex flex-wrap gap-4 mb-6">
+            <div class="bg-muted/30 p-4 rounded-lg flex-1 min-w-[180px]">
+              <div class="text-2xl font-bold"><%= @cache_metrics.overall_hit_rate %>%</div>
+              <div class="text-sm text-muted-foreground">Overall Hit Rate</div>
+            </div>
+            <div class="bg-muted/30 p-4 rounded-lg flex-1 min-w-[180px]">
+              <div class="text-2xl font-bold"><%= @cache_metrics.total_hits %></div>
+              <div class="text-sm text-muted-foreground">Cache Hits</div>
+            </div>
+            <div class="bg-muted/30 p-4 rounded-lg flex-1 min-w-[180px]">
+              <div class="text-2xl font-bold"><%= @cache_metrics.total_misses %></div>
+              <div class="text-sm text-muted-foreground">Cache Misses</div>
+            </div>
+            <div class="bg-muted/30 p-4 rounded-lg flex-1 min-w-[180px]">
+              <div class="text-2xl font-bold"><%= @cache_metrics.total_invalidations %></div>
+              <div class="text-sm text-muted-foreground">Cache Invalidations</div>
+            </div>
+          </div>
+          
+          <h4 class="font-medium mb-3 text-sm">Cache Performance by Category</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b text-left">
+                  <th class="py-3 pr-4 font-medium">Category</th>
+                  <th class="py-3 px-4 font-medium text-right">Hit Rate</th>
+                  <th class="py-3 px-4 font-medium text-right">Hits</th>
+                  <th class="py-3 px-4 font-medium text-right">Misses</th>
+                  <th class="py-3 px-4 font-medium text-right">Invalidations</th>
+                  <th class="py-3 pl-4 font-medium text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <%= for metric <- @cache_metrics.metrics_by_prefix do %>
+                  <tr class="border-b last:border-0 hover:bg-muted/50">
+                    <td class="py-3 pr-4 font-medium"><%= metric.prefix || "unknown" %></td>
+                    <td class="py-3 px-4 text-right"><%= metric.hit_rate %>%</td>
+                    <td class="py-3 px-4 text-right"><%= metric.hits %></td>
+                    <td class="py-3 px-4 text-right"><%= metric.misses %></td>
+                    <td class="py-3 px-4 text-right"><%= metric.invalidations %></td>
+                    <td class="py-3 pl-4 text-right"><%= metric.total %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Detailed Metrics Sections -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Cluster Nodes -->

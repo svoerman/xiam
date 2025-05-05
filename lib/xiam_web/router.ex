@@ -202,6 +202,7 @@ defmodule XIAMWeb.Router do
     
     # Hierarchy Routes
     get "/hierarchy/nodes", HierarchyController, :list_nodes
+    get "/hierarchy/nodes/roots", HierarchyController, :list_root_nodes
     post "/hierarchy/nodes", HierarchyController, :create_node
     get "/hierarchy/nodes/:id", HierarchyController, :get_node
     put "/hierarchy/nodes/:id", HierarchyController, :update_node

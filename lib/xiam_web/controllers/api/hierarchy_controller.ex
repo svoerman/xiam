@@ -14,8 +14,22 @@ defmodule XIAMWeb.API.HierarchyController do
   GET /api/hierarchy/nodes
   Lists all hierarchy nodes.
   """
-  def list_nodes(conn, _params) do
-    nodes = Hierarchy.list_nodes()
+  def list_nodes(conn, params) do
+    # If root_only param is present, use the optimized root nodes function
+    nodes = if Map.get(params, "root_only") == "true" do
+      Hierarchy.list_root_nodes()
+    else
+      Hierarchy.list_nodes()
+    end
+    render(conn, :index, nodes: nodes)
+  end
+
+  @doc """
+  GET /api/hierarchy/nodes/roots
+  Lists only root hierarchy nodes (optimized endpoint).
+  """
+  def list_root_nodes(conn, _params) do
+    nodes = Hierarchy.list_root_nodes()
     render(conn, :index, nodes: nodes)
   end
 
@@ -239,18 +253,20 @@ defmodule XIAMWeb.API.HierarchyController do
   """
   def check_user_access(conn, %{"user_id" => user_id, "node_id" => node_id}) do
     # Using an existing function that performs this check
-    has_access = case Hierarchy.get_node(node_id) do
-      nil -> false
+    {has_access, node, role} = case Hierarchy.get_node(node_id) do
+      nil -> {false, nil, nil}
       node ->
         # Check if user has any access to this node or its ancestors
-        access_paths = 
+        access_records = 
           XIAM.Hierarchy.Access
           |> where(user_id: ^user_id)
-          |> select([a], a.access_path)
+          |> preload(:role)
           |> Repo.all()
         
+        access_paths = Enum.map(access_records, & &1.access_path)
+        
         if Enum.empty?(access_paths) do
-          false
+          {false, node, nil}
         else
           # Using a direct SQL query to check access using ltree
           query = """
@@ -261,10 +277,53 @@ defmodule XIAMWeb.API.HierarchyController do
           """
           
           result = Repo.query!(query, [access_paths, node.path])
-          Enum.at(result.rows, 0) |> Enum.at(0)
+          has_access = Enum.at(result.rows, 0) |> Enum.at(0)
+          
+          # Find the applicable role if access is granted
+          role = if has_access do
+            # Get the role from the first applicable access grant
+            # This could be enhanced to choose the most specific role if needed
+            matching_access = Enum.find(access_records, fn access -> 
+              String.starts_with?(node.path, access.access_path)
+            end)
+            matching_access && matching_access.role
+          end
+          
+          {has_access, node, role}
         end
     end
-    json(conn, %{has_access: has_access})
+    
+    response = %{
+      "success" => true,
+      "has_access" => has_access
+    }
+    
+    # Add node and role details if they're available
+    response = if node do
+      node_map = %{
+        "id" => node.id,
+        "name" => node.name,
+        "path" => node.path,
+        "node_type" => node.node_type,
+        "metadata" => node.metadata || %{},
+        "parent_id" => node.parent_id
+      }
+      Map.put(response, "node", node_map)
+    else
+      response
+    end
+    
+    response = if role do
+      role_map = %{
+        "id" => role.id,
+        "name" => role.name
+      }
+      Map.put(response, "role", role_map)
+    else
+      response
+    end
+    
+    json(conn, response)
   end
   
   # Original functions below

@@ -5,16 +5,16 @@ defmodule XIAM.Hierarchy.Access do
   """
   use Ecto.Schema
   import Ecto.Changeset
-  
+
   schema "hierarchy_access" do
     field :access_path, :string  # ltree stored as string
-    
+
     belongs_to :user, XIAM.Users.User
     belongs_to :role, Xiam.Rbac.Role
-    
+
     timestamps()
   end
-  
+
   @doc """
   Changeset for creating and updating hierarchy access.
   """
