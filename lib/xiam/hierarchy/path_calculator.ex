@@ -45,7 +45,7 @@ defmodule XIAM.Hierarchy.PathCalculator do
   def parent_path(path) when is_binary(path) do
     case String.split(path, ".") do
       [_] -> nil
-      parts -> parts |> Enum.slice(0..-2//-1) |> Enum.join(".")
+      parts -> parts |> Enum.slice(0..-2//1) |> Enum.join(".")
     end
   end
 

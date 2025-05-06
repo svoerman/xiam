@@ -61,7 +61,13 @@ defmodule XIAM.HierarchyTest do
 
     test "create_node/1 with valid data creates a node" do
       attrs = valid_attrs()
-      assert {:ok, %Node{} = node} = Hierarchy.create_node(attrs)
+      
+      # Use our resilient pattern to handle potential repo initialization issues
+      result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        Hierarchy.create_node(attrs)
+      end, max_retries: 3, retry_delay: 100)
+      
+      assert {:ok, %Node{} = node} = result
       assert node.name == attrs.name
       assert node.node_type == "company"
       assert node.metadata == %{"key" => "value"}

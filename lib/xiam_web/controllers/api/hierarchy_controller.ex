@@ -521,9 +521,15 @@ defmodule XIAMWeb.API.HierarchyController do
     
     # Format for API
     grants = Enum.map(access_grants, fn access ->
+      # Get path components and extract the last component
+      # which could be used to identify the node
+      path_components = String.split(access.access_path, ".")
+      path_id = List.last(path_components)
+      
       %{
         id: access.id,
-        node_id: access.node_id,
+        access_path: access.access_path,
+        path_id: path_id,   # Add path_id for clients that need a simple identifier
         role_id: access.role_id,
         role: %{
           id: access.role.id,
@@ -543,9 +549,26 @@ defmodule XIAMWeb.API.HierarchyController do
     accessible_nodes = Hierarchy.list_accessible_nodes(user_id)
     
     # Format for API
-    nodes = Enum.map(accessible_nodes, fn %{node: node, role_id: role_id} ->
-      Map.from_struct(node)
-      |> Map.put(:role_id, role_id)
+    nodes = Enum.map(accessible_nodes, fn node ->
+      # Handle both possible formats: %{node: node, role_id: role_id} or the node itself with role_id
+      {node_data, role_id} = case node do
+        %{node: n, role_id: r} -> {n, r}
+        %{role_id: r} -> {node, r} 
+        _ -> {node, nil}
+      end
+      
+      # Create a safe map with only the fields we need
+      %{
+        id: node_data.id,
+        path: node_data.path,
+        node_type: node_data.node_type,
+        name: node_data.name,
+        metadata: node_data.metadata,
+        parent_id: node_data.parent_id,
+        inserted_at: node_data.inserted_at,
+        updated_at: node_data.updated_at,
+        role_id: role_id  # Add the role_id to the node data
+      }
     end)
     
     json(conn, %{data: nodes})
@@ -556,19 +579,74 @@ defmodule XIAMWeb.API.HierarchyController do
   Checks if a user has access to a specific node.
   """
   def check_user_access(conn, %{"user_id" => user_id, "node_id" => node_id}) do
-    {has_access, node, role} = Hierarchy.check_access(user_id, node_id)
-    
-    if has_access do
-      json(conn, %{
-        has_access: true,
-        node: Map.from_struct(node),
-        role: %{
-          id: role.id,
-          name: role.name
+    # Handle both the new format {:ok, %{has_access: bool, node: node, role: role}} 
+    # and the old format {has_access, node, role}
+    case Hierarchy.AccessManager.check_access(user_id, node_id) do
+      {:ok, %{has_access: true, node: node, role: role}} ->
+        # Extract only the fields we need, excluding associations
+        safe_node = %{
+          id: node.id,
+          path: node.path,
+          node_type: node.node_type,
+          name: node.name,
+          metadata: Map.get(node, :metadata),
+          parent_id: node.parent_id,
+          inserted_at: Map.get(node, :inserted_at),
+          updated_at: Map.get(node, :updated_at)
         }
-      })
-    else
-      json(conn, %{has_access: false})
+        
+        json(conn, %{
+          has_access: true,
+          node: safe_node,
+          role: %{
+            id: role.id,
+            name: role.name
+          }
+        })
+        
+      # Handle the no access case with the new format
+      {:ok, %{has_access: false}} ->
+        json(conn, %{has_access: false})
+        
+      # For backward compatibility, handle the old format too
+      {true, node, role} when is_map(node) and is_map(role) ->
+        # Extract only the fields we need, excluding associations
+        safe_node = %{
+          id: node.id,
+          path: node.path,
+          node_type: node.node_type,
+          name: node.name,
+          metadata: node.metadata,
+          parent_id: node.parent_id,
+          inserted_at: node.inserted_at,
+          updated_at: node.updated_at
+        }
+        
+        json(conn, %{
+          has_access: true,
+          node: safe_node,
+          role: %{
+            id: role.id,
+            name: role.name
+          }
+        })
+      
+      # Handle old format no access
+      {false, _nil1, _nil2} ->
+        json(conn, %{has_access: false})
+        
+      # Handle error cases
+      {:error, reason} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Access check failed", reason: reason})
+        
+      unexpected ->
+        # Log unexpected format for debugging
+        IO.puts("Unexpected response format in check_user_access: #{inspect(unexpected)}")
+        conn
+        |> put_status(:internal_server_error)
+        |> json(%{error: "Unexpected response format"})
     end
   end
 
@@ -580,13 +658,31 @@ defmodule XIAMWeb.API.HierarchyController do
     {has_access, node, role} = Hierarchy.check_access_by_path(user_id, path)
     
     if has_access do
-      json(conn, %{
-        has_access: true,
-        node: node && Map.from_struct(node),
-        role: role && %{
+      # Extract only the fields we need, excluding associations
+      safe_node = if node do
+        %{
+          id: node.id,
+          path: node.path,
+          node_type: node.node_type,
+          name: node.name,
+          metadata: node.metadata,
+          parent_id: node.parent_id,
+          inserted_at: node.inserted_at,
+          updated_at: node.updated_at
+        }
+      end
+      
+      safe_role = if role do
+        %{
           id: role.id,
           name: role.name
         }
+      end
+      
+      json(conn, %{
+        has_access: true,
+        node: safe_node,
+        role: safe_role
       })
     else
       json(conn, %{has_access: false})

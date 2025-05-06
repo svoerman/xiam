@@ -33,7 +33,13 @@ Application.put_env(:xiam, :users, XIAM.Users.Mock)
 
 # Configure ExUnit 
 ExUnit.configure(exclude: [pending: true])
+# Make sure Phoenix endpoint is started to initialize ETS tables
+Application.ensure_all_started(:phoenix)
+Application.ensure_all_started(:phoenix_ecto)
+
+# Configure sandbox mode for tests
 ExUnit.start()
+Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual)
 
 # Ensure the repo is properly started
 repo_pid = Process.whereis(XIAM.Repo)

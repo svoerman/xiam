@@ -32,6 +32,10 @@ defmodule XIAMWeb.ConnCase do
   end
 
   setup tags do
+    # Initialize ETS tables to avoid lookup errors during tests
+    XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    XIAM.ETSTestHelper.initialize_endpoint_config()
+    
     # Use the improved sandbox setup from DataCase
     XIAM.DataCase.setup_sandbox(tags)
     

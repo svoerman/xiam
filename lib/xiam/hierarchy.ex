@@ -8,6 +8,7 @@ defmodule XIAM.Hierarchy do
   alias XIAM.Hierarchy.NodeManager
   alias XIAM.Hierarchy.AccessManager
   alias XIAM.Hierarchy.PathCalculator
+  alias XIAM.Hierarchy.IDHelper
 
   # Node Management delegations
 
@@ -192,12 +193,24 @@ defmodule XIAM.Hierarchy do
   end
   
   @doc """
-  Checks if a user has access to a specific node.
-  Used by tests.
+  Checks if a user has access to a node.
+  Returns true if user has access, false otherwise.
   """
   def can_access?(user_id, node_id) do
-    {has_access, _, _} = AccessManager.check_access(user_id, node_id)
-    has_access
+    # Normalize IDs to ensure consistent types
+    user_id = IDHelper.normalize_user_id(user_id)
+    node_id = IDHelper.normalize_node_id(node_id)
+    
+    # The AccessManager.check_access now returns a tuple with a map for consistency with tests
+    # Extract just the boolean value for backward compatibility
+    case AccessManager.check_access(user_id, node_id) do
+      {:ok, %{has_access: has_access}} -> has_access
+      {has_access, _, _} -> has_access
+      error -> 
+        # For any error response, assume no access
+        IO.puts("Error in can_access?: #{inspect(error)}")
+        false
+    end
   end
   
   @doc """
@@ -205,6 +218,10 @@ defmodule XIAM.Hierarchy do
   Used by tests with a different parameter pattern than the AccessManager version.
   """
   def revoke_access(user_id, node_id) do
+    # Normalize IDs to ensure consistent types
+    user_id = IDHelper.normalize_user_id(user_id)
+    node_id = IDHelper.normalize_node_id(node_id)
+    
     # First find the node to get its path
     case NodeManager.get_node(node_id) do
       nil -> 

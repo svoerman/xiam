@@ -217,6 +217,8 @@ defmodule XIAMWeb.Router do
     get "/hierarchy/access/node/:node_id", HierarchyController, :list_node_access_grants
     get "/hierarchy/access/user/:user_id", HierarchyController, :list_user_access_grants
     post "/hierarchy/check-access", HierarchyController, :check_user_access
+    post "/hierarchy/check-access-by-path", HierarchyController, :check_user_access_by_path
+    get "/hierarchy/users/:user_id/accessible-nodes", HierarchyController, :list_user_accessible_nodes
 
     # Hierarchy Access Control Routes
     scope "/v1" do
