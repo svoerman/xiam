@@ -6,6 +6,7 @@ defmodule XIAMWeb.Plugs.AdminAuthPlugTest do
   alias XIAM.Users.User
   alias Xiam.Rbac.Role
   alias Xiam.Rbac.Capability
+  alias Phoenix.Controller
   
   # Create test data
   setup do
@@ -45,31 +46,41 @@ defmodule XIAMWeb.Plugs.AdminAuthPlugTest do
   end
 
   describe "AdminAuthPlug" do
-    @tag :pending
     test "allows access when user has admin privileges", %{conn: conn, admin_user: admin_user} do
-      conn = Plug.Conn.assign(conn, :current_user, admin_user)
+      # Set up connection with proper Pow configuration and flash
+      conn = conn
+        |> Plug.Test.init_test_session([])
+        |> Pow.Plug.put_config(otp_app: :xiam)
+        |> Controller.fetch_flash()
+        |> Plug.Conn.assign(:current_user, admin_user)
       conn = AdminAuthPlug.call(conn, %{})
       
       refute conn.halted
-      refute Flash.get(conn.assigns.flash || %{}, :error)
+      refute Flash.get(conn.assigns.flash, :error)
     end
 
-    @tag :pending
     test "denies access when user does not have admin privileges", %{conn: conn, regular_user: regular_user} do
-      conn = Plug.Conn.assign(conn, :current_user, regular_user)
+      conn = conn
+        |> Plug.Test.init_test_session([])
+        |> Pow.Plug.put_config(otp_app: :xiam)
+        |> Controller.fetch_flash()
+        |> Plug.Conn.assign(:current_user, regular_user)
       conn = AdminAuthPlug.call(conn, %{})
       
       assert conn.halted
-      assert Flash.get(conn.assigns.flash || %{}, :error) == "You do not have permission to access this area."
+      assert Flash.get(conn.assigns.flash, :error) == "You do not have permission to access this area."
       assert redirected_to(conn) == "/"
     end
 
-    @tag :pending
     test "denies access when user is not logged in", %{conn: conn} do
+      conn = conn
+        |> Plug.Test.init_test_session([])
+        |> Pow.Plug.put_config(otp_app: :xiam)
+        |> Controller.fetch_flash()
       conn = AdminAuthPlug.call(conn, %{})
       
       assert conn.halted
-      assert Flash.get(conn.assigns.flash || %{}, :error) == "You do not have permission to access this area."
+      assert Flash.get(conn.assigns.flash, :error) == "You do not have permission to access this area."
       assert redirected_to(conn) == "/"
     end
     

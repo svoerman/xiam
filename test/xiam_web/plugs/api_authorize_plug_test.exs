@@ -1,5 +1,5 @@
 defmodule XIAMWeb.Plugs.APIAuthorizePlugTest do
-  use XIAMWeb.ConnCase, async: true
+  use XIAMWeb.ConnCase, async: false
 
   alias XIAMWeb.Plugs.APIAuthorizePlug
   alias Xiam.Rbac.{Role, Capability, Product}
@@ -7,6 +7,9 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlugTest do
   @capability "test.capability"
 
   setup do
+    # Ensure database connection is in shared mode
+    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+    
     # First create a product
     {:ok, product} =
       Product.changeset(%Product{}, %{

@@ -1,5 +1,5 @@
 defmodule XIAMWeb.Plugs.AdminRedirectPlugTest do
-  use XIAMWeb.ConnCase, async: true
+  use XIAMWeb.ConnCase, async: false
 
   alias XIAMWeb.Plugs.AdminRedirectPlug
   alias XIAM.Users.User

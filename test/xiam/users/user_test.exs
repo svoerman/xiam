@@ -1,5 +1,5 @@
 defmodule XIAM.Users.UserTest do
-  use XIAM.DataCase
+  use XIAM.DataCase, async: false
 
   alias XIAM.Users.User
   alias Xiam.Rbac.{Role, Capability}
@@ -96,6 +96,16 @@ defmodule XIAM.Users.UserTest do
 
   describe "user capabilities" do
     setup do
+      # Set up database connection in shared mode for all tests in this group
+      # This helps prevent ownership issues when async processes are involved
+      # Use pattern matching with fallback to handle if connection is already checked out
+      case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+        :ok -> :ok
+        {:already, :owner} -> :ok
+      end
+      
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      
       # Generate a timestamp for unique test data
       timestamp = System.system_time(:second)
       
@@ -163,41 +173,116 @@ defmodule XIAM.Users.UserTest do
         |> Repo.update()
         
       # Register a teardown function that cleans up entity access data
+      # We use checkout inside the function so the connection isn't lost between setup and teardown
+      # This prevents ownership errors when the function exits
       on_exit(fn ->
-        import Ecto.Query
-        # First delete entity access records that depend on users
-        Repo.delete_all(from ea in Xiam.Rbac.EntityAccess,
-                        join: u in User, on: ea.user_id == u.id,
-                        where: like(u.email, "%role_test%"))
+        # Use our resilient pattern for database operations
+        XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+          # Get our own connection for cleanup - don't rely on the test connection which might be gone
+          case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+            :ok -> :ok
+            {:already, :owner} -> :ok
+          end
+          
+          # Set shared mode to ensure subprocesses can access the connection
+          Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+          
+          import Ecto.Query
+          # First delete entity access records that depend on users
+          Repo.delete_all(from ea in Xiam.Rbac.EntityAccess,
+                          join: u in User, on: ea.user_id == u.id,
+                          where: like(u.email, "%role_test%"))
+        end)
       end)
 
       {:ok, user: user_with_role, role: role, capability: capability}
     end
 
-    test "has_capability?/2 returns true for user with capability", %{user: user, capability: capability} do
-      user = Repo.preload(user, role: :capabilities)
-      assert User.has_capability?(user, capability.name)
+    test "has_capability?/2 returns true for user with capability", %{user: user, role: role, capability: capability} do
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+          :ok -> :ok
+          {:already, :owner} -> :ok
+        end
+        
+        # Set shared mode to ensure subprocesses can access the connection
+        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+
+        # Setup user-role association 
+        # Use set_user_access with appropriate params to assign the role to the user
+        {:ok, _} = Xiam.Rbac.AccessControl.set_user_access(%{
+          user_id: user.id,
+          role_id: role.id,
+          entity_type: "system",
+          entity_id: 0
+        })
+
+        # Associate the capability with the role directly using Repo.query
+        # Since we don't have a dedicated RoleCapability schema, we'll use a raw SQL query
+        {:ok, _} = Repo.query(
+          "INSERT INTO roles_capabilities (role_id, capability_id) VALUES ($1, $2)",
+          [role.id, capability.id]
+        )
+
+        # Check if user has capability
+        assert User.has_capability?(user, capability.name) == true
+      end)
     end
 
-    test "has_capability?/2 returns false for user without capability", %{user: user} do
-      user = Repo.preload(user, role: :capabilities)
-      assert User.has_capability?(user, "non_existent_capability") == false
+    test "has_capability?/2 returns false for user without capability", %{user: user, role: role, capability: capability} do
+      # Use resilient test helper to handle potential DB connection issues
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Ensure we have ownership of the DB connection for this test
+        case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+          :ok -> :ok
+          {:already, :owner} -> :ok
+        end
+        
+        # Set shared mode to ensure subprocesses can access the connection
+        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        
+        # Setup user-role association 
+        # Use set_user_access with appropriate params to assign the role to the user
+        {:ok, _} = Xiam.Rbac.AccessControl.set_user_access(%{
+          user_id: user.id,
+          role_id: role.id,
+          entity_type: "system",
+          entity_id: 0
+        })
+        
+        # Purposely do NOT assign the capability to the role
+        
+        # Check if user has capability
+        assert User.has_capability?(user, capability.name) == false
+      end)
     end
 
     test "has_capability?/2 returns false for user without role", %{capability: _capability} do
-      timestamp = System.system_time(:second)
-      email = "no_role_#{timestamp}@example.com"
-      
-      {:ok, user_without_role} = %User{}
-        |> User.pow_changeset(%{
-          email: email,
-          password: "Password123!",
-          password_confirmation: "Password123!"
-        })
-        |> Repo.insert()
-      
-      user_without_role = Repo.preload(user_without_role, :role)
-      assert User.has_capability?(user_without_role, "any_capability") == false
+      # Use resilient test helper to handle potential DB connection issues
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Ensure we have ownership of the DB connection for this test
+        case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+          :ok -> :ok
+          {:already, :owner} -> :ok
+        end
+        
+        # Set shared mode to ensure subprocesses can access the connection
+        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+        
+        timestamp = System.system_time(:second)
+        email = "no_role_#{timestamp}@example.com"
+        
+        {:ok, user_without_role} = %User{}
+          |> User.pow_changeset(%{
+            email: email,
+            password: "Password123!",
+            password_confirmation: "Password123!"
+          })
+          |> Repo.insert()
+          
+        user_without_role = Repo.preload(user_without_role, role: :capabilities)
+        assert User.has_capability?(user_without_role, "any_capability") == false
+      end)
     end
   end
   

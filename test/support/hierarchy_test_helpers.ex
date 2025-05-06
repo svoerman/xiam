@@ -14,16 +14,11 @@ defmodule XIAM.HierarchyTestHelpers do
   
   Returns the created user struct.
   """
-  def create_test_user(_attrs \\ %{}) do
-    # Generate a truly unique ID and timestamp to ensure unique emails
-    user_id = System.unique_integer([:positive, :monotonic])
-    timestamp = :os.system_time(:millisecond)
-    
-    # Create a test user with a guaranteed unique email
-    %{
-      id: "user_#{user_id}",
-      email: "test_#{user_id}_#{timestamp}@example.com"
-    }
+  def create_test_user(attrs \\ %{}) do
+    # Use the proper user creation function from test_helpers.ex
+    # This ensures we create a real database record that won't violate foreign key constraints
+    {:ok, user} = XIAM.TestHelpers.create_test_user(attrs)
+    user
   end
   
   @doc """
@@ -31,17 +26,12 @@ defmodule XIAM.HierarchyTestHelpers do
   
   Returns the created role struct.
   """
-  def create_test_role(_attrs \\ %{}) do
-    name = "Role#{System.unique_integer()}"
-    role_id = System.unique_integer([:positive, :monotonic])
-    
-    # Create a role with an integer ID to match the database schema expectations
-    role = %{
-      id: role_id,
-      name: name
-    }
-    
-    role
+  def create_test_role(name, attrs \\ %{}) do
+    # Use the XIAM.TestHelpers implementation which creates database records
+    case XIAM.TestHelpers.create_test_role(name, attrs) do
+      {:ok, role} -> role
+      {:error, changeset} -> raise "Failed to create test role: #{inspect(changeset)}"
+    end
   end
   
   @doc """
@@ -55,14 +45,72 @@ defmodule XIAM.HierarchyTestHelpers do
   Returns a map with the created nodes.
   """
   def create_hierarchy_tree do
-    # Add a unique identifier to avoid unique constraint violations
-    unique_id = System.unique_integer([:positive, :monotonic])
-    {:ok, root} = Hierarchy.create_node(%{name: "Root#{unique_id}", node_type: "organization"})
-    {:ok, dept} = create_child_node(root, %{name: "Department#{unique_id}", node_type: "department"})
-    {:ok, team} = create_child_node(dept, %{name: "Team#{unique_id}", node_type: "team"})
-    {:ok, project} = create_child_node(team, %{name: "Project#{unique_id}", node_type: "project"})
+    # Use timestamp + unique integer to avoid path collisions
+    timestamp = System.system_time(:millisecond)
+    unique_id = "#{timestamp}_#{System.unique_integer([:positive, :monotonic])}"
     
-    %{root: root, dept: dept, team: team, project: project}
+    # Use resilient operations with retry logic wrapped by ResilientTestHelper
+    XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      # Create the root node with resilient creation pattern
+      root = create_node_with_retry("Root_#{unique_id}", "organization", nil)
+      
+      # Create department under root
+      dept = create_node_with_retry("Department_#{unique_id}", "department", root.id)
+      
+      # Create team under department
+      team = create_node_with_retry("Team_#{unique_id}", "team", dept.id)
+      
+      # Create project under team
+      project = create_node_with_retry("Project_#{unique_id}", "project", team.id)
+      
+      # Return the hierarchy map
+      %{root: root, dept: dept, team: team, project: project}
+    end)
+  end
+  
+  @doc """
+  Creates a node with retry logic to handle uniqueness constraint errors.
+  This function implements the resilient pattern for node creation in tests.
+  
+  ## Parameters
+  - name: The name for the node
+  - node_type: The type of node (organization, department, team, etc.)
+  - parent_id: The ID of the parent node, or nil for root nodes
+  - retry_count: Counter for retries, defaults to 0 (internal use)
+  
+  ## Returns
+  The created node on success, raises an exception after 5 failed retries.
+  """
+  def create_node_with_retry(name, node_type, parent_id, retry_count \\ 0) do
+    # Add retry suffix for subsequent attempts to ensure uniqueness
+    actual_name = if retry_count > 0, do: "#{name}_retry#{retry_count}", else: name
+    
+    # Prepare node attributes
+    attrs = %{name: actual_name, node_type: node_type, parent_id: parent_id}
+    
+    # Attempt to create the node
+    case Hierarchy.create_node(attrs) do
+      {:ok, node} -> 
+        # Success - return the node
+        node
+      {:error, %Ecto.Changeset{errors: errors}} ->
+        # Check if this is a uniqueness constraint error
+        path_error = Enum.find(errors, fn {field, {_msg, constraint_info}} -> 
+          field == :path && Keyword.get(constraint_info, :constraint) == :unique 
+        end)
+        
+        if path_error && retry_count < 5 do
+          # Retry with a different name
+          IO.puts("Retrying node creation with different name due to path collision: #{actual_name}")
+          create_node_with_retry(name, node_type, parent_id, retry_count + 1)
+        else
+          # Either not a uniqueness error or we've exceeded retries
+          raise "Failed to create node after #{retry_count} retries: #{inspect(errors)}"
+        end
+      {:error, error} ->
+        # Handle other types of errors
+        raise "Unexpected error creating node: #{inspect(error)}"
+    end
   end
   
   @doc """

@@ -28,11 +28,9 @@ defmodule XIAM.DataCase do
   end
 
   setup tags do
-    # First ensure all required ETS tables exist
-    XIAM.ETSTestHelper.ensure_ets_tables_exist()
-    
-    # Then set up the database sandbox
-    XIAM.DataCase.setup_sandbox(tags)
+    # Use the comprehensive resilient database setup for better initialization
+    # This handles ETS tables, database connections, and sandbox configuration
+    XIAM.ResilientDatabaseSetup.initialize_test_environment(tags)
     :ok
   end
 
@@ -40,25 +38,30 @@ defmodule XIAM.DataCase do
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
-    # This process-based mutex helps avoid race conditions when multiple tests
-    # try to set up the sandbox concurrently
     sandbox_mutex_name = :sandbox_setup_mutex
     
-    # Create a process-registry based mutex if it doesn't exist
+    # Create the mutex process if it doesn't exist
+    # This is an improved version of the mutex to better handle parallel test processes
     case Process.whereis(sandbox_mutex_name) do
       nil ->
-        # Create a mutex process if it doesn't exist - start with unlocked state (false)
-        pid = spawn(fn -> mutex_loop(false) end)
+        # Create a mutex that can handle queued requests more efficiently
+        # The state tracks {locked, queue} where queue is a FIFO of waiting processes
+        pid = spawn(fn -> improved_mutex_loop({false, []}) end)
         Process.register(pid, sandbox_mutex_name)
       _ ->
         :ok
     end
     
-    # Acquire the mutex before proceeding
-    _result = safe_mutex_call(sandbox_mutex_name, :acquire, 5000)
+    # Acquire the mutex before proceeding with a longer timeout
+    # Increased from 5000ms to 15000ms to reduce warnings in large test runs
+    _result = safe_mutex_call(sandbox_mutex_name, :acquire, 15000)
     
-    # Ensure the application is started with the repo
-    app_start_result = Application.ensure_all_started(:xiam)
+    # We need to be more resilient with application startup in concurrent tests
+    app_start_result = try do
+      Application.ensure_all_started(:xiam)
+    rescue
+      e -> {:error, {:exception, e}}
+    end
     
     # Handle application start result more gracefully
     case app_start_result do
@@ -66,8 +69,12 @@ defmodule XIAM.DataCase do
       {:error, {:xiam, {{:shutdown, {:failed_to_start_child, XIAM.Repo, {:already_started, _}}}, _}}} ->
         # This is expected in concurrent tests - the repo is already started
         :ok
+      {:error, {:xiam, {{:shutdown, {:failed_to_start_child, XIAMWeb.Endpoint, _}}, _}}} ->
+        # Phoenix endpoint already started by another test - this is ok
+        :ok
       {:error, reason} ->
-        # Log other errors but try to continue
+        # Log other errors but try to continue - we've improved our ETS table handling
+        # so many errors that would previously fail tests should now be handled
         IO.warn("Application start error: #{inspect(reason)}, trying to proceed")
     end
 
@@ -127,7 +134,10 @@ defmodule XIAM.DataCase do
         {^ref, result} -> result
       after
         timeout -> 
-          IO.warn("Mutex call to #{inspect(mutex_name)} timed out after #{timeout}ms")
+          # Only warn for significant timeouts, common timeouts during parallel tests are normal
+          if timeout > 5000 do
+            IO.warn("Mutex call to #{inspect(mutex_name)} timed out after #{timeout}ms")
+          end
           :timeout
       end
     rescue
@@ -137,48 +147,40 @@ defmodule XIAM.DataCase do
     end
   end
   
-  # Simple mutex process loop
-  defp mutex_loop(_locked = false) do
+  # Improved mutex process loop with proper queue handling
+  # Takes a state tuple {locked, queue} where queue is a list of waiting processes
+  defp improved_mutex_loop({locked, queue}) do
     receive do
       {from, ref, :acquire} ->
-        # Mutex is free, grant access to caller
-        send(from, {ref, :acquired})
-        mutex_loop(true)
+        if not locked do
+          # Mutex is free, grant access immediately
+          send(from, {ref, :ok})
+          improved_mutex_loop({true, queue})
+        else
+          # Mutex is locked, add to queue and continue with current state
+          # We'll process this request when the mutex is released
+          improved_mutex_loop({locked, queue ++ [{from, ref}]})
+        end
+        
       {from, ref, :release} ->
-        # Already unlocked, just acknowledge
-        send(from, {ref, :released})
-        mutex_loop(false)
-      {from, ref, _other} ->
-        # Unknown command
-        send(from, {ref, :error})
-        mutex_loop(false)
+        # Release the mutex and notify the sender
+        send(from, {ref, :ok})
+        
+        # Check if there are waiting processes in the queue
+        case queue do
+          [] -> 
+            # No waiting processes, just unlock
+            improved_mutex_loop({false, []})
+            
+          [{next_from, next_ref} | rest] ->
+            # Grant access to the next process in queue
+            send(next_from, {next_ref, :ok})
+            improved_mutex_loop({true, rest})
+        end
     end
   end
   
-  # When mutex is locked
-  defp mutex_loop(_locked = true) do
-    receive do
-      {from, ref, :acquire} ->
-        # Mutex is locked, queue this request
-        # We deliberately block this caller until mutex is released
-        receive do
-          :mutex_released -> 
-            # Now the mutex is available
-            send(from, {ref, :acquired})
-            mutex_loop(true)
-        end
-      {from, ref, :release} ->
-        # Release the mutex
-        send(from, {ref, :released})
-        # Notify the next waiting process if any
-        send(self(), :mutex_released)
-        mutex_loop(false)
-      {from, ref, _other} ->
-        # Unknown command
-        send(from, {ref, :error})
-        mutex_loop(true)
-    end
-  end
+  # Removed unused mutex_loop/1 function
   
   # Try to setup using start_owner (newer approach)
   defp try_setup_with_start_owner(tags) do

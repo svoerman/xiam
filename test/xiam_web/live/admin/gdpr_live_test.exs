@@ -86,14 +86,27 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
 
   describe "GDPR LiveView" do
     setup %{conn: conn} do
-      # Create admin user
-      admin_user = create_admin_user() |> XIAM.Repo.preload(:role)
+      # Make sure ETS tables are initialized
+      :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache)
+      :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache_metrics)
+      
+      # Initialize ResilientTestHelper for application startup issues
+      # Create admin user with resilient operation
+      admin_user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_admin_user() |> XIAM.Repo.preload(:role)
+      end)
 
-      # Create a test user to manage in GDPR
-      test_user = create_test_user()
+      # Create a test user to manage in GDPR with resilient operation
+      test_user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_test_user()
+      end)
 
       # Authenticate connection
       conn = login(conn, admin_user)
+      
+      # Ensure Application.app_dir(:phoenix_live_view) will work by setting dummy path
+      # This fixes the "unknown application: nil" error
+      Application.put_env(:phoenix_live_view, :app_dir, Application.app_dir(:phoenix))
 
       # Return authenticated connection and users
       {:ok, conn: conn, admin_user: admin_user, test_user: test_user}

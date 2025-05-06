@@ -1,5 +1,5 @@
 defmodule XIAMWeb.API.ProductControllerTest do
-  use XIAMWeb.ConnCase, async: true
+  use XIAMWeb.ConnCase, async: false
   import Ecto.Query
 
   alias XIAM.Repo

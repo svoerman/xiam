@@ -16,6 +16,9 @@ Application.ensure_all_started(:postgrex)
 Application.ensure_all_started(:ecto)
 Application.ensure_all_started(:xiam)
 
+# Compile the ResilientDatabaseSetup module to ensure it's available
+Code.ensure_compiled(XIAM.ResilientDatabaseSetup)
+
 # Disable Oban for testing (before ExUnit starts)
 Application.put_env(:oban, :testing, :manual)
 Application.put_env(:oban, :queues, false)
@@ -31,24 +34,31 @@ Application.put_env(:xiam, :users, XIAM.Users.Mock)
 # We'll simplify our testing approach for the refactored components
 # and rely on the existing test infrastructure
 
-# Configure ExUnit 
-ExUnit.configure(exclude: [pending: true])
+# Configure ExUnit with improved test pattern recognition
+ExUnit.configure(
+  # Only exclude pending tags, include previously skipped tests
+  exclude: [pending: true],
+  include: [:test],
+  patterns: ["*_test.exs", "test_*.exs", "*/*_test.exs"]
+)
 # Make sure Phoenix endpoint is started to initialize ETS tables
 Application.ensure_all_started(:phoenix)
 Application.ensure_all_started(:phoenix_ecto)
 
-# Configure sandbox mode for tests
+# Start ExUnit
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual)
 
-# Ensure the repo is properly started
-repo_pid = Process.whereis(XIAM.Repo)
-unless is_pid(repo_pid) and Process.alive?(repo_pid) do
-  {:ok, _} = XIAM.Repo.start_link([])
+# Initialize the database using our enhanced resilient setup
+# This handles repo startup, sandbox mode configuration, and ETS tables
+XIAM.ResilientDatabaseSetup.initialize_test_environment()
+
+# Double-check that repo is properly initialized with diagnostic output
+case XIAM.ResilientDatabaseSetup.repository_status(XIAM.Repo) do
+  {:ok, _pid} -> 
+    IO.puts("✅ Repository successfully initialized for tests")
+  status -> 
+    IO.warn("⚠️ Repository initialization issue: #{inspect(status)}")
 end
-
-# Configure sandbox mode for Ecto
-Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual)
 
 # Explicitly check that the repo is accessible
 try do

@@ -1,5 +1,5 @@
 defmodule XIAMWeb.Admin.UsersLiveTest do
-  use XIAMWeb.ConnCase, async: true
+  use XIAMWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   alias XIAM.Users.User

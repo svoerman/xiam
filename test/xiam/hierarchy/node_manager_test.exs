@@ -1,8 +1,38 @@
 defmodule XIAM.Hierarchy.NodeManagerTest do
-  use XIAM.DataCase
+  use XIAM.DataCase, async: false
   
   alias XIAM.Hierarchy.NodeManager
   alias XIAM.Hierarchy.Node
+  
+  # Helper function for creating nodes with retry logic to handle uniqueness constraints
+  defp create_node_with_retry(name, node_type, parent_id, retry_count \\ 0) do
+    # Add retry suffix for subsequent attempts to ensure uniqueness
+    actual_name = if retry_count > 0, do: "#{name}_retry#{retry_count}", else: name
+    
+    # Attempt to create the node
+    case NodeManager.create_node(%{name: actual_name, node_type: node_type, parent_id: parent_id}) do
+      {:ok, node} -> 
+        # Success - return the node
+        node
+      {:error, %Ecto.Changeset{errors: errors}} ->
+        # Check if this is a uniqueness constraint error
+        path_error = Enum.find(errors, fn {field, {_msg, constraint_info}} -> 
+          field == :path && Keyword.get(constraint_info, :constraint) == :unique 
+        end)
+        
+        if path_error && retry_count < 5 do
+          # Retry with a different name
+          # Debug info removed about retrying node creation
+          create_node_with_retry(name, node_type, parent_id, retry_count + 1)
+        else
+          # Either not a uniqueness error or we've exceeded retries
+          raise "Failed to create node after #{retry_count} retries: #{inspect(errors)}"
+        end
+      {:error, error} ->
+        # Handle other types of errors
+        raise "Unexpected error creating node: #{inspect(error)}"
+    end
+  end
   
   describe "create_node/1" do
     test "creates a root node with valid data" do
@@ -95,12 +125,16 @@ defmodule XIAM.Hierarchy.NodeManagerTest do
   describe "deep hierarchy operations" do
     setup do
       # Create a deep hierarchy with unique names to avoid path collisions
-      unique_id = System.unique_integer([:positive, :monotonic])
-      # Create a deep hierarchy: Root > Department > Team > Project
-      {:ok, root} = NodeManager.create_node(%{name: "Root#{unique_id}", node_type: "organization"})
-      {:ok, dept} = NodeManager.create_node(%{parent_id: root.id, name: "Department#{unique_id}", node_type: "department"})
-      {:ok, team} = NodeManager.create_node(%{parent_id: dept.id, name: "Team#{unique_id}", node_type: "team"})
-      {:ok, project} = NodeManager.create_node(%{parent_id: team.id, name: "Project#{unique_id}", node_type: "project"})
+      # Using timestamp + random values to ensure uniqueness across test runs
+      timestamp = System.system_time(:millisecond)
+      unique_id = "#{timestamp}_#{System.unique_integer([:positive, :monotonic])}"
+      
+      # Use resilient operations to create the deep hierarchy: Root > Department > Team > Project
+      # Pattern: Use try-catch to handle potential conflicts and retry with different names if needed
+      root = create_node_with_retry("Root_#{unique_id}", "organization", nil)
+      dept = create_node_with_retry("Dept_#{unique_id}", "department", root.id)
+      team = create_node_with_retry("Team_#{unique_id}", "team", dept.id)
+      project = create_node_with_retry("Project_#{unique_id}", "project", team.id)
       
       %{root: root, dept: dept, team: team, project: project}
     end

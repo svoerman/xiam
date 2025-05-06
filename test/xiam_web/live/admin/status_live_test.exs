@@ -70,6 +70,17 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
   end
 
   setup %{conn: conn} do
+    # Initialize required ETS tables
+    :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache)
+    :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache_metrics)
+    
+    # Insert some sample data for the metrics table
+    # This ensures the test doesn't fail if the table is empty
+    :ets.insert(:hierarchy_cache_metrics, {{:path, :hits}, 10})
+    :ets.insert(:hierarchy_cache_metrics, {{:node, :hits}, 5})
+    :ets.insert(:hierarchy_cache_metrics, {{:access, :hits}, 3})
+    :ets.insert(:hierarchy_cache_metrics, {{:total, :hits}, 18})
+    
     # Create admin user
     user = create_admin_user()
 

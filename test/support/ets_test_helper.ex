@@ -47,31 +47,34 @@ defmodule XIAM.ETSTestHelper do
   This is a more resilient version that recovers from common errors.
   """
   def safely_ensure_table_exists(table_name) when is_atom(table_name) do
+    # Check if the table already exists using a more resilient pattern
+    # that works better with concurrent test processes
     try do
       case :ets.info(table_name) do
         :undefined ->
-          # Table doesn't exist, try to create it
+          # Table doesn't exist, try to create it with default options
+          # We use try inside try to handle nested errors in a controlled way
           try do
-            :ets.new(table_name, [:named_table, :public, :set, {:read_concurrency, true}])
+            :ets.new(table_name, [:named_table, :public, read_concurrency: true])
+            :created
           rescue
+            # The table might have been created by another process between our check and creation attempt
             ArgumentError -> 
-              # Table already exists (race condition) or other creation error
-              IO.puts("Warning: Could not create ETS table #{inspect(table_name)}, may already exist")
+              case :ets.info(table_name) do
+                :undefined -> :error # Still undefined? That's unexpected
+                _ -> :ok # Table exists now, so that's what we wanted
+              end
           end
         _ ->
-          # Table exists, do nothing
+          # Table already exists, nothing to do
           :ok
       end
     rescue
-      _ -> 
-        # Error checking table existence, try to create it
-        try do
-          :ets.new(table_name, [:named_table, :public, :set, {:read_concurrency, true}])
-        rescue
-          _ -> 
-            # Failed to create, but we'll continue anyway
-            IO.puts("Warning: Failed to ensure ETS table #{inspect(table_name)} exists")
-        end
+      # The most resilient approach - if anything goes wrong, don't crash the test
+      e -> 
+        # Log the error and return error tuple
+        IO.puts("Warning: Failed to ensure ETS table #{inspect(table_name)} exists: #{inspect(e)}")
+        {:error, e}
     end
   end
   
@@ -89,6 +92,14 @@ defmodule XIAM.ETSTestHelper do
     # Make sure the endpoint module is loaded
     endpoint = XIAMWeb.Endpoint
     
+    # Make sure the application is set in the environment
+    # This is critical for LiveView tests which need Application.app_dir
+    Application.put_env(:phoenix_live_view, :app_name, :xiam)
+    Application.put_env(:phoenix, :json_library, Jason)
+
+    # Make sure the actual app environment is set
+    Application.put_env(:xiam, :env, :test)
+    
     # Get the actual runtime config
     config = Application.get_all_env(:xiam_web)[:endpoint] || %{}
     
@@ -96,7 +107,7 @@ defmodule XIAM.ETSTestHelper do
     basic_config = %{
       secret_key_base: config[:secret_key_base] || String.duplicate("a", 64),
       signing_salt: config[:signing_salt] || "test-signing-salt",
-      live_view: config[:live_view] || [signing_salt: "test-lv-salt"],
+      live_view: [signing_salt: "test-lv-salt", application: :xiam],
       url: config[:url] || [host: "localhost", port: 4000],
       render_errors: config[:render_errors] || [view: XIAMWeb.ErrorHTML, accepts: ~w(html json)]
     }

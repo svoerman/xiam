@@ -32,11 +32,16 @@ defmodule XIAM.TestHelpers do
   
   @doc """
   Creates a test role with the given name.
+  Name can be a string or a map with a name key.
   """
   def create_test_role(name, attrs \\ %{}) do
+    # Extract name string from map if a map was provided
+    role_name = if is_map(name) and Map.has_key?(name, :name), do: name.name, else: name
+    description = "Test role for #{role_name}"
+    
     attrs = Map.merge(%{
-      name: name,
-      description: "Test role for #{name}"
+      name: role_name,
+      description: description
     }, attrs)
     
     Rbac.Role.changeset(%Rbac.Role{}, attrs)
