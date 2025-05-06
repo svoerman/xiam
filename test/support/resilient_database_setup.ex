@@ -125,11 +125,23 @@ defmodule XIAM.ResilientDatabaseSetup do
     # Track the calling process - essential for proper connection ownership
     _caller = self()
     
-    # Start by ensuring ETS tables exist
+    # First, set required application environment variables
+    # Critical for LiveView tests to prevent "unknown application: nil" errors
+    Application.put_env(:phoenix_live_view, :app_name, :xiam)
+    Application.put_env(:phoenix, :json_library, Jason)
+    Application.put_env(:xiam, :env, :test)
+    
+    # Initialize application-specific ETS tables (not Phoenix tables)
+    # This will safely check Phoenix tables but won't try to create them
     XIAM.ETSTestHelper.ensure_ets_tables_exist()
     
     # Make sure the application is started
+    # Let Phoenix create its own ETS tables during startup
     start_result = Application.ensure_all_started(:xiam)
+    
+    # After the application has started, ensure our tables have proper configuration
+    # This will check if Phoenix tables exist and only then try to configure them
+    XIAM.ETSTestHelper.safely_initialize_phoenix_config()
     
     # Ensure the repository is started
     repo_result = ensure_repository_started()

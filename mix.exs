@@ -10,7 +10,7 @@ defmodule XIAM.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      # Add the test coverage configuration
+      # Add the test coverage configuration - only used when explicitly requested
       test_coverage: [
         tool: ExCoveralls,
         output_dir: "cover/",
@@ -119,9 +119,11 @@ defmodule XIAM.MixProject do
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      # Customize the test runner to manage coverage better
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "coveralls"],
-      # Add a separate alias for full coverage report
+      # Standard test runner without coverage reporting
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", &Mix.Tasks.Test.run/1],
+      # Run tests with basic coverage report
+      "test.with_coverage": ["ecto.create --quiet", "ecto.migrate --quiet", "coveralls"],
+      # Run tests with detailed HTML coverage report
       "test.coverage": ["ecto.create --quiet", "ecto.migrate --quiet", "coveralls.html"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind xiam", "esbuild xiam"],

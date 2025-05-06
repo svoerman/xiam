@@ -277,40 +277,33 @@ defmodule XIAM.HierarchyTest do
     end
     
     test "grant_access/3 grants access to a node", %{user: user, department: department, role: role} do
-      assert {:ok, access} = Hierarchy.grant_access(user.id, department.id, role.id)
-      assert access.user_id == user.id
-      assert access.access_path == department.path
-      assert access.role_id == role.id
+      # Use the resilient test helper to handle database connection issues
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Grant access using the hierarchy manager
+        {:ok, access} = Hierarchy.grant_access(user.id, department.id, role.id)
+        
+        # Verify the access was correctly granted
+        assert access.user_id == user.id
+        assert access.access_path == department.path
+        assert access.role_id == role.id
+      end)
     end
     
     test "can_access?/2 correctly checks access inheritance", %{user: user, country: country, company: company, department: department, team: team, role: role} do
-      # Grant access at department level
-      {:ok, _} = Hierarchy.grant_access(user.id, department.id, role.id)
-      
-      # Check if repo is available before running this part of the test
-      if Process.whereis(XIAM.Repo) do
-        try do
-          # User should have access to department and its descendants (team)
-          assert Hierarchy.can_access?(user.id, department.id)
-          assert Hierarchy.can_access?(user.id, team.id)
-          
-          # But not to ancestors (country, company) - access doesn't flow upward
-          refute Hierarchy.can_access?(user.id, country.id) 
-          refute Hierarchy.can_access?(user.id, company.id)
-        rescue
-          e in RuntimeError -> 
-            if String.contains?(Exception.message(e), "could not lookup Ecto repo") do
-              # Return early without printing debug messages
-              :ok
-            else
-              # Re-raise other runtime errors
-              reraise e, __STACKTRACE__
-            end
-        end
-      else
-        # Return early without printing debug messages
-        :ok
-      end
+      # Using a safer approach with the ResilientTestHelper to handle transient failures
+      # This will automatically handle ETS table and repo connection issues
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Grant access at department level
+        {:ok, _} = Hierarchy.grant_access(user.id, department.id, role.id)
+        
+        # User should have access to department and its descendants (team)
+        assert Hierarchy.can_access?(user.id, department.id)
+        assert Hierarchy.can_access?(user.id, team.id)
+        
+        # But not to ancestors (country, company) - access doesn't flow upward
+        refute Hierarchy.can_access?(user.id, country.id) 
+        refute Hierarchy.can_access?(user.id, company.id)
+      end)
     end
     
     test "revoke_access/2 removes access", %{user: user, department: department, team: team, role: role} do

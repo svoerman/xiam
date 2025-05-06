@@ -37,15 +37,27 @@ defmodule XIAM.Hierarchy.PathCalculatorTest do
   
   describe "path traversal" do
     setup do
-      # Create a deep hierarchy with unique names to avoid path collisions
-      unique_id = System.unique_integer([:positive, :monotonic])
-      # Create a deep hierarchy: Root > Department > Team > Project
-      {:ok, root} = NodeManager.create_node(%{name: "Root#{unique_id}", node_type: "organization"})
-      {:ok, dept} = NodeManager.create_node(%{parent_id: root.id, name: "Department#{unique_id}", node_type: "department"})
-      {:ok, team} = NodeManager.create_node(%{parent_id: dept.id, name: "Team#{unique_id}", node_type: "team"})
-      {:ok, project} = NodeManager.create_node(%{parent_id: team.id, name: "Project#{unique_id}", node_type: "project"})
+      # Use the resilient test helper to handle database connections and ETS table issues
+      # This wraps the node creation in a robust error handling pattern
+      hierarchy = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Generate a more robust unique identifier combining timestamp and random components
+        # This helps ensure uniqueness even when tests are run in rapid succession
+        timestamp = System.system_time(:millisecond)
+        random_suffix = :rand.uniform(100_000)
+        unique_id = "#{timestamp}_#{random_suffix}"
+        
+        # Create a deep hierarchy: Root > Department > Team > Project
+        # Use the enhanced unique ID to avoid path collisions
+        {:ok, root} = NodeManager.create_node(%{name: "Root#{unique_id}", node_type: "organization"})
+        {:ok, dept} = NodeManager.create_node(%{parent_id: root.id, name: "Department#{unique_id}", node_type: "department"})
+        {:ok, team} = NodeManager.create_node(%{parent_id: dept.id, name: "Team#{unique_id}", node_type: "team"})
+        {:ok, project} = NodeManager.create_node(%{parent_id: team.id, name: "Project#{unique_id}", node_type: "project"})
+        
+        %{root: root, dept: dept, team: team, project: project}
+      end)
       
-      %{root: root, dept: dept, team: team, project: project}
+      # Return the hierarchy map for the tests to use
+      hierarchy
     end
     
     test "finds ancestors by path", %{project: project, root: root, dept: dept, team: team} do

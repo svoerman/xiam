@@ -36,9 +36,9 @@ Application.put_env(:xiam, :users, XIAM.Users.Mock)
 
 # Configure ExUnit with improved test pattern recognition
 ExUnit.configure(
-  # Only exclude pending tags, include previously skipped tests
+  # Only exclude pending tags, skip any other exclusions
   exclude: [pending: true],
-  include: [:test],
+  # Don't include :test tag as it's a reserved tag that all tests have implicitly
   patterns: ["*_test.exs", "test_*.exs", "*/*_test.exs"]
 )
 # Make sure Phoenix endpoint is started to initialize ETS tables

@@ -164,94 +164,81 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
   describe "access control" do
     test "grants access to a node", %{conn: conn, user: user, team: team, role: role} do
       # Ensure ETS tables exist before making API requests
+      # This is a critical step for Phoenix endpoints
       ensure_ets_tables_exist()
       
-      # Grant access via the API
+      # Prepare the parameters for granting access
       params = %{
         "user_id" => user.id,
         "node_id" => team.id,
         "role_id" => role.id
       }
       
-      # Use resilient pattern to make API request
-      conn = post(conn, ~p"/api/hierarchy/access", params)
-      # The response here is directly returning the access record properties
-      assert %{"id" => id} = json_response(conn, 201)
-      assert is_integer(id)
+      # Use safely_execute_ets_operation for API requests which involve ETS tables
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Make the first API request to grant access
+        post_conn = post(conn, ~p"/api/hierarchy/access", params)
+        
+        # Verify the response
+        response1 = json_response(post_conn, 201)
+        assert %{"id" => id} = response1
+        assert is_integer(id)
+      end)
       
-      # Verify the access was granted by using the check-access endpoint
-      conn = post(conn, ~p"/api/hierarchy/check-access", %{
-        "user_id" => user.id,
-        "node_id" => team.id
-      })
-      
-      # Extract response and verify access was granted
-      response = json_response(conn, 200)
-      response_data = response["data"] || response
-      assert response_data["has_access"] == true
+      # Use another safely_execute_ets_operation for the check-access request
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Verify the access was granted by using the check-access endpoint
+        check_conn = post(conn, ~p"/api/hierarchy/check-access", %{
+          "user_id" => user.id,
+          "node_id" => team.id
+        })
+        
+        # Extract response and verify access was granted
+        response2 = json_response(check_conn, 200)
+        response_data = response2["data"] || response2
+        assert response_data["has_access"] == true
+      end)
     end
     
     @tag :resilient_test
     test "check_user_access with POST returns properly structured node data", %{conn: conn, user: user, team: team, role: role} do
-      # Use gentle ETS table initialization approach
+      # Initialize ETS tables to avoid Phoenix endpoint issues
       ensure_ets_tables_exist()
       
-      # Verify the team exists before proceeding
-      team_check = Hierarchy.get_node(team.id)
-      # Changed to match direct struct instead of {:ok, _} tuple
-      assert %XIAM.Hierarchy.Node{} = team_check
-      
-      # Grant access with improved resilience
-      access_result = try do
-        Hierarchy.grant_access(user.id, team.id, role.id)
-      rescue
-        e in [RuntimeError, ArgumentError] ->
-          IO.puts("Warning: Error granting access: #{inspect(e)}")
-          {:ok, _} = XIAM.Repo.start_link()
-          Hierarchy.grant_access(user.id, team.id, role.id)
-      end
-      
-      # Only continue if access was granted successfully
-      case access_result do
-        {:ok, _access} ->
-          # Test the API endpoint with proper error handling
-          params = %{"user_id" => user.id, "node_id" => team.id}
-          
-          response_data = try do
-            conn = post(conn, ~p"/api/hierarchy/check-access", params)
-            json_response(conn, 200)
-          rescue
-            e in [ArgumentError] ->
-              IO.puts("Retrying after ETS error: #{inspect(e)}")
-              ensure_ets_tables_exist()
-              conn = post(conn, ~p"/api/hierarchy/check-access", params)
-              json_response(conn, 200)
-          end
-          
-          # Updated to handle either direct or nested response format
-          response_data = response_data["data"] || response_data
-          
-          # Now that we have the response, validate its structure
-          assert %{"has_access" => true, "node" => node, "role" => role_data} = response_data
-          
-          # Verify node structure
-          assert node["id"] == team.id
-          assert node["name"] == team.name
-          assert node["path"] == team.path
-          
-          # Verify no raw Ecto associations
-          refute Map.has_key?(node, "parent")
-          refute Map.has_key?(node, "children")
-          
-          # Verify role data
-          assert role_data["id"] == role.id
-          assert role_data["name"] == role.name
-          
-        error ->
-          # If access wasn't granted, provide a helpful message but don't fail
-          IO.puts("Skipping test due to access grant failure: #{inspect(error)}")
-          assert true # Avoid test failure
-      end
+      # Use the resilient test helper to handle transient failures
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Start by granting access to the team
+        {:ok, _access} = Hierarchy.grant_access(user.id, team.id, role.id)
+        
+        # Set up params for the API request
+        params = %{"user_id" => user.id, "node_id" => team.id}
+        
+        # Ensure ETS tables exist right before the API request
+        ensure_ets_tables_exist()
+        
+        # Make the API request
+        conn = post(conn, ~p"/api/hierarchy/check-access", params)
+        response_data = json_response(conn, 200)
+        
+        # Extract the relevant data (handles both formats)
+        response_data = response_data["data"] || response_data
+        
+        # Validate the response structure
+        assert %{"has_access" => true, "node" => node, "role" => role_data} = response_data
+        
+        # Verify node structure
+        assert node["id"] == team.id
+        assert node["name"] == team.name
+        assert node["path"] == team.path
+        
+        # Verify no raw Ecto associations (proper JSON serialization)
+        refute Map.has_key?(node, "parent")
+        refute Map.has_key?(node, "children")
+        
+        # Verify role data
+        assert role_data["id"] == role.id
+        assert role_data["name"] == role.name
+      end)
     end
     
     @tag :skip

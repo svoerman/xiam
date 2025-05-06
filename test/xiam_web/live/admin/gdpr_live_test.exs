@@ -3,9 +3,84 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
 
   import Phoenix.LiveViewTest
   import Mock
-
+  
   alias XIAM.Users.User
   alias XIAM.Repo
+  
+  # Helper function to create a consistent mock for Repo.preload
+  # This is needed for the AdminAuthPlug which checks for admin privileges
+  defp create_preload_mock do
+    fn user, preload_opts -> 
+      case preload_opts do
+        [role: :capabilities] ->
+          # Create a proper %Xiam.Rbac.Role{} with proper %Xiam.Rbac.Capability{} structs
+          admin_capability = %Xiam.Rbac.Capability{
+            id: 1, 
+            name: "admin_access",
+            description: "Admin access capability", 
+            product_id: 1,
+            inserted_at: NaiveDateTime.utc_now(),
+            updated_at: NaiveDateTime.utc_now()
+          }
+          
+          role = case user.role do
+            %Xiam.Rbac.Role{} = role -> 
+              # Keep the existing struct but update capabilities
+              %{role | capabilities: [admin_capability]}
+            _ -> 
+              # Create a new role struct if needed
+              %Xiam.Rbac.Role{
+                id: user.role.id, 
+                name: user.role.name,
+                description: "Admin role for tests",
+                capabilities: [admin_capability],
+                inserted_at: NaiveDateTime.utc_now(),
+                updated_at: NaiveDateTime.utc_now()
+              }
+          end
+          
+          %{user | role: role}
+        _ -> user
+      end
+    end
+  end
+  
+  # Helper functions for test user creation
+  defp setup_admin_user do
+    {:ok, admin_user} = %User{}
+      |> User.pow_changeset(%{
+        email: "gdpr_admin_user@example.com",
+        password: "Password123!",
+        password_confirmation: "Password123!"
+      })
+      |> Repo.insert()
+    
+    # Add admin role
+    {:ok, role} = %Xiam.Rbac.Role{
+      name: "GDPR Admin",
+      description: "Admin role for GDPR tests"
+    }
+    |> Repo.insert()
+    
+    # Set admin role
+    {:ok, admin_user} = Ecto.Changeset.change(admin_user, %{role_id: role.id})
+                |> Repo.update()
+                
+    # Return the admin user
+    admin_user
+  end
+  
+  defp setup_test_user do
+    {:ok, test_user} = %User{}
+      |> User.pow_changeset(%{
+        email: "gdpr_test_user@example.com",
+        password: "Password123!",
+        password_confirmation: "Password123!"
+      })
+      |> Repo.insert()
+      
+    test_user
+  end
 
   # Helper for test authentication
   def create_admin_user() do
@@ -86,45 +161,42 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
 
   describe "GDPR LiveView" do
     setup %{conn: conn} do
-      # Make sure ETS tables are initialized
-      :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache)
-      :ok = XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache_metrics)
+      # Initialize LiveView test environment with proper ETS table handling
+      XIAM.LiveViewTestHelper.initialize_live_view_test_env()
       
-      # Initialize ResilientTestHelper for application startup issues
-      # Create admin user with resilient operation
-      admin_user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        create_admin_user() |> XIAM.Repo.preload(:role)
-      end)
+      # Create admin user
+      admin_user = setup_admin_user() |> Repo.preload(:role)
 
-      # Create a test user to manage in GDPR with resilient operation
-      test_user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        create_test_user()
-      end)
+      # Create a test user to manage in GDPR
+      test_user = setup_test_user()
 
       # Authenticate connection
       conn = login(conn, admin_user)
-      
-      # Ensure Application.app_dir(:phoenix_live_view) will work by setting dummy path
-      # This fixes the "unknown application: nil" error
-      Application.put_env(:phoenix_live_view, :app_dir, Application.app_dir(:phoenix))
 
       # Return authenticated connection and users
       {:ok, conn: conn, admin_user: admin_user, test_user: test_user}
     end
 
-    test "mounts successfully", %{conn: conn, admin_user: admin_user} do
+    test "mounts successfully", context do
+      %{conn: conn, admin_user: admin_user} = context
+      
+      # Define mock functions outside the with_mocks block as per the memory guidance
       get_by_mock = fn User, query_opts ->
         case Keyword.fetch(query_opts, :id) do
           {:ok, id} when id == admin_user.id -> admin_user
           _ -> nil
         end
       end
+      
+      all_mock = fn _query -> [] end
+      list_consent_types_mock = fn -> [] end
 
       with_mocks([
-        {XIAM.Consent, [], [list_consent_types: fn -> [] end]},
+        {XIAM.Consent, [], [list_consent_types: list_consent_types_mock]},
         {XIAM.Repo, [], [
-          all: fn _query -> [] end,
-          get_by: get_by_mock
+          all: all_mock,
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, _view, html} = live(conn, ~p"/admin/gdpr")
@@ -147,7 +219,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Consent, [], [list_consent_types: fn -> [] end]},
         {XIAM.Repo, [], [
           all: fn _query -> [] end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr")
@@ -159,19 +232,26 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
       end
     end
 
-    test "handles theme toggle", %{conn: conn, admin_user: admin_user} do
+    test "handles theme toggle", context do
+      %{conn: conn, admin_user: admin_user} = context
+      
+      # Define mock functions outside the with_mocks block as per the memory guidance
       get_by_mock = fn User, query_opts ->
         case Keyword.fetch(query_opts, :id) do
           {:ok, id} when id == admin_user.id -> admin_user
           _ -> nil
         end
       end
+      
+      all_mock = fn _query -> [] end
+      list_consent_types_mock = fn -> [] end
 
       with_mocks([
-        {XIAM.Consent, [], [list_consent_types: fn -> [] end]},
+        {XIAM.Consent, [], [list_consent_types: list_consent_types_mock]},
         {XIAM.Repo, [], [
-          all: fn _query -> [] end,
-          get_by: get_by_mock
+          all: all_mock,
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr")
@@ -193,7 +273,10 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
       assert redirected_to(conn) =~ ~p"/session/new"
     end
 
-    test "selects a user and displays their management panel", %{conn: conn, admin_user: admin_user, test_user: test_user} do
+    test "selects a user and displays their management panel", context do
+      %{conn: conn, admin_user: admin_user, test_user: test_user} = context
+      
+      # Define the mock function outside the with_mocks block to capture context variables
       get_by_mock = fn User, query_opts ->
         case Keyword.fetch(query_opts, :id) do
           {:ok, id} when id == admin_user.id -> admin_user
@@ -202,15 +285,41 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         end
       end
 
+      # Define the get mock function for the User
+      get_mock = fn User, id ->
+        cond do
+          id == test_user.id -> test_user
+          id == admin_user.id -> admin_user
+          true -> nil
+        end
+      end
+
+      # Define mock for all users query
+      all_mock = fn _query -> [test_user] end
+      
+      # Mock the consent functions
+      consent_types_mock = fn -> [] end
+      user_consents_mock = fn _user_id -> [] end
+
       with_mocks([
         {XIAM.Consent, [], [
-          list_consent_types: fn -> [] end,
-          get_user_consents: fn _user_id -> [] end
+          list_consent_types: consent_types_mock,
+          get_user_consents: user_consents_mock
+        ]},
+        {XIAM.Users, [], [
+          get_user: fn id -> 
+            cond do
+              id == test_user.id -> test_user
+              id == admin_user.id -> admin_user
+              true -> nil
+            end
+          end
         ]},
         {XIAM.Repo, [], [
-          all: fn _query -> [test_user] end,
-          get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          all: all_mock,
+          get: get_mock,
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr")
@@ -240,7 +349,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Consent, [], [list_consent_types: fn -> [] end]},
         {XIAM.Repo, [], [
           all: fn _query -> [] end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr")
@@ -275,7 +385,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")
@@ -317,7 +428,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")
@@ -351,7 +463,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")
@@ -387,7 +500,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")
@@ -432,6 +546,7 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
           get_by: get_by_mock,
+          preload: create_preload_mock(),
           delete: fn user when user.id == test_user.id -> {:ok, test_user} end # Mock Repo.delete/1
         ]}
       ]) do
@@ -473,7 +588,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")
@@ -509,7 +625,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [] end,
           get: fn User, _id -> nil end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         # We need to match the redirect explicitly since live/3 will follow redirects
@@ -539,7 +656,8 @@ defmodule XIAMWeb.Admin.GDPRLiveTest do
         {XIAM.Repo, [], [
           all: fn _query -> [test_user] end,
           get: fn User, id when id == test_user.id -> test_user end,
-          get_by: get_by_mock
+          get_by: get_by_mock,
+          preload: create_preload_mock()
         ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/admin/gdpr?user_id=#{test_user.id}")

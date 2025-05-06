@@ -18,27 +18,75 @@ defmodule XIAM.ETSTestHelper do
   Call this in your test setup to avoid ETS table lookup errors.
   """
   def ensure_ets_tables_exist do
-    # Make sure the Phoenix endpoint is loaded
+    # Instead of directly creating the Phoenix endpoint tables, we'll check
+    # if they exist first and avoid creating them if they do.
+    # This prevents conflicts when Phoenix itself tries to create them.
     endpoint = XIAMWeb.Endpoint
     
-    # Create a list of all Phoenix-related ETS tables we need to ensure exist
-    # This includes the endpoint itself, Phoenix.Config, and Phoenix.LiveReloader
+    # Only attempt to create non-Phoenix tables that should exist before application startup
     tables_to_ensure = [
-      endpoint,
-      Phoenix.Config,
-      Phoenix.LiveReloader,
       XIAM.Cache.HierarchyCache,
       XIAM.Hierarchy.AccessCache
     ]
     
-    # Ensure each table exists
+    # Ensure application-specific tables exist
     Enum.each(tables_to_ensure, fn table -> 
       safely_ensure_table_exists(table)
     end)
     
-    # Initialize the endpoint configuration
-    initialize_endpoint_config()
+    # For Phoenix tables, only check if they exist and initialize config if needed
+    phoenix_tables = [endpoint, Phoenix.Config, Phoenix.LiveReloader]
     
+    # For Phoenix tables, don't try to create them, just check if they need config
+    phoenix_tables_status = Enum.map(phoenix_tables, fn table ->
+      check_phoenix_table(table)
+    end)
+    
+    # Only initialize endpoint config if tables already exist but might not be fully configured
+    case phoenix_tables_status do
+      [:exists, :exists, :exists] -> 
+        # Tables exist, make sure they have the right configuration
+        safely_initialize_phoenix_config()
+      _ ->
+        # Some tables don't exist yet, application startup will handle them
+        :ok
+    end
+    
+    :ok
+  end
+  
+  # Check if a Phoenix table exists but don't try to create it
+  defp check_phoenix_table(table_name) do
+    try do
+      case :ets.info(table_name) do
+        :undefined -> :not_exists
+        _ -> :exists
+      end
+    rescue
+      _ -> :not_exists
+    end
+  end
+
+  @doc """
+  Initialize the Phoenix endpoint configuration ETS tables.
+  This function is called from ConnCase setup to ensure Phoenix endpoint tables are properly configured.
+  """
+  def initialize_endpoint_config do
+    # Make sure required ETS tables exist
+    ensure_ets_tables_exist()
+    
+    # Set crucial Phoenix configuration for tests
+    _endpoint = XIAMWeb.Endpoint
+    app_module = :xiam
+    app_dir = Application.app_dir(app_module)
+    
+    # Initialize endpoint configuration
+    Application.put_env(:phoenix, :json_library, Jason)
+    Application.put_env(app_module, :app_name, app_module)
+    Application.put_env(app_module, :env, :test)
+    Application.put_env(app_module, :app_dir, app_dir)
+    
+    # Return success
     :ok
   end
   
@@ -56,7 +104,9 @@ defmodule XIAM.ETSTestHelper do
           # We use try inside try to handle nested errors in a controlled way
           try do
             :ets.new(table_name, [:named_table, :public, read_concurrency: true])
-            :created
+            # Always return :ok for successful creation to ensure consistent return values
+            # This avoids pattern matching issues in tests
+            :ok
           rescue
             # The table might have been created by another process between our check and creation attempt
             ArgumentError -> 
@@ -85,71 +135,83 @@ defmodule XIAM.ETSTestHelper do
   end
   
   @doc """
-  Initializes basic endpoint configuration in the endpoint ETS table for tests.
-  In Phoenix, the endpoint configuration is stored in an ETS table named after the endpoint module.
+  Initializes basic endpoint configuration in the endpoint ETS table for tests,
+  but only if the tables already exist. This avoids conflicts with Phoenix trying
+  to create the tables itself.
   """
-  def initialize_endpoint_config do
+  def safely_initialize_phoenix_config do
     # Make sure the endpoint module is loaded
     endpoint = XIAMWeb.Endpoint
     
-    # Make sure the application is set in the environment
-    # This is critical for LiveView tests which need Application.app_dir
+    # Critical application environment settings for LiveView tests
+    # This addresses the "unknown application: nil" error in LiveView tests
     Application.put_env(:phoenix_live_view, :app_name, :xiam)
     Application.put_env(:phoenix, :json_library, Jason)
-
-    # Make sure the actual app environment is set
     Application.put_env(:xiam, :env, :test)
     
-    # Get the actual runtime config
-    config = Application.get_all_env(:xiam_web)[:endpoint] || %{}
+    # Check if the Phoenix tables actually exist before trying to modify them
+    endpoint_exists = table_exists?(endpoint)
+    config_exists = table_exists?(Phoenix.Config)
     
-    # Basic config required for many Phoenix operations
-    basic_config = %{
-      secret_key_base: config[:secret_key_base] || String.duplicate("a", 64),
-      signing_salt: config[:signing_salt] || "test-signing-salt",
-      live_view: [signing_salt: "test-lv-salt", application: :xiam],
-      url: config[:url] || [host: "localhost", port: 4000],
-      render_errors: config[:render_errors] || [view: XIAMWeb.ErrorHTML, accepts: ~w(html json)]
-    }
-    
-    # In Phoenix, the endpoint configuration is stored in a single ETS table
-    # that's named after the endpoint module
-    safely_ensure_table_exists(endpoint)
-    safely_ensure_table_exists(Phoenix.Config)
-    
-    # Store all config items in the endpoint table
-    # Use try/rescue to handle potential ETS errors gracefully
-    try do
-      for {key, value} <- basic_config do
-        :ets.insert(endpoint, {key, value})
+    if endpoint_exists and config_exists do
+      # Get the actual runtime config
+      config = Application.get_all_env(:xiam_web)[:endpoint] || %{}
+      
+      # Basic config required for many Phoenix operations
+      basic_config = %{
+        secret_key_base: config[:secret_key_base] || String.duplicate("a", 64),
+        signing_salt: config[:signing_salt] || "test-signing-salt",
+        live_view: [signing_salt: "test-lv-salt", application: :xiam],
+        url: config[:url] || [host: "localhost", port: 4000],
+        render_errors: config[:render_errors] || [view: XIAMWeb.ErrorHTML, accepts: ~w(html json)]
+      }
+      
+      # Store all config items in the endpoint table
+      # Use try/rescue to handle potential ETS errors gracefully
+      try do
+        for {key, value} <- basic_config do
+          :ets.insert(endpoint, {key, value})
+        end
+      rescue
+        _ -> 
+          IO.puts("Warning: Could not insert configuration into endpoint ETS table")
       end
-    rescue
-      _ -> 
-        IO.puts("Warning: Could not insert configuration into endpoint ETS table")
-    end
-    
-    # Configure Phoenix.Config ETS table
-    # Phoenix looks up dynamic configurations through this table
-    try do
-      # Store endpoint configuration in Phoenix.Config table
-      # This is used by the Phoenix framework for dynamic config
-      :ets.insert(Phoenix.Config, {endpoint, basic_config})
-    rescue
-      _ -> 
-        IO.puts("Warning: Could not insert configuration into Phoenix.Config ETS table")
-    end
-    
-    # Phoenix also looks up values using Application env during tests
-    # Store configuration in Application env with proper keys
-    Application.put_env(:xiam_web, endpoint, basic_config)
-    Application.put_env(:phoenix, :endpoint, basic_config)
-    
-    # Phoenix can also look up individual keys under the :phoenix namespace
-    for {key, value} <- basic_config do
-      Application.put_env(:phoenix, key, value)
+      
+      # Configure Phoenix.Config ETS table
+      # Phoenix looks up dynamic configurations through this table
+      try do
+        # Store endpoint configuration in Phoenix.Config table
+        # This is used by the Phoenix framework for dynamic config
+        :ets.insert(Phoenix.Config, {endpoint, basic_config})
+      rescue
+        _ -> 
+          IO.puts("Warning: Could not insert configuration into Phoenix.Config ETS table")
+      end
+      
+      # Phoenix also looks up values using Application env during tests
+      # Store configuration in Application env with proper keys
+      Application.put_env(:xiam_web, endpoint, basic_config)
+      Application.put_env(:phoenix, :endpoint, basic_config)
+      
+      # Phoenix can also look up individual keys under the :phoenix namespace
+      for {key, value} <- basic_config do
+        Application.put_env(:phoenix, key, value)
+      end
     end
     
     :ok
+  end
+  
+  # Private helper to safely check if a table exists
+  defp table_exists?(table_name) do
+    try do
+      case :ets.info(table_name) do
+        :undefined -> false
+        _ -> true
+      end
+    rescue
+      _ -> false
+    end
   end
   
   @doc """

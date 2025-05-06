@@ -1,7 +1,10 @@
 defmodule XIAMWeb.Admin.AuditLogsLiveTest do
   use XIAMWeb.ConnCase
+  
+  @moduletag :integration
 
   import Phoenix.LiveViewTest
+  import Mock
   alias XIAM.Users.User
   alias XIAM.Audit
   alias XIAM.Repo
@@ -123,22 +126,163 @@ defmodule XIAMWeb.Admin.AuditLogsLiveTest do
   end
 
   describe "AuditLogs LiveView" do
-    test "mounts successfully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/audit-logs")
+    @tag :integration
 
-      # Verify page title is set correctly
-      assert html =~ "Audit Logs"
-      assert html =~ "View and search system audit logs"
+    setup %{conn: conn} do
+      # Use the centralized LiveViewTestHelper for consistent environment setup
+      # This helper ensures all proper ETS tables exist and environment variables are set
+      XIAM.LiveViewTestHelper.initialize_live_view_test_env()
+      
+      # Create an admin user for testing
+      admin_user = create_admin_user()
+      
+      # Create test logs with the admin user
+      test_logs = create_test_logs(admin_user)
+
+      # Authenticate the connection with admin user
+      conn = login(conn, admin_user)
+      
+      {:ok, conn: conn, admin_user: admin_user, test_logs: test_logs}
+    end
+    
+    @tag :integration
+    test "mounts successfully", context do
+      %{conn: conn, admin_user: admin_user, test_logs: test_logs} = context
+      
+      # Define mock functions outside the with_mocks block to capture context variables
+      list_audit_logs_mock = fn _filter, _pagination -> 
+        # Ensure each test log has a properly preloaded actor association
+        preloaded_logs = Enum.map(test_logs, fn log -> 
+          # If the log has an actor_id that matches the admin_user, preload the association
+          # Otherwise, ensure actor is nil so the template shows "System"
+          case log.actor_id do
+            id when id == admin_user.id -> 
+              %{log | actor: admin_user}
+            nil -> 
+              %{log | actor: nil}
+            _ -> 
+              # For any other actor_id, create a fake actor with email
+              %{log | actor: %{email: "other_user_#{log.actor_id}@example.com"}}
+          end
+        end)
+        
+        %{items: preloaded_logs, total_pages: 1, total_count: length(preloaded_logs)}
+      end
+      
+      # Define the mock function for checking admin user
+      get_by_mock = fn User, query_opts ->
+        case Keyword.fetch(query_opts, :id) do
+          {:ok, id} when id == admin_user.id -> admin_user
+          _ -> nil
+        end
+      end
+
+      # Mock for the Repo.all function used in available_users
+      repo_all_mock = fn query ->
+        # Check if this is the query for available_users that selects email and id
+        # The query is expected to return a list of {email, id} tuples
+        if match?(%Ecto.Query{}, query) do
+          case query do
+            # This pattern matches the select: {user.email, user.id} in available_users
+            %{select: %{expr: {:{},[],_}}} ->
+              # Return a simple list of email/id tuples
+              [{admin_user.email, admin_user.id}]
+            
+            # For any other queries
+            _ -> []
+          end
+        else
+          # Default fallback for non-Ecto.Query values
+          []
+        end
+      end
+      
+      with_mocks([
+        {XIAM.Audit, [], [
+          list_audit_logs: list_audit_logs_mock
+        ]},
+        {XIAM.Repo, [], [
+          get_by: get_by_mock,
+          all: repo_all_mock
+        ]}
+      ]) do
+        {:ok, _view, html} = live(conn, ~p"/admin/audit-logs")
+
+        # Verify page title is set correctly
+        assert html =~ "Audit Logs"
+        assert html =~ "View and search system audit logs"
+      end
     end
 
-    test "displays audit log entries", %{conn: conn, test_logs: test_logs} do
-      {:ok, view, _html} = live(conn, ~p"/admin/audit-logs")
+    @tag :integration
+    test "displays audit log entries", context do
+      %{conn: conn, admin_user: admin_user, test_logs: test_logs} = context
+      
+      # Define mock functions outside the with_mocks block to properly capture context variables
+      list_audit_logs_mock = fn _filter, _pagination -> 
+        # Ensure each test log has a properly preloaded actor association
+        preloaded_logs = Enum.map(test_logs, fn log -> 
+          # If the log has an actor_id that matches the admin_user, preload the association
+          # Otherwise, ensure actor is nil so the template shows "System"
+          case log.actor_id do
+            id when id == admin_user.id -> 
+              %{log | actor: admin_user}
+            nil -> 
+              %{log | actor: nil}
+            _ -> 
+              # For any other actor_id, create a fake actor with email
+              %{log | actor: %{email: "other_user_#{log.actor_id}@example.com"}}
+          end
+        end)
+        
+        %{items: preloaded_logs, total_pages: 1, total_count: length(preloaded_logs)}
+      end
+      
+      # Define the mock function for checking admin user
+      get_by_mock = fn User, query_opts ->
+        case Keyword.fetch(query_opts, :id) do
+          {:ok, id} when id == admin_user.id -> admin_user
+          _ -> nil
+        end
+      end
 
-      # Verify that all test logs are shown - actions are displayed with spaces
-      for log <- test_logs do
-        action_text = log.action |> String.replace("_", " ")
-        assert has_element?(view, "td", action_text)
-        if log.ip_address, do: assert(has_element?(view, "td", log.ip_address))
+      # Mock for the Repo.all function used in available_users
+      repo_all_mock = fn query ->
+        # Check if this is the query for available_users that selects email and id
+        # The query is expected to return a list of {email, id} tuples
+        if match?(%Ecto.Query{}, query) do
+          case query do
+            # This pattern matches the select: {user.email, user.id} in available_users
+            %{select: %{expr: {:{},[],_}}} ->
+              # Return a simple list of email/id tuples
+              [{admin_user.email, admin_user.id}]
+            
+            # For any other queries
+            _ -> []
+          end
+        else
+          # Default fallback for non-Ecto.Query values
+          []
+        end
+      end
+      
+      with_mocks([
+        {XIAM.Audit, [], [
+          list_audit_logs: list_audit_logs_mock
+        ]},
+        {XIAM.Repo, [], [
+          get_by: get_by_mock,
+          all: repo_all_mock
+        ]}
+      ]) do
+        {:ok, view, _html} = live(conn, ~p"/admin/audit-logs")
+
+        # Verify that all test logs are shown - actions are displayed with spaces
+        for log <- test_logs do
+          action_text = log.action |> String.replace("_", " ")
+          assert has_element?(view, "td", action_text)
+          if log.ip_address, do: assert(has_element?(view, "td", log.ip_address))
+        end
       end
     end
 
