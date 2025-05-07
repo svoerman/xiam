@@ -1,7 +1,10 @@
 defmodule XIAMWeb.API.AccessControlControllerTest do
-  use XIAMWeb.ConnCase
+  use XIAMWeb.ConnCase, async: false
   import Ecto.Query
 
+  # Import the ETSTestHelper to ensure proper test environment
+  import XIAM.ETSTestHelper
+  
   alias XIAM.Users.User
   alias XIAM.Repo
   alias XIAM.Auth.JWT
@@ -13,8 +16,9 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
   alias Xiam.Rbac.AccessControl
 
   setup %{conn: conn} do
-    # Generate a timestamp for unique test data
-    timestamp = System.system_time(:second)
+    # Generate a timestamp for unique test data with better uniqueness
+    # Use a combination of millisecond timestamp and random component
+    timestamp = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
 
     # Clean up existing test data
     Repo.delete_all(from ea in Xiam.Rbac.EntityAccess, join: u in User, on: ea.user_id == u.id, where: like(u.email, "%access_ctrl_test%"))
@@ -84,6 +88,9 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
 
   describe "user access endpoints" do
     test "set_user_access/2 creates entity access", %{conn: conn, user: user, role: role} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
       # Create access params
       params = %{
         "user_id" => user.id,
@@ -92,41 +99,64 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
         "role" => role.name
       }
 
-      # Make request
-      conn = post(conn, ~p"/api/access", params)
+      # Use safely_execute_ets_operation for API requests that involve ETS tables
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Make request
+        conn = post(conn, ~p"/api/access", params)
 
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 200)
-      assert data["user_id"] == user.id
-      assert data["entity_type"] == "test_entity"
-      assert data["entity_id"] == 123
-      assert data["role_id"] == role.id
+        # Verify response - focusing on behavior, not implementation
+        assert %{"data" => data} = json_response(conn, 200)
+        
+        # Assert that we got a successful response with the expected data structure
+        assert is_map(data)
+        assert data["user_id"] == user.id
+        assert data["entity_type"] == "test_entity"
+        assert data["entity_id"] == 123
+        assert data["role_id"] == role.id
+      end)
     end
 
     test "get_user_access/2 retrieves user access", %{conn: conn, user: user, product: product, role: role} do
-      # Setup: Grant access first, including required entity_type and entity_id
-      access_params = %{
-        user_id: user.id,
-        product_id: product.id,
-        role_id: role.id,
-        entity_type: "test_entity",
-        entity_id: 999
-      }
-      {:ok, _access} = AccessControl.set_user_access(access_params)
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Use safely_execute_db_operation to handle the database setup
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Setup: Grant access first, including required entity_type and entity_id
+        access_params = %{
+          user_id: user.id,
+          product_id: product.id,
+          role_id: role.id,
+          entity_type: "test_entity",
+          entity_id: 999
+        }
+        {:ok, _access} = AccessControl.set_user_access(access_params)
+      end)
 
-      # Test: Retrieve access
-      conn = get(conn, ~p"/api/access?user_id=#{user.id}")
+      # Use safely_execute_ets_operation for the API request
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Test: Retrieve access
+        conn = get(conn, ~p"/api/access?user_id=#{user.id}")
 
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 200)
-      assert is_list(data)
-      assert length(data) >= 1
-      assert Enum.all?(data, fn access -> access["user_id"] == user.id end)
+        # Verify response - focusing on behavior
+        assert %{"data" => data} = json_response(conn, 200)
+        
+        # Test that we get a list of access permissions
+        assert is_list(data)
+        assert length(data) >= 1
+        
+        # Verify the access entries are for our test user
+        assert Enum.all?(data, fn access -> access["user_id"] == user.id end)
+      end)
     end
   end
 
   describe "capability endpoints" do
     test "create_capability/2 creates a capability", %{conn: conn, product: product, timestamp: timestamp} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Create a unique capability name to avoid conflicts across test runs
       capability_name = "test_api_capability_#{timestamp}"
       params = %{
         "product_id" => product.id,
@@ -134,32 +164,59 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
         "description" => "Test capability description"
       }
 
-      # Make request
-      conn = post(conn, ~p"/api/capabilities", params)
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Make request
+        conn = post(conn, ~p"/api/capabilities", params)
 
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 201)
-      assert data["name"] == capability_name
-      assert data["product_id"] == product.id
+        # Verify the behavior - capability created successfully
+        assert %{"data" => data} = json_response(conn, 201)
+        
+        # Verify the response contains the expected data
+        assert data["name"] == capability_name
+        assert data["product_id"] == product.id
+        assert data["description"] == "Test capability description"
+      end)
     end
 
-    test "get_product_capabilities/2 returns product capabilities", %{conn: conn, product: product} do
-      # Setup: Create a capability first
-      capability_attrs = %{
-        product_id: product.id,
-        name: "View Dashboard",
-        description: "Allows viewing the main dashboard"
-      }
-      {:ok, _capability} = AccessControl.create_capability(capability_attrs)
+    test "get_product_capabilities/2 returns product capabilities", %{conn: conn, product: product, timestamp: timestamp} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Create a unique capability name
+      capability_name = "View_Dashboard_#{timestamp}"
+      
+      # Setup: Create a capability first using safely_execute_db_operation
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        capability_attrs = %{
+          product_id: product.id,
+          name: capability_name,
+          description: "Allows viewing the main dashboard"
+        }
+        {:ok, _capability} = AccessControl.create_capability(capability_attrs)
+      end)
 
-      # Test: Retrieve capabilities
-      conn = get(conn, ~p"/api/products/#{product.id}/capabilities")
+      # Use safely_execute_ets_operation for the API request
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Test: Retrieve capabilities
+        conn = get(conn, ~p"/api/products/#{product.id}/capabilities")
 
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 200)
-      assert is_list(data)
-      assert length(data) >= 1
-      assert Enum.any?(data, fn c -> c["name"] == "View Dashboard" end)
+        # Verify the behavior - capabilities are returned
+        assert %{"data" => data} = json_response(conn, 200)
+        
+        # Verify that we get a list of capabilities
+        assert is_list(data)
+        assert length(data) >= 1
+        
+        # Verify our test capability is in the list
+        assert Enum.any?(data, fn c -> c["name"] == capability_name end)
+      end)
+    end
+    
+    @tag :skip
+    test "get_capability/2 retrieves a specific capability", %{conn: _conn, product: _product, timestamp: _timestamp} do
+      # Skipping this test as the specific capability endpoint is not defined in the router
+      # Based on the router.ex, there is no GET route for /api/capabilities/:id
     end
   end
 end

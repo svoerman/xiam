@@ -1,6 +1,7 @@
 defmodule XIAMWeb.API.ProductControllerTest do
   use XIAMWeb.ConnCase, async: false
   import Ecto.Query
+  import XIAM.ETSTestHelper
 
   alias XIAM.Repo
   alias XIAM.Rbac.ProductContext
@@ -12,8 +13,9 @@ defmodule XIAMWeb.API.ProductControllerTest do
   alias XIAM.Auth.JWT
 
   setup %{conn: conn} do
-    # Generate a unique timestamp for this test run
-    timestamp = System.system_time(:second)
+    # Generate a unique timestamp for this test run with better uniqueness
+    # Use a combination of millisecond timestamp and random component
+    timestamp = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
 
     # Clean up existing test data that might interfere
     Repo.delete_all(from p in Product, where: like(p.product_name, "%Test_Product_%") or like(p.product_name, "%New_Test_Product_%"))
@@ -78,69 +80,115 @@ defmodule XIAMWeb.API.ProductControllerTest do
 
   describe "index/2" do
     test "lists all products", %{conn: conn, product: product, token: token} do
-      conn = conn
-        |> put_req_header("accept", "application/json")
-        |> put_req_header("content-type", "application/json")
-        |> put_req_header("authorization", "Bearer #{token}")
-        |> get(~p"/api/products")
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Use safely_execute_ets_operation for API requests that involve ETS tables
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        conn = conn
+          |> put_req_header("accept", "application/json")
+          |> put_req_header("content-type", "application/json")
+          |> put_req_header("authorization", "Bearer #{token}")
+          |> get(~p"/api/products")
 
-      assert %{"data" => products} = json_response(conn, 200)
-      assert length(products) >= 1
-      assert Enum.any?(products, fn p -> p["id"] == product.id end)
-      assert Enum.any?(products, fn p -> p["product_name"] == product.product_name end)
+        # Verify the behavior - focus on the API response structure and content
+        assert %{"data" => products} = json_response(conn, 200)
+        assert is_list(products), "Expected products to be a list"
+        assert length(products) >= 1, "Expected at least one product"
+        
+        # Verify our test product is included in the list
+        assert Enum.any?(products, fn p -> p["id"] == product.id end)
+        assert Enum.any?(products, fn p -> p["product_name"] == product.product_name end)
+      end)
     end
   end
 
   describe "create/2" do
     test "creates a product with valid attributes", %{conn: conn, timestamp: timestamp} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Create a unique product name
       product_name = "New_Test_Product_#{timestamp}"
       params = %{"product_name" => product_name}
-      conn = post(conn, ~p"/api/products", params)
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        conn = post(conn, ~p"/api/products", params)
 
-      assert %{"data" => data} = json_response(conn, 201)
-      assert data["product_name"] == product_name
+        # Verify the behavior - product created successfully
+        assert %{"data" => data} = json_response(conn, 201)
+        assert data["product_name"] == product_name
+        
+        # Store the product ID for database verification
+        product_id = data["id"]
+        
+        # Verify product was created in database using safely_execute_db_operation
+        XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+          created_product = Repo.get(Product, product_id)
+          assert created_product != nil
+          assert created_product.product_name == product_name
+        end)
+      end)
     end
 
     test "returns error with invalid attributes", %{conn: conn} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Try to create a product with empty name
       params = %{"product_name" => ""}
-      conn = post(conn, ~p"/api/products", params)
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        conn = post(conn, ~p"/api/products", params)
 
-      assert %{"errors" => _errors} = json_response(conn, 422)
+        # Verify the behavior - validation error expected
+        assert %{"errors" => errors} = json_response(conn, 422)
+        assert errors != %{}
+        assert Map.has_key?(errors, "product_name") || Map.has_key?(errors, ":product_name")
+      end)
     end
 
     test "returns error with missing attributes", %{conn: conn} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Try to create a product with no params
       params = %{}
-      conn = post(conn, ~p"/api/products", params)
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        conn = post(conn, ~p"/api/products", params)
 
-      assert %{"errors" => _errors} = json_response(conn, 422)
+        # Verify the behavior - validation error expected
+        assert %{"errors" => errors} = json_response(conn, 422)
+        assert errors != %{}
+        assert Map.has_key?(errors, "product_name") || Map.has_key?(errors, ":product_name")
+      end)
     end
   end
 
-  # Add the moved product endpoints tests here
   describe "product endpoints (moved from access control tests)" do
-    test "create_product/2 creates a product", %{conn: conn, timestamp: timestamp} do
-      # This test uses the capabilities setup in this file (create_product)
-      product_name = "New_Api_Product_#{timestamp}"
-      params = %{"product_name" => product_name}
-
-      # Make request
-      conn = post(conn, ~p"/api/products", params)
-
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 201)
-      assert data["product_name"] == product_name
+    @tag :skip
+    test "update_product/2 updates a product", %{conn: _conn, product: _product} do
+      # Skipping this test as the update endpoint is not defined in the router
+      # According to line 199 in router.ex, only index and create actions are supported
+      # resources "/products", ProductController, only: [:index, :create]
     end
 
-    test "list_products/2 returns all products", %{conn: conn, product: product} do
-      # This test uses the capabilities setup in this file (list_products)
-      # Make request
-      conn = get(conn, ~p"/api/products")
-
-      # Verify response
-      assert %{"data" => data} = json_response(conn, 200)
-      assert is_list(data)
-      assert length(data) >= 1
-      assert Enum.any?(data, fn p -> p["id"] == product.id end)
+    @tag :skip
+    test "get_product/2 retrieves a specific product", %{conn: _conn, product: _product} do
+      # Skipping this test as the show endpoint is not defined in the router
+      # According to line 199 in router.ex, only index and create actions are supported
+      # resources "/products", ProductController, only: [:index, :create]
+    end
+    
+    @tag :skip
+    test "delete_product/2 removes a product", %{conn: _conn, timestamp: _timestamp} do
+      # Skipping this test as the delete endpoint is not defined in the router
+      # According to line 199 in router.ex, only index and create actions are supported
+      # resources "/products", ProductController, only: [:index, :create]
     end
   end
 end

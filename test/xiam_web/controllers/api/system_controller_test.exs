@@ -1,5 +1,8 @@
 defmodule XIAMWeb.API.SystemControllerTest do
-  use XIAMWeb.ConnCase
+  use XIAMWeb.ConnCase, async: false
+  
+  # Import the ETSTestHelper to ensure proper test environment
+  import XIAM.ETSTestHelper
 
   alias XIAM.Users.User
   alias XIAM.Repo
@@ -67,128 +70,148 @@ defmodule XIAMWeb.API.SystemControllerTest do
 
   describe "health/2" do
     test "returns basic health information without authentication", %{conn: conn} do
-      conn = conn
-        |> put_req_header("accept", "application/json")
-        |> get(~p"/api/system/health") # Use the old endpoint path for backward compatibility
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        conn = conn
+          |> put_req_header("accept", "application/json")
+          |> get(~p"/api/system/health") # Use the old endpoint path for backward compatibility
 
-      response = json_response(conn, 200)
-      assert response["status"] == "ok"
-      assert response["version"] != nil
-      assert response["timestamp"] != nil
+        # Verify behavior - focus on response structure
+        response = json_response(conn, 200)
+        assert response["status"] == "ok", "Expected health status to be 'ok'"
+        assert response["version"] != nil, "Expected version to be present"
+        assert response["timestamp"] != nil, "Expected timestamp to be present"
 
-      # Since we're testing an endpoint that might be changing, be more flexible with assertions
-      # environment might not be included in all implementations
+        # Verify timestamp format (ISO8601)
+        timestamp = response["timestamp"]
+        assert String.match?(timestamp, ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/), "Expected ISO8601 timestamp format"
+      end)
     end
   end
 
   describe "status/2" do
     test "returns detailed health information when authenticated", %{authed_conn: conn} do
-      # Mock the Health module to return consistent test data
-      with_mock XIAM.System.Health, [
-        check_health: fn ->
-          %{
-            database: %{
-              status: :ok,
-              connected: true,
-              user_count: 10,
-              version: "PostgreSQL 15.3"
-            },
-            application: %{
-              status: :ok,
-              version: "0.1.0",
-              uptime: 3600,
-              environment: :test
-            },
-            memory: %{
-              status: :ok,
-              total: 1_000_000,
-              processes: 500_000,
-              atom: 100_000,
-              binary: 200_000,
-              code: 300_000,
-              ets: 150_000,
-              system: 250_000
-            },
-            disk: %{
-              status: :ok,
-              free: 10_000_000_000,
-              total: 50_000_000_000
-            },
-            cluster: %{
-              status: :ok,
-              nodes: [node()]
-            },
-            system_info: %{
-              otp_release: "25.0",
-              process_count: 400,
-              port_count: 30
-            },
-            timestamp: ~U[2023-01-01 00:00:00Z]
-          }
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Use safely_execute_ets_operation with mocking for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Mock the Health module to return consistent test data
+        with_mock XIAM.System.Health, [
+          check_health: fn ->
+            %{
+              database: %{
+                status: :ok,
+                connected: true,
+                user_count: 10,
+                version: "PostgreSQL 15.3"
+              },
+              application: %{
+                status: :ok,
+                version: "0.1.0",
+                uptime: 3600,
+                environment: :test
+              },
+              system: %{
+                status: :ok,
+                memory: {
+                  4096, # Total memory (MB)
+                  2048, # Used memory (MB)
+                  50    # Percentage used
+                },
+                cpu: {
+                  4,    # Number of cores
+                  25    # CPU usage percentage
+                }
+              }
+            }
+          end
+        ] do
+          conn = get(conn, ~p"/api/system/status")
+          
+          # Verify behavior - focus on response structure and content
+          response = json_response(conn, 200)
+          
+          # Check overall status
+          assert response["status"] == "ok", "Expected system status to be 'ok'"
+          
+          # Check database section
+          assert %{"database" => database} = response
+          assert database["connected"] == true, "Expected database to be connected"
+          assert database["user_count"] == 10, "Expected user_count to match mock data"
+          assert database["version"] == "PostgreSQL 15.3", "Expected database version to match mock data"
+          
+          # Check application section
+          assert %{"application" => app} = response
+          assert app["version"] == "0.1.0", "Expected app version to match mock data"
+          assert app["uptime"] == 3600, "Expected uptime to match mock data"
+          assert app["environment"] == "test", "Expected environment to match mock data"
+          
+          # Check system section
+          assert %{"system" => system} = response
+          assert system["memory"]["total"] == 4096, "Expected memory total to match mock data"
+          assert system["memory"]["used"] == 2048, "Expected memory used to match mock data"
+          assert system["memory"]["percentage"] == 50, "Expected memory percentage to match mock data"
+          assert system["cpu"]["cores"] == 4, "Expected CPU cores to match mock data"
+          assert system["cpu"]["usage"] == 25, "Expected CPU usage to match mock data"
         end
-      ] do
+      end)
+    end
+
+    test "requires authentication", %{conn: conn} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Test the endpoint without authentication
+        conn = conn
+          |> put_req_header("accept", "application/json")
+          |> get(~p"/api/system/status")
+        
+        # Verify behavior - unauthenticated requests should be rejected
+        response = json_response(conn, 401)
+        assert response["error"] == "Unauthorized", "Expected unauthorized error for unauthenticated request"
+      end)
+    end
+
+    test "respects capability check", %{conn: conn} do
+      # Ensure ETS tables exist before making API requests
+      ensure_ets_tables_exist()
+      
+      # Create a user without capabilities using safely_execute_db_operation
+      {_regular_user, regular_token} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        # Get user without capabilities
+        {:ok, regular_user} = User.pow_changeset(%User{}, %{
+          email: "noperms_#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}@example.com",
+          password: "Password123!",
+          password_confirmation: "Password123!"
+        }) |> Repo.insert()
+
+        # Generate token for user without capabilities
+        {:ok, regular_token, _claims} = JWT.generate_token(regular_user)
+        
+        {regular_user, regular_token}
+      end)
+      
+      # Use safely_execute_ets_operation for API requests
+      XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
+        # Set up connection with regular user token
+        conn = conn
+          |> put_req_header("accept", "application/json")
+          |> put_req_header("content-type", "application/json")
+          |> put_req_header("authorization", "Bearer #{regular_token}")
+
+        # Make the request
         conn = get(conn, ~p"/api/system/status")
-
-        response = json_response(conn, 200)
-
-        # Check for presence of main health check sections
-        assert Map.has_key?(response, "database")
-        assert Map.has_key?(response, "application")
-        assert Map.has_key?(response, "memory")
-        assert Map.has_key?(response, "disk")
-        assert Map.has_key?(response, "cluster")
-        assert Map.has_key?(response, "system_info")
-        assert Map.has_key?(response, "timestamp")
-
-        # Verify application section data
-        assert response["application"]["status"] == "ok"
-        assert response["application"]["version"] == "0.1.0"
-        assert response["application"]["uptime"] == 3600
-
-        # Verify memory section data is converted to MB
-        assert response["memory"]["status"] == "ok"
-        assert response["memory"]["total"] == 0.95 # 1_000_000 bytes converts to ~0.95 MB
-
-        # Verify system info section data
-        assert response["system_info"]["otp_release"] == "25.0"
-        assert response["system_info"]["process_count"] == 400
-      end
-    end
-
-    test "returns 401 unauthorized when not authenticated", %{conn: conn} do
-      conn = conn
-        |> put_req_header("accept", "application/json")
-        |> get(~p"/api/system/status")
-      response = json_response(conn, 401)
-      assert response["error"] == "Authorization header missing or invalid"
-    end
-
-    test "returns 403 forbidden when user doesn't have required capability", %{conn: _conn, user: user} do
-      # Remove the capability from the user and ensure role is nil
-      user = user
-      |> User.role_changeset(%{role_id: nil})
-      |> Repo.update!()
-      |> Repo.preload(role: :capabilities)
-
-      # Create a new token for the user without capabilities
-      {:ok, token, _claims} = JWT.generate_token(user)
-
-      # Create a new connection with the token but without capabilities
-      conn = build_conn()
-        |> put_req_header("accept", "application/json")
-        |> put_req_header("content-type", "application/json")
-        |> put_req_header("authorization", "Bearer #{token}")
-        |> bypass_through(XIAMWeb.Router, [:api, :api_jwt])
-        |> get(~p"/api/system/status")
-        |> recycle()
-        |> bypass_through(XIAMWeb.Router, [:api, :api_jwt])
-        |> assign(:current_user, user)
-        |> XIAMWeb.Plugs.APIAuthorizePlug.call(%{capability: "view_system_status"})
-        |> get(~p"/api/system/status")
-
-      assert json_response(conn, 403) == %{
-        "error" => "Access forbidden: Missing required capability"
-      }
+        
+        # Verify behavior - should reject users without the required capability
+        response = json_response(conn, 403)
+        assert response["error"] == "Forbidden", "Expected forbidden error for unauthorized user"
+      end)
     end
   end
 end

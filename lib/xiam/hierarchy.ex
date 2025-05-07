@@ -208,7 +208,6 @@ defmodule XIAM.Hierarchy do
       {has_access, _, _} -> has_access
       error -> 
         # For any error response, assume no access
-        IO.puts("Error in can_access?: #{inspect(error)}")
         false
     end
   end

@@ -5,6 +5,7 @@ defmodule XIAMWeb.Admin.AuditLogsLiveTest do
 
   import Phoenix.LiveViewTest
   import Mock
+  import XIAM.ETSTestHelper
   alias XIAM.Users.User
   alias XIAM.Audit
   alias XIAM.Repo
@@ -17,51 +18,74 @@ defmodule XIAMWeb.Admin.AuditLogsLiveTest do
     # Create a timestamp for unique email
     timestamp = System.system_time(:millisecond)
     
-    # Create a user
-    {:ok, user} = %User{}
-      |> User.pow_changeset(%{
-        email: "admin_audit_logs_user_#{timestamp}@example.com",
-        password: "Password123!",
-        password_confirmation: "Password123!"
-      })
+    # Ensure ETS tables exist
+    ensure_ets_tables_exist()
+    
+    # Create a user using the resilient pattern
+    user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      {:ok, user} = %User{}
+        |> User.pow_changeset(%{
+          email: "admin_audit_logs_user_#{timestamp}@example.com",
+          password: "Password123!",
+          password_confirmation: "Password123!"
+        })
+        |> Repo.insert()
+      user
+    end)
+
+    # Create a role with admin capability using the resilient pattern
+    role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      {:ok, role} = %Xiam.Rbac.Role{
+        name: "Audit Admin Role #{timestamp}",
+        description: "Role with admin access"
+      }
       |> Repo.insert()
+      role
+    end)
 
-    # Create a role with admin capability
-    {:ok, role} = %Xiam.Rbac.Role{
-      name: "Audit Admin Role #{timestamp}",
-      description: "Role with admin access"
-    }
-    |> Repo.insert()
-
-    # Create a product for capabilities
-    {:ok, product} = %Xiam.Rbac.Product{
-      product_name: "Audit Logs Test Product #{timestamp}",
-      description: "Product for testing audit logs access"
-    }
-    |> Repo.insert()
+    # Create a product for capabilities using the resilient pattern
+    product = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      {:ok, product} = %Xiam.Rbac.Product{
+        product_name: "Audit Logs Test Product #{timestamp}",
+        description: "Product for testing audit logs access"
+      }
+      |> Repo.insert()
+      product
+    end)
     
-    # Add admin capability
-    {:ok, capability} = %Xiam.Rbac.Capability{
-      name: "admin_access",
-      description: "Admin access",
-      product_id: product.id
-    }
-    |> Repo.insert()
+    # Add admin capability using the resilient pattern
+    capability = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      {:ok, capability} = %Xiam.Rbac.Capability{
+        name: "admin_access",
+        description: "Admin access",
+        product_id: product.id
+      }
+      |> Repo.insert()
+      capability
+    end)
     
-    # Associate capability with role
-    role
-    |> Repo.preload(:capabilities)
-    |> Ecto.Changeset.change()
-    |> Ecto.Changeset.put_assoc(:capabilities, [capability])
-    |> Repo.update!()
+    # Associate capability with role using the resilient pattern
+    user_with_role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      # First, preload capabilities
+      role_with_capabilities = role |> Repo.preload(:capabilities)
+      
+      # Update role with capability
+      updated_role = role_with_capabilities
+        |> Ecto.Changeset.change()
+        |> Ecto.Changeset.put_assoc(:capabilities, [capability])
+        |> Repo.update!()
 
-    # Assign role to user
-    {:ok, user} = user
-      |> User.role_changeset(%{role_id: role.id})
-      |> Repo.update()
+      # Assign role to user
+      {:ok, updated_user} = user
+        |> User.role_changeset(%{role_id: updated_role.id})
+        |> Repo.update()
 
-    # Return user with preloaded role and capabilities
-    user |> Repo.preload(role: :capabilities)
+      # Return user with preloaded role and capabilities
+      updated_user |> Repo.preload(role: :capabilities)
+    end)
+    
+    # Return the updated user
+    user_with_role
   end
 
   defp login(conn, user) do
@@ -338,6 +362,8 @@ defmodule XIAMWeb.Admin.AuditLogsLiveTest do
 
     test "pagination controls are displayed when needed", %{conn: conn} do
       # Create more audit logs to trigger pagination
+      # Ensure ETS tables exist
+      ensure_ets_tables_exist()
       user = create_admin_user()
       
       # Create 30 logs (more than per_page which is set to 25 in the component)
