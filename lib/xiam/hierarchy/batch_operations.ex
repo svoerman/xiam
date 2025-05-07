@@ -48,18 +48,25 @@ defmodule XIAM.Hierarchy.BatchOperations do
   def revoke_batch_access(user_id, node_ids) do
     results = 
       Enum.map(node_ids, fn node_id ->
-        # First get the access record
-        access = Repo.get_by(Access, user_id: user_id, node_id: node_id)
-        
-        if access do
-          case AccessManager.revoke_access(access.id) do
-            {:ok, _} -> 
-              %{node_id: node_id, status: :success}
-            {:error, reason} -> 
-              %{node_id: node_id, status: :error, reason: reason}
-          end
-        else
-          %{node_id: node_id, status: :error, reason: :access_not_found}
+        # Get the node to find its path
+        case NodeManager.get_node(node_id) do
+          nil ->
+            %{node_id: node_id, status: :error, reason: :node_not_found}
+            
+          node ->
+            # Use access_path instead of node_id
+            access = Repo.get_by(Access, user_id: user_id, access_path: node.path)
+            
+            if access do
+              case AccessManager.revoke_access(access.id) do
+                {:ok, _} -> 
+                  %{node_id: node_id, status: :success}
+                {:error, reason} -> 
+                  %{node_id: node_id, status: :error, reason: reason}
+              end
+            else
+              %{node_id: node_id, status: :error, reason: :access_not_found}
+            end
         end
       end)
     

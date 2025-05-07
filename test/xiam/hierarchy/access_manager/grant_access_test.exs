@@ -8,7 +8,21 @@ defmodule XIAM.Hierarchy.AccessManager.GrantAccessTest do
   
   describe "grant_access/3" do
     setup do
-      create_basic_test_hierarchy()
+      # First ensure the repo is started with explicit applications
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure repository is properly started
+      XIAM.ResilientDatabaseSetup.ensure_repository_started()
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      XIAM.ETSTestHelper.initialize_endpoint_config()
+      
+      # Create test hierarchy with resilient pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_basic_test_hierarchy()
+      end, max_retries: 3, retry_delay: 200)
     end
     
     @tag :access_grants

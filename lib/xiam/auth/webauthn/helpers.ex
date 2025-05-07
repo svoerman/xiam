@@ -2,6 +2,7 @@ defmodule XIAM.Auth.WebAuthn.Helpers do
   @moduledoc """
   Helper functions shared between WebAuthn Registration and Authentication.
   """
+  @behaviour XIAM.Auth.WebAuthn.HelpersBehaviour
   require Logger
 
   @doc """

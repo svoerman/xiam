@@ -10,6 +10,10 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
   alias XIAM.Auth.WebAuthn.Helpers
   alias XIAM.Auth.PasskeyRepository
   require Logger
+  
+  # Use configurable modules for testing support
+  @wax_module Application.compile_env(:xiam, :wax_module, Wax)
+  @helpers_module Application.compile_env(:xiam, :helpers_module, Helpers)
 
   @doc """
   Formats a UserPasskey struct into the map Wax expects for allow_credentials
@@ -134,12 +138,22 @@ defmodule XIAM.Auth.WebAuthn.CredentialManager do
 
   @doc """
   Verifies the WebAuthn assertion using Wax.
+  
+  ## Parameters
+  - credential_info - Map containing the decoded credential information
+  - passkey - The UserPasskey struct from the database
+  - challenge - The Wax.Challenge struct
+  
+  ## Returns
+  - {:ok, result} on successful verification
+  - {:error, reason} on verification failure
   """
   def verify_with_wax(credential_info, passkey, challenge) do
     # Decode the stored public key from CBOR binary to a map for Wax
-    public_key_map = Helpers.decode_public_key(passkey.public_key)
+    # Use the configurable helpers module for easier testing
+    public_key_map = @helpers_module.decode_public_key(passkey.public_key)
 
-    Wax.authenticate(
+    @wax_module.authenticate(
       credential_info.authenticator_data,
       credential_info.client_data_json,
       credential_info.signature,

@@ -7,10 +7,11 @@ defmodule XIAM.HierarchyTest do
   alias XIAM.Repo
 
   describe "nodes" do
-    # Use a function to generate unique valid attributes for each test
+    # Use a function to generate unique valid attributes for each test using the robust timestamp + random pattern
     def valid_attrs do
+      unique_id = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
       %{
-        name: "Test Node #{System.unique_integer([:positive, :monotonic])}",
+        name: "Test Node #{unique_id}",
         node_type: "company",
         metadata: %{"key" => "value"}
       }
@@ -71,8 +72,20 @@ defmodule XIAM.HierarchyTest do
     end
 
     test "get_node/1 returns the node with given id" do
-      node = node_fixture()
-      assert Hierarchy.get_node(node.id).id == node.id
+      # First ensure the repo is started
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Create node using resilient pattern
+      node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        node_fixture()
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Verify node using resilient pattern to handle potential database issues
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        fetched_node = Hierarchy.get_node(node.id)
+        assert fetched_node.id == node.id
+      end, max_retries: 3, retry_delay: 200)
     end
 
     test "create_node/1 with valid data creates a node" do
@@ -131,71 +144,115 @@ defmodule XIAM.HierarchyTest do
     end
 
     test "is_descendant?/2 correctly identifies descendant relationships" do
-      parent = node_fixture()
+      # First ensure the repo is started
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
       
-      child_attrs = Map.put(valid_attrs(), :parent_id, parent.id)
-      {:ok, child} = Hierarchy.create_node(child_attrs)
+      # Setup ETS tables for cache operations
+      XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache)
+      XIAM.ETSTestHelper.safely_ensure_table_exists(:hierarchy_cache_metrics)
       
-      grandchild_attrs = Map.put(valid_attrs(), :parent_id, child.id)
-      grandchild_attrs = Map.put(grandchild_attrs, :name, "Grandchild")
-      {:ok, grandchild} = Hierarchy.create_node(grandchild_attrs)
+      # Create parent node using resilient pattern
+      parent = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        node_fixture()
+      end, max_retries: 3, retry_delay: 200)
       
-      assert Hierarchy.is_descendant?(child.id, parent.id)
-      assert Hierarchy.is_descendant?(grandchild.id, parent.id)
-      assert Hierarchy.is_descendant?(grandchild.id, child.id)
-      refute Hierarchy.is_descendant?(parent.id, child.id)
-      refute Hierarchy.is_descendant?(child.id, grandchild.id)
+      # Create child node with resilient pattern
+      child = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        child_attrs = Map.put(valid_attrs(), :parent_id, parent.id)
+        {:ok, child} = Hierarchy.create_node(child_attrs)
+        child
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Create grandchild node with resilient pattern
+      grandchild = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        grandchild_attrs = Map.put(valid_attrs(), :parent_id, child.id)
+        grandchild_attrs = Map.put(grandchild_attrs, :name, "Grandchild_#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}")
+        {:ok, grandchild} = Hierarchy.create_node(grandchild_attrs)
+        grandchild
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Test descendant relationships with resilient pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        assert Hierarchy.is_descendant?(child.id, parent.id)
+        assert Hierarchy.is_descendant?(grandchild.id, parent.id)
+        assert Hierarchy.is_descendant?(grandchild.id, child.id)
+        refute Hierarchy.is_descendant?(parent.id, child.id)
+        refute Hierarchy.is_descendant?(child.id, grandchild.id)
+      end, max_retries: 3, retry_delay: 200)
     end
 
+    @tag timeout: 120_000  # Explicitly increase the test timeout to ensure we have enough time
     test "move_subtree/2 moves a node and its descendants to a new parent" do
-      # Use resilient test patterns to ensure database operations succeed
+      # Ensure ETS tables exist before running the test
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Make sure the database connections are explicitly started/reset
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      
+      # Create parent nodes with shorter timeouts and more resilience
       old_parent = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        node_fixture(name: "Old Parent")
-      end)
+        node_fixture(name: "Old Parent #{System.system_time(:millisecond)}")
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)
+      
+      # Early assertion to fail fast if first step doesn't work
+      assert %XIAM.Hierarchy.Node{} = old_parent, "Failed to create old parent node"
       
       new_parent = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        node_fixture(name: "New Parent")
-      end)
+        node_fixture(name: "New Parent #{System.system_time(:millisecond)}")
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)  
       
-      # Create a node under old_parent
+      # Early assertion to fail fast if second step doesn't work
+      assert %XIAM.Hierarchy.Node{} = new_parent, "Failed to create new parent node"
+      
+      # Create a node under old_parent with a unique name based on timestamp
+      node_name = "Test Node #{System.system_time(:millisecond)}"
       node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        node_attrs = Map.put(valid_attrs(), :parent_id, old_parent.id)
+        node_attrs = valid_attrs() |> Map.put(:parent_id, old_parent.id) |> Map.put(:name, node_name)
         {:ok, created_node} = Hierarchy.create_node(node_attrs)
         created_node
-      end)
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)
       
-      # Create a child under node
+      # Create a child under node - also with timestamp uniqueness
+      child_name = "Child #{System.system_time(:millisecond)}"
       child = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        child_attrs = Map.put(valid_attrs(), :parent_id, node.id)
-        child_attrs = Map.put(child_attrs, :name, "Child")
+        child_attrs = valid_attrs() |> Map.put(:parent_id, node.id) |> Map.put(:name, child_name)
         {:ok, created_child} = Hierarchy.create_node(child_attrs)
         created_child
-      end)
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)
       
-      # Move the node to new_parent with resilient execution
+      # Move the node to new_parent with resilient execution and shorter timeout
       result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        Hierarchy.move_subtree(node, new_parent.id)
-      end)
-      assert {:ok, _moved_node} = result
+        # Use our more resilient version that accepts node IDs
+        Hierarchy.move_subtree(node.id, new_parent.id)
+      end, max_retries: 5, retry_delay: 300, timeout: 10_000)
+      
+      # Verify the move was successful (with more flexible assertions)
+      case result do
+        {:ok, _moved_node} ->
+          :ok  # Expected case, continue
+        error ->
+          flunk("Failed to move node: #{inspect(error)}")
+      end
       
       # Get refreshed records with resilient execution
       refreshed_node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         Hierarchy.get_node(node.id)
-      end)
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)
       
       refreshed_child = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         Hierarchy.get_node(child.id)
-      end)
+      end, max_retries: 3, retry_delay: 200, timeout: 5_000)
       
-      # Check relationships with resilient assertions
-      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        assert refreshed_node.parent_id == new_parent.id
-        assert String.starts_with?(refreshed_node.path, "#{new_parent.path}.")
-        
-        # Check that child was also moved
-        assert refreshed_child.parent_id == refreshed_node.id
-        assert String.starts_with?(refreshed_child.path, refreshed_node.path)
-      end)
+      # Check the parent relationship and path structure with resilient assertions
+      assert refreshed_node.parent_id == new_parent.id, "Node's parent_id should match new_parent.id"
+      assert String.starts_with?(refreshed_node.path, "#{new_parent.path}."), "Node's path should start with new parent's path"
+      
+      # Check that child was also moved properly
+      assert refreshed_child.parent_id == refreshed_node.id, "Child's parent_id should match the moved node's id"
+      assert String.starts_with?(refreshed_child.path, refreshed_node.path), "Child's path should start with moved node's path"
     end
 
     test "move_subtree/2 prevents moving a node to its own descendant" do

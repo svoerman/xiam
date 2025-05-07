@@ -175,6 +175,9 @@ defmodule XIAM.HierarchyEdgeCasesTest do
   
   describe "large-scale operations" do
     test "efficiently lists accessible nodes with many grants" do
+      # Ensure Phoenix ETS tables exist before starting test
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
       # Create a user with multiple access grants
       user = Adapter.create_test_user()
       role = Adapter.create_test_role()

@@ -127,7 +127,8 @@ defmodule XIAM.Hierarchy.PathTraversalTest do
   describe "path calculation and traversal" do
     setup do
       # Create a more complex hierarchy for traversal tests with unique names
-      unique_id = System.unique_integer([:positive, :monotonic])
+      # Using the more robust timestamp + random approach to avoid uniqueness constraint issues
+      unique_id = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
       
       # Use resilient test helper to ensure the repo is started
       {:ok, root} = ResilientTestHelper.safely_execute_db_operation(fn ->

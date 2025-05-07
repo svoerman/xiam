@@ -157,9 +157,20 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
   end
   
-  # Initialize test state before each test
+  # Initialize test state before each test with resilient patterns
   setup do
-    MockAdapter.init_test_state()
+    # First ensure the repo is started
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    
+    # Ensure ETS tables exist for Phoenix-related operations
+    XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    
+    # Initialize mock state with resilient pattern
+    XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      MockAdapter.init_test_state()
+    end, max_retries: 3, retry_delay: 200)
+    
     :ok
   end
   
@@ -207,12 +218,22 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   describe "hierarchy access control" do
     setup do
-      # Create test users and roles
-      user = MockAdapter.create_user()
-      role = MockAdapter.create_role()
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
       
-      # Create a test hierarchy
-      hierarchy = MockAdapter.create_test_hierarchy()
+      # Create test users and roles with resilient pattern
+      user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_user()
+      end, max_retries: 3, retry_delay: 200)
+      
+      role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_role()
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Create a test hierarchy with resilient pattern
+      hierarchy = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_test_hierarchy()
+      end, max_retries: 3, retry_delay: 200)
       
       %{user: user, role: role, hierarchy: hierarchy}
     end
@@ -257,12 +278,22 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   describe "hierarchy edge cases" do
     setup do
-      # Create test users and roles
-      user = MockAdapter.create_user()
-      role = MockAdapter.create_role()
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
       
-      # Create a test hierarchy
-      hierarchy = MockAdapter.create_test_hierarchy()
+      # Create test users and roles with resilient pattern
+      user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_user()
+      end, max_retries: 3, retry_delay: 200)
+      
+      role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_role()
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Create a test hierarchy with resilient pattern
+      hierarchy = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        MockAdapter.create_test_hierarchy()
+      end, max_retries: 3, retry_delay: 200)
       
       %{user: user, role: role, hierarchy: hierarchy}
     end

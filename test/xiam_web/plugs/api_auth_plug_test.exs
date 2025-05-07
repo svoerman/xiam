@@ -1,12 +1,18 @@
 defmodule XIAMWeb.Plugs.APIAuthPlugTest do
   use XIAMWeb.ConnCase
 
+  # Import ETSTestHelper to ensure ETS tables exist before running tests
+  import XIAM.ETSTestHelper
+  
   alias XIAMWeb.Plugs.APIAuthPlug
   alias XIAM.Users.User
   alias XIAM.Auth.JWT
   alias XIAM.Repo
 
   setup %{conn: conn} do
+    # Ensure ETS tables exist before running the test
+    ensure_ets_tables_exist()
+    
     # Explicitly ensure repo is available
     case Process.whereis(XIAM.Repo) do
       nil ->

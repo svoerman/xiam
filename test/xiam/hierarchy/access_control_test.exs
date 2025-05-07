@@ -13,25 +13,33 @@ defmodule XIAM.Hierarchy.AccessControlTest do
   alias XIAM.HierarchyTestAdapter
   
   setup do
-    # Ensure the repository is started before creating test data
+    # First ensure the repo is started with explicit applications
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    
+    # Also use the resilient repository setup
     XIAM.ResilientDatabaseSetup.ensure_repository_started()
     
-    # Create a test user and role with unique name using resilient pattern
+    # Ensure ETS tables exist for Phoenix-related operations
+    XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    
+    # Create a test user and role with more robust unique identifiers
     timestamp = System.system_time(:millisecond)
-    unique_id = System.unique_integer([:positive, :monotonic])
+    random_suffix = :rand.uniform(100_000)
+    robust_unique_id = "#{timestamp}_#{random_suffix}"
     
     user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
       create_test_user()
-    end)
+    end, max_retries: 3, retry_delay: 200)
     
     role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-      create_test_role("Editor_#{timestamp}_#{unique_id}")
-    end)
+      create_test_role("Editor_#{robust_unique_id}")
+    end, max_retries: 3, retry_delay: 200)
     
     # Create a test hierarchy using resilient pattern
     hierarchy = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
       create_hierarchy_tree()
-    end)
+    end, max_retries: 3, retry_delay: 200)
     
     %{user: user, role: role, root: hierarchy.root, dept: hierarchy.dept, 
       team: hierarchy.team, project: hierarchy.project}

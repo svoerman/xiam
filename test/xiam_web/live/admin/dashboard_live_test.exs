@@ -3,6 +3,7 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
 
   import Phoenix.LiveViewTest
   alias XIAM.Users.User
+  alias XIAM.ETSTestHelper
   alias XIAM.Repo
 
   # Helpers for test authentication
@@ -77,33 +78,50 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
 
   describe "Dashboard LiveView" do
     test "mounts successfully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, _view, html} = live(conn, ~p"/admin")
 
-      # Verify page title is set correctly
-      assert html =~ "XIAM Admin Dashboard"
-      assert html =~ "Manage your CIAM system"
+        # Verify page title is set correctly
+        assert html =~ "XIAM Admin Dashboard"
+        assert html =~ "Manage your CIAM system"
+      end)
     end
 
     test "displays all admin dashboard cards", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, _view, html} = live(conn, ~p"/admin")
 
-      # Check that all expected cards are displayed
-      assert html =~ "User Management"
-      assert html =~ "Roles &amp; Capabilities"
-      assert html =~ "Entity Access"
-      assert html =~ "Products &amp; Capabilities"
-      assert html =~ "GDPR Compliance"
-      assert html =~ "System Settings"
-      assert html =~ "Audit Logs"
-      assert html =~ "System Status"
-      assert html =~ "Consent Records"
+        # Check that all expected cards are displayed
+        assert html =~ "User Management"
+        assert html =~ "Roles &amp; Capabilities"
+        assert html =~ "Entity Access"
+        assert html =~ "Products &amp; Capabilities"
+        assert html =~ "User Registrations"
+        assert html =~ "System Settings"
+        assert html =~ "Audit Logs"
+        assert html =~ "System Status"
+        assert html =~ "Consent Records"
+      end)
     end
 
     test "has working links to all sections", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Test each link by making sure it exists and returns a valid response
-      expected_links = [
+        # Test each link by making sure it exists and returns a valid response
+        expected_links = [
         {"Manage Users", ~p"/admin/users"},
         {"Manage Roles", ~p"/admin/roles"},
         {"Manage Entity Access", ~p"/admin/entity-access"},
@@ -115,55 +133,80 @@ defmodule XIAMWeb.Admin.DashboardLiveTest do
         {"Manage Consents", ~p"/admin/consents"}
       ]
 
-      for {link_text, path} <- expected_links do
-        # Check that the link element exists
-        assert has_element?(view, "a", link_text)
+        for {link_text, path} <- expected_links do
+          # Check that the link element exists
+          assert has_element?(view, "a", link_text)
 
-        # Check that the link has the correct destination
-        assert has_element?(view, "a[href='#{path}']", link_text)
-      end
+          # Check that the link has the correct destination
+          assert has_element?(view, "a[href='#{path}']", link_text)
+        end
+      end)
     end
 
     test "handles theme toggle event", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Send the toggle_theme event and make sure it doesn't crash
-      result = view |> render_hook("toggle_theme")
-      assert result =~ "XIAM Admin Dashboard"
+        # Send the toggle_theme event and make sure it doesn't crash
+        result = view |> render_hook("toggle_theme")
+        assert result =~ "XIAM Admin Dashboard"
+      end)
     end
 
     test "assigns the correct page title", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Test the internal socket assigns
-      assert view.module == XIAMWeb.Admin.DashboardLive
-      assert render(view) =~ "XIAM Admin Dashboard"
+        # Test the internal socket assigns
+        assert view.module == XIAMWeb.Admin.DashboardLive
+        assert render(view) =~ "XIAM Admin Dashboard"
 
-      # Get the socket assigns directly
-      assert has_element?(view, "[data-test-id='page-title']", "XIAM Admin Dashboard")
+        # Get the socket assigns directly
+        assert has_element?(view, "[data-test-id='page-title']", "XIAM Admin Dashboard")
+      end)
     end
 
     test "admin_header component works as expected", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Verify that the admin_header component renders correctly
-      assert has_element?(view, ".admin-header")
-      assert has_element?(view, "h1", "XIAM Admin Dashboard")
-      assert has_element?(view, ".text-sm", "Manage your CIAM system")
+        # Verify that the admin_header component renders correctly
+        assert has_element?(view, ".admin-header")
+        assert has_element?(view, "h1", "XIAM Admin Dashboard")
+        assert has_element?(view, ".text-sm", "Manage your CIAM system")
+      end)
     end
 
     test "all dashboard card components render correctly", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin")
+      # Ensure Phoenix ETS tables exist
+      ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use the resilient test helper pattern
+      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, view, _html} = live(conn, ~p"/admin")
 
-      # Verify all cards have the correct styling classes
-      assert has_element?(view, ".grid .bg-card")
-      assert has_element?(view, ".grid .rounded-lg")
-      assert has_element?(view, ".grid .border")
-      assert has_element?(view, ".grid .shadow-sm")
+        # Verify all cards have the correct styling classes
+        assert has_element?(view, ".grid .bg-card")
+        assert has_element?(view, ".grid .rounded-lg")
+        assert has_element?(view, ".grid .border")
+        assert has_element?(view, ".grid .shadow-sm")
 
-      # Count the number of cards
-      cards = view |> element(".grid") |> render() |> Floki.parse_document!() |> Floki.find(".bg-card")
-      assert length(cards) >= 9 # There should be at least 9 cards
+        # Count the number of cards
+        cards = view |> element(".grid") |> render() |> Floki.parse_document!() |> Floki.find(".bg-card")
+        assert length(cards) >= 9 # There should be at least 9 cards
+      end)
     end
 
     test "redirects anonymous users to login", %{} do

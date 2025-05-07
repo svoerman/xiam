@@ -166,9 +166,16 @@ defmodule XIAM.ResilientDatabaseSetup do
     # Explicitly initialize hierarchy and access caches
     cache_result = initialize_hierarchy_caches()
     
-    # Return diagnostics if something failed
+    # Return diagnostics if something failed, but don't treat already_started repo as a failure
+    # This avoids warnings when the repository was already started by the application
     case {start_result, repo_result, sandbox_result, configure_result, cache_result} do
+      # Success case - everything started properly
       {{:ok, _}, {:ok, _}, {:ok, _}, _, :ok} -> :ok
+      
+      # Application start failed with already_started repo - this is actually fine
+      {{:error, {:xiam, {{:shutdown, {:failed_to_start_child, XIAM.Repo, {:already_started, _}}}, _}}}, {:ok, _}, {:ok, _}, _, :ok} -> :ok
+      
+      # Any other failure combination - log a warning
       result -> 
         IO.warn("Test environment initialization issues: #{inspect(result)}")
         :warning

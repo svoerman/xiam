@@ -6,9 +6,29 @@ defmodule XIAM.Hierarchy.IntegrationTest do
   
   describe "integrated hierarchy operations" do
     setup do
-      # Create a test user and role using our test helpers with explicit integer ID
-      user = create_test_user(%{id: 88888})
-      role = create_test_role(%{name: "Editor", id: 88888})
+      # First ensure the repo is started with explicit applications
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure repository is properly started
+      XIAM.ResilientDatabaseSetup.ensure_repository_started()
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+
+      # Use timestamp-based unique identifiers to ensure uniqueness
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
+      unique_id = "#{timestamp}_#{random_suffix}"
+
+      # Create a test user and role using our test helpers with resilient patterns
+      user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_test_user(%{id: 88888, username: "test_user_#{unique_id}"})
+      end, max_retries: 3, retry_delay: 200)
+      
+      role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_test_role(%{name: "Editor_#{unique_id}", id: 88888})
+      end, max_retries: 3, retry_delay: 200)
       
       %{user: user, role: role}
     end

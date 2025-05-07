@@ -9,6 +9,7 @@ defmodule XIAM.Hierarchy do
   alias XIAM.Hierarchy.AccessManager
   alias XIAM.Hierarchy.PathCalculator
   alias XIAM.Hierarchy.IDHelper
+  alias XIAM.Hierarchy.Node
 
   # Node Management delegations
 
@@ -187,9 +188,19 @@ defmodule XIAM.Hierarchy do
   @doc """
   Moves a node and its descendants to a new parent.
   Renamed to move_node in the NodeManager but keeping for backward compatibility.
+  
+  This function can accept either a Node struct or a node ID as the first argument.
   """
-  def move_subtree(node, new_parent_id) do
+  def move_subtree(%Node{} = node, new_parent_id) do
     NodeManager.move_node(node, new_parent_id)
+  end
+  
+  def move_subtree(node_id, new_parent_id) when is_integer(node_id) or is_binary(node_id) do
+    # First get the node by ID
+    case NodeManager.get_node(node_id) do
+      nil -> {:error, :node_not_found}
+      node -> NodeManager.move_node(node, new_parent_id)
+    end
   end
   
   @doc """
@@ -206,7 +217,7 @@ defmodule XIAM.Hierarchy do
     case AccessManager.check_access(user_id, node_id) do
       {:ok, %{has_access: has_access}} -> has_access
       {has_access, _, _} -> has_access
-      error -> 
+      _error -> 
         # For any error response, assume no access
         false
     end

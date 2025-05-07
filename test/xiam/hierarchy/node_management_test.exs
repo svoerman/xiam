@@ -85,8 +85,22 @@ defmodule XIAM.Hierarchy.NodeManagementTest do
   
   describe "node retrieval" do
     setup do
-      unique_id = System.unique_integer([:positive, :monotonic])
-      {:ok, node} = Hierarchy.create_node(%{name: "Test Node#{unique_id}", node_type: "organization"})
+      # First ensure the repo is started
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use more robust unique identifier with timestamp + random to avoid collisions
+      unique_id = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
+      
+      # Create node with resilient pattern
+      node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, node} = Hierarchy.create_node(%{name: "Test Node#{unique_id}", node_type: "organization"})
+        node
+      end, max_retries: 3, retry_delay: 200)
+      
       %{node: node}
     end
     
@@ -133,8 +147,22 @@ defmodule XIAM.Hierarchy.NodeManagementTest do
   
   describe "node updates" do
     setup do
-      unique_id = System.unique_integer([:positive, :monotonic])
-      {:ok, node} = Hierarchy.create_node(%{name: "Original Name#{unique_id}", node_type: "organization"})
+      # First ensure the repo is started
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Use more robust unique identifier with timestamp + random
+      unique_id = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
+      
+      # Create node with resilient pattern
+      node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        {:ok, node} = Hierarchy.create_node(%{name: "Original Name#{unique_id}", node_type: "organization"})
+        node
+      end, max_retries: 3, retry_delay: 200)
+      
       %{node: node}
     end
     
@@ -167,9 +195,20 @@ defmodule XIAM.Hierarchy.NodeManagementTest do
   
   describe "node hierarchy operations" do
     setup do
-      # Create a test hierarchy
-      %{root: root, dept: dept, team: team, project: project} = create_hierarchy_tree()
-      %{root: root, dept: dept, team: team, project: project}
+      # First ensure the repo is started
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
+      # Create a test hierarchy with resilient pattern
+      hierarchy = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        create_hierarchy_tree()
+      end, max_retries: 3, retry_delay: 200)
+      
+      # Return the hierarchy components
+      %{root: hierarchy.root, dept: hierarchy.dept, team: hierarchy.team, project: hierarchy.project}
     end
     
     test "gets child nodes", %{dept: dept, team: team} do
