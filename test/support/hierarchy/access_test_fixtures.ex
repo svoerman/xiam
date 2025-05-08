@@ -8,58 +8,32 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
   
   alias XIAM.Hierarchy.NodeManager
   alias XIAM.ResilientTestHelper
-  # Using mock data now, no need for Pow dependencies
-  # Note: We're avoiding direct alias of User and Role to prevent circular dependencies
-  
+  alias XIAM.Repo
+  alias XIAM.Users.User
+  alias Xiam.Rbac.Role
+ 
   @doc """
   Create a test user for access management tests.
   Returns the created user or an error tuple.
   """
   def create_test_user do
-    # For consistency with the test improvement strategy in the memory
-    # We'll use a simpler approach that avoids complex dependencies
-    
-    # Create a test user via direct Ecto operations
-    user_attrs = %{
-      email: "test-user-#{System.unique_integer([:positive, :monotonic])}@example.com",
-      password: "Password123!",
-      password_confirmation: "Password123!",
-    }
-    
-    # We'll use a mock user instead of trying to create a real one
-    # This aligns with the memory about test improvements and proper test isolation
-    mock_user_id = System.unique_integer([:positive]) 
-    mock_user = %{
-      id: mock_user_id,
-      email: user_attrs.email
-    }
-    
-    # Return usable mock user directly (not in a tuple) to work with extract_user_id
-    # This prevents test failures from user creation issues
-    mock_user
+    ResilientTestHelper.safely_execute_db_operation(fn ->
+      attrs = %{email: "test-user-#{System.system_time(:millisecond)}@example.com",
+               password_hash: "$2b$12$k6N9.nTHTg0vIGXhx0hMaOScOmYpBqmRVulhbS5TCPZWqIpthRyJ2"}
+      %User{} |> Ecto.Changeset.change(attrs) |> Repo.insert!()
+    end, max_retries: 3, retry_delay: 200)
   end
-  
-  # No need for private helpers as we're using mocks for better test isolation
   
   @doc """
   Create a test role for access management tests.
   Returns the created role or an error tuple.
   """
   def create_test_role do
-    # Create a mock role with a unique name, similar to our user mock approach
-    # This aligns with the test improvement strategy in the memory
-    role_name = "TestRole#{System.unique_integer([:positive, :monotonic])}"
-    
-    # Mock role with minimal fields needed for the tests
-    mock_role_id = System.unique_integer([:positive])
-    mock_role = %{
-      id: mock_role_id,
-      name: role_name,
-      description: "Test role for access management tests"
-    }
-    
-    # Return mock role directly (not in a tuple) to work with extract_role_id
-    mock_role
+    ResilientTestHelper.safely_execute_db_operation(fn ->
+      name = "TestRole#{System.system_time(:millisecond)}"
+      {:ok, role} = Role.create_role(%{name: name, description: "Test role for access management tests"})
+      role
+    end, max_retries: 3, retry_delay: 200)
   end
   
   @doc """

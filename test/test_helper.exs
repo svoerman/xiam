@@ -11,10 +11,9 @@ System.at_exit(fn _status ->
   Logger.configure(level: original_level)
 end)
 
-# Make sure the application is started before tests
-Application.ensure_all_started(:postgrex)
-Application.ensure_all_started(:ecto)
-Application.ensure_all_started(:xiam)
+# Consolidate required applications startup
+[:postgrex, :ecto, :ecto_sql, :xiam, :phoenix, :phoenix_ecto]
+|> Enum.each(&Application.ensure_all_started/1)
 
 # Compile the ResilientDatabaseSetup module to ensure it's available
 Code.ensure_compiled(XIAM.ResilientDatabaseSetup)
@@ -36,21 +35,11 @@ Application.put_env(:xiam, :users, XIAM.Users.Mock)
 
 # Configure ExUnit with improved test pattern recognition
 ExUnit.configure(
-  # Only exclude pending tags, skip any other exclusions
-  exclude: [pending: true],
-  # Don't include :test tag as it's a reserved tag that all tests have implicitly
-  patterns: ["*_test.exs", "test_*.exs", "*/*_test.exs"]
+  exclude: [pending: true]
 )
-# Make sure Phoenix endpoint is started to initialize ETS tables
-Application.ensure_all_started(:phoenix)
-Application.ensure_all_started(:phoenix_ecto)
-
-# Start ExUnit
-ExUnit.start()
 
 # Ensure TestOutputHelper is properly compiled first
 # Don't use Code.require_file which causes module redefinition warnings
-Application.ensure_all_started(:xiam)
 # Use the compiled module directly
 alias XIAM.TestOutputHelper, as: Output
 
@@ -86,3 +75,6 @@ _workers =
 
 # We don't need to drain the queue because we're using a clean test database
 # and we've disabled Oban's job processing
+
+# Start ExUnit
+ExUnit.start()

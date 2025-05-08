@@ -15,7 +15,7 @@ defmodule XIAM.Hierarchy.AccessManager.CheckAccessTest do
   alias XIAM.Repo
   
   # Import the test fixtures but define our own helper functions
-  import XIAM.Hierarchy.AccessTestFixtures, only: [create_test_department: 0]
+  import XIAM.Hierarchy.AccessTestFixtures, only: [create_basic_test_hierarchy: 1]
 
   # Apply flexible assertions pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
   # Completely rename our assertion functions to avoid any conflicts
@@ -175,116 +175,52 @@ defmodule XIAM.Hierarchy.AccessManager.CheckAccessTest do
   
   describe "check_access/2" do
     setup do
-      # First ensure the repo is started with explicit applications
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
-      # Ensure database repository is properly started
-      XIAM.ResilientDatabaseSetup.ensure_repository_started()
-      
-      # Set sandbox mode to shared to allow concurrent access
-      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Ensure ETS tables are properly initialized
+      # Checkout sandbox and ensure ETS tables
+      _ = Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
       XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
-      
-      # Create real database records for the tests
-      user_unique = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
-      role_unique = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
-      
-      # Create a real user record in the database using direct SQL
-      user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        # Use Ecto.Adapters.SQL.query instead of structs to avoid module loading issues
-        # Fix: Remove confirmed_at column which doesn't exist in the schema
-        {:ok, result} = Ecto.Adapters.SQL.query(Repo, """
-          INSERT INTO users (email, password_hash, inserted_at, updated_at)
-          VALUES ($1, $2, $3, $4) RETURNING id, email
-        """, [
-          "test-user-#{user_unique}@example.com",
-          "$2b$12$k6N9.nTHTg0vIGXhx0hMaOScOmYpBqmRVulhbS5TCPZWqIpthRyJ2",  # "password"
-          DateTime.utc_now(),
-          DateTime.utc_now()
-        ])
-        
-        # Extract user data from result
-        [[id, email]] = result.rows
-        %{id: id, email: email}
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Create a real role record in the database using direct SQL
-      role = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        # Use Ecto.Adapters.SQL.query instead of structs to avoid module loading issues
-        {:ok, result} = Ecto.Adapters.SQL.query(Repo, """
-          INSERT INTO roles (name, description, inserted_at, updated_at)
-          VALUES ($1, $2, $3, $4) RETURNING id, name
-        """, [
-          "TestRole#{role_unique}",
-          "Test role for access management tests",
-          DateTime.utc_now(),
-          DateTime.utc_now()
-        ])
-        
-        # Extract role data from result
-        [[id, name]] = result.rows
-        %{id: id, name: name}
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Create a department node
-      dept = create_test_department()
-      
-      # Return test fixtures
-      {:ok, %{user: user, role: role, dept: dept}}
+      :ok
     end
-    
+    setup :create_basic_test_hierarchy
+     
     @tag :check_access
     test "returns true when user has access to a node", %{user: user, role: role, dept: dept} do
-      # Ensure connections are ready for this test
-      XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Make sure ETS tables exist
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      
-      # Extract IDs
-      user_id = extract_user_id(user)
-      role_id = extract_role_id(role)
-      node_id = extract_node_id(dept)
-      
-      # Grant access with resilient retry patterns
-      grant_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        AccessManager.grant_access(user_id, node_id, role_id)
-      end, max_retries: 5, retry_delay: 300)
-      
-      case grant_result do
-        {:ok, _access} ->
-          # Check access with improved resilience
-          check_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-            AccessManager.check_access(user_id, node_id)
-          end, max_retries: 5, retry_delay: 300)
-          
-          # Assert access is granted
-          check_access_test_expect_granted(check_result)
-          
-          # Clean up with better error handling
-          cleanup_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-            ensure_access_revoked(user_id, dept.path)
-          end, max_retries: 3, retry_delay: 200)
-          
-          case cleanup_result do
-            {:ok, _} -> :ok
-            _ -> Output.warn("Failed to clean up test access grants")
-          end
-          
-        {:error, error} ->
-          flunk("Failed to grant access: #{inspect(error)}")
-      end
-    end
+      # Setup: sandbox and ETS already initialized via ResilientTestCase
+       
+       # Extract IDs
+       user_id = extract_user_id(user)
+       role_id = extract_role_id(role)
+       node_id = extract_node_id(dept)
+       
+       # Grant access with resilient retry patterns
+       grant_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+         AccessManager.grant_access(user_id, node_id, role_id)
+       end, max_retries: 5, retry_delay: 300)
+       
+       case grant_result do
+         {:ok, _access} ->
+           # Check access with improved resilience
+           check_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+             AccessManager.check_access(user_id, node_id)
+           end, max_retries: 5, retry_delay: 300)
+           
+           # Assert access is granted
+           check_access_test_expect_granted(check_result)
+           
+           # Clean up with better error handling
+           cleanup_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+             ensure_access_revoked(user_id, dept.path)
+           end, max_retries: 3, retry_delay: 200)
+           
+           case cleanup_result do
+             {:ok, _} -> :ok
+             _ -> Output.warn("Failed to clean up test access grants")
+           end
+           
+         {:error, error} ->
+           flunk("Failed to grant access: #{inspect(error)}")
+       end
+     end
     
     @tag :check_access
     test "returns false when user does not have access", %{user: user, dept: dept} do

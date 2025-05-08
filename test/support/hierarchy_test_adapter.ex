@@ -54,7 +54,7 @@ defmodule XIAM.HierarchyTestAdapter do
   Returns a role struct with ID for use in tests.
   """
   def create_test_role do
-    # Generate a unique name for the test role with timestamp to ensure uniqueness
+    # Generate a unique name for the test role
     name = "Role_#{System.unique_integer([:positive, :monotonic])}"
     
     # First check if the role already exists in the process dictionary for tests
@@ -85,15 +85,14 @@ defmodule XIAM.HierarchyTestAdapter do
             mock_role
         end
       rescue
-        # If there's a database error, use a mock role
-        _e ->
-          mock_role = %{
-            id: System.unique_integer([:positive]),
-            name: name,
-            description: "Mock test role for #{name} (fallback)"
-          }
-          Process.put({:test_role, name}, mock_role)
-          mock_role
+        e in Ecto.ConstraintError ->
+          if e.constraint == "roles_name_index" do
+            mock_role = %{ id: System.unique_integer([:positive]), name: name, description: "Mock test role for #{name}" }
+            Process.put({:test_role, name}, mock_role)
+            mock_role
+          else
+            reraise e, __STACKTRACE__
+          end
       end
     end
   end
@@ -880,23 +879,19 @@ defmodule XIAM.HierarchyTestAdapter do
   defp get_child_nodes_from_dictionary(parent_id) do
     # Find all nodes that have this parent
     # Handle both when Process.get() returns a map or a list (for different test scenarios)
-    dict_keys = case Process.get() do
-      dict when is_map(dict) -> Map.keys(dict)
-      dict when is_list(dict) -> Enum.map(dict, fn {key, _} -> key end)
-      nil -> []
-    end
+    process_dict = Process.get()
     
-    # Find child nodes
-    child_ids = Enum.filter(dict_keys, fn
-      {:test_node_parent, _child_id, ^parent_id} -> true
-      {:test_node_parent, child_id} when is_integer(child_id) -> 
-        Process.get({:test_node_parent, child_id}) == parent_id
+    # Filter key-value pairs for parent relationships matching our node_id
+    child_nodes = Enum.filter(process_dict, fn
+      {{:test_node_parent, _child_id, ^parent_id}} -> true
+      {{:test_node_parent, child_id}, parent_id} when is_integer(child_id) -> 
+        # Check if this node's parent is the node we're revoking access for
+        parent_id == parent_id
       _ -> false
     end)
-    |> Enum.map(fn
-      {:test_node_parent, child_id, _} -> child_id
-      {:test_node_parent, child_id} -> child_id
-    end)
+    
+    # Extract the child IDs from the key-value pairs
+    child_ids = Enum.map(child_nodes, fn {{:test_node_parent, child_id}, _parent_id} -> child_id end)
     
     # Get data for each child
     children = Enum.map(child_ids, fn child_id ->
@@ -1053,7 +1048,8 @@ defmodule XIAM.HierarchyTestAdapter do
     
     # Filter key-value pairs for parent relationships matching our node_id
     child_nodes = Enum.filter(process_dict, fn
-      {{:test_node_parent, child_id}, parent_id} when is_integer(child_id) or is_binary(child_id) -> 
+      {{:test_node_parent, _child_id, ^node_id}} -> true
+      {{:test_node_parent, child_id}, parent_id} when is_integer(child_id) -> 
         # Check if this node's parent is the node we're revoking access for
         parent_id == node_id
       _ -> false
