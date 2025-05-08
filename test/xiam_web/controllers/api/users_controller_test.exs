@@ -1,6 +1,5 @@
 defmodule XIAMWeb.API.UsersControllerTest do
   use XIAMWeb.ConnCase, async: false
-  import Ecto.Query
   import Mock
   import XIAM.ETSTestHelper
 
@@ -8,23 +7,31 @@ defmodule XIAMWeb.API.UsersControllerTest do
   alias XIAM.Rbac.ProductContext
   alias Xiam.Rbac
   alias XIAM.Users.User
-  alias Xiam.Rbac.Role
-  alias Xiam.Rbac.Product
-  alias Xiam.Rbac.Capability
   alias XIAM.Auth.JWT
   alias XIAM.Jobs.AuditLogger
 
   setup %{conn: conn} do
+    # Explicitly start applications for database resilience
+    # Following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    
+    # Use shared mode for database connections
+    Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+    
     # Generate a timestamp for unique test data with better uniqueness
     # Use a combination of millisecond timestamp and random component
     timestamp = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
 
-    # Clean up existing test data
-    Repo.delete_all(from u in User, where: like(u.email, "%users_api_test%"))
-    Repo.delete_all(from r in Role, where: like(r.name, "%Users_Api_Role%"))
-    Repo.delete_all(from c in Capability, where: like(c.name, "%_user%"))
-    # Also delete test product
-    Repo.delete_all(from p in Product, where: like(p.product_name, "%Users_Test_Product%"))
+    # Clean up existing test data using direct SQL queries for better resilience
+    XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      # Using direct SQL query instead of Repo.delete_all
+      {:ok, _} = Ecto.Adapters.SQL.query(Repo, "DELETE FROM users WHERE email LIKE $1", ["%users_api_test%"])
+      {:ok, _} = Ecto.Adapters.SQL.query(Repo, "DELETE FROM roles WHERE name LIKE $1", ["%Users_Api_Role%"])
+      {:ok, _} = Ecto.Adapters.SQL.query(Repo, "DELETE FROM capabilities WHERE name LIKE $1", ["%_user%"])
+      {:ok, _} = Ecto.Adapters.SQL.query(Repo, "DELETE FROM products WHERE product_name LIKE $1", ["%Users_Test_Product%"])
+    end, max_retries: 3, retry_delay: 200)
 
     # --- Create Product --- (Capabilities need a product)
     {:ok, product} = ProductContext.create_product(%{product_name: "Users_Test_Product_#{timestamp}", description: "Test Product"})

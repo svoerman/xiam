@@ -7,6 +7,15 @@ defmodule XIAMWeb.Live.Components.PasskeyComponentTest do
 
   describe "PasskeyComponent" do
     setup %{conn: conn} do
+      # Explicitly start applications for database resilience
+      # Following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      {:ok, _} = Application.ensure_all_started(:phoenix_live_view)
+      
+      # Ensure ETS tables exist for Phoenix
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
       # Create a test user
       user = %XIAM.Users.User{
         id: 123,

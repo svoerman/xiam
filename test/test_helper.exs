@@ -48,16 +48,22 @@ Application.ensure_all_started(:phoenix_ecto)
 # Start ExUnit
 ExUnit.start()
 
+# Ensure TestOutputHelper is properly compiled first
+# Don't use Code.require_file which causes module redefinition warnings
+Application.ensure_all_started(:xiam)
+# Use the compiled module directly
+alias XIAM.TestOutputHelper, as: Output
+
 # Initialize the database using our enhanced resilient setup
 # This handles repo startup, sandbox mode configuration, and ETS tables
 XIAM.ResilientDatabaseSetup.initialize_test_environment()
 
-# Double-check that repo is properly initialized with diagnostic output
+# Double-check that repo is properly initialized with controlled diagnostic output
 case XIAM.ResilientDatabaseSetup.repository_status(XIAM.Repo) do
   {:ok, _pid} -> 
-    IO.puts("✅ Repository successfully initialized for tests")
+    Output.debug_print("✅ Repository successfully initialized for tests")
   status -> 
-    IO.warn("⚠️ Repository initialization issue: #{inspect(status)}")
+    Output.warn("⚠️ Repository initialization issue", inspect(status))
 end
 
 # Explicitly check that the repo is accessible

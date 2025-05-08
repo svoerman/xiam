@@ -1,4 +1,5 @@
 defmodule XIAM.ResilientDatabaseSetup do
+  alias XIAM.TestOutputHelper, as: Output
   @moduledoc """
   Provides enhanced database setup functions for test environments.
   
@@ -37,11 +38,16 @@ defmodule XIAM.ResilientDatabaseSetup do
         # Repository is started and running, verify it's accessible
         verify_repository_connection(repo)
         
+      {:error, {:process_dead, pid}} ->
+        # Process exists but is dead, restart it
+        Output.debug_print("Repository process #{inspect(pid)} is dead, restarting...")
+        restart_repository(repo, max_attempts, current_attempt)
+        
       {:error, :not_started} ->
         # Repository is not started, try to start it
-        start_result = start_repository(repo)
+        start_result = do_start_repository(repo)
         case start_result do
-          {:ok, _pid} -> verify_repository_connection(repo)
+          :ok -> verify_repository_connection(repo)
           _ -> 
             # Failed to start, retry after a short delay
             Process.sleep(50 * current_attempt)
@@ -92,6 +98,7 @@ defmodule XIAM.ResilientDatabaseSetup do
   
   @doc """
   Attempts to start a repository with proper error handling.
+  This is the public API for starting repositories.
   """
   def start_repository(repo) do
     # Ensure all dependent applications are started first
@@ -106,6 +113,64 @@ defmodule XIAM.ResilientDatabaseSetup do
       end
     rescue
       e -> {:error, {:exception, e}}
+    end
+  end
+  
+  # Private implementation of repository start for internal use.
+  # Used by restart_repository and ensure_repository_started.
+  defp do_start_repository(repo) do
+    # Try to start the repo
+    start_result = try do
+      repo.start_link()
+    rescue
+      e -> {:error, e}
+    end
+    
+    case start_result do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+  
+  # Function to restart a repository with a dead process
+  defp restart_repository(repo, max_attempts, current_attempt) do
+    if current_attempt < max_attempts do
+      # First try to stop the repository if it exists but is dead
+      _stop_result = try do
+        # Try to stop the repository - this may fail if process is already dead
+        case Process.whereis(repo) do
+          pid when is_pid(pid) -> 
+            try do
+              Process.exit(pid, :kill)
+              :ok
+            catch
+              _kind, _value -> :ok  # Already dead, that's fine
+            end
+          nil -> :ok  # Process doesn't exist, nothing to stop
+        end
+      rescue
+        e -> {:error, e}
+      end
+      
+      # Add a small delay before restart attempt
+      Process.sleep(200 * (current_attempt + 1))
+      
+      # Now try to start it
+      start_result = do_start_repository(repo)
+      
+      case start_result do
+        :ok -> 
+          # Successfully restarted
+          :ok
+        _error -> 
+          # Failed to restart, try again with incremented attempt count
+          Output.debug_print("Restart attempt #{current_attempt + 1} failed, trying again...")
+          restart_repository(repo, max_attempts, current_attempt + 1)
+      end
+    else
+      # Exceeded max attempts
+      {:error, :max_restart_attempts_exceeded}
     end
   end
   
@@ -148,10 +213,45 @@ defmodule XIAM.ResilientDatabaseSetup do
     
     # Make sure the sandbox mode is set to manual
     # This is particularly important for nested setups which may cause multiple checkouts
+    # Add retry mechanism for sandbox mode setup to handle transient process failures
     sandbox_result = try do
-      # Simply set the mode to manual - there's no getter function
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual)
-      {:ok, :manual}
+      # Retry sandbox mode configuration with exponential backoff
+      retry_result = retry_with_backoff(fn ->
+        try do
+          # Ensure the repository is started before trying to set mode
+          case ensure_repo_started() do
+            :ok ->
+              # Set the mode to manual
+              Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, :manual)
+              {:ok, :manual}
+            {:error, reason} ->
+              {:error, {:repo_not_started, reason}}
+          end
+        rescue
+          e in [ArgumentError, RuntimeError] ->
+            # Common errors include repo not started or process not alive
+            {:error, {:sandbox_mode, e}}
+        catch
+          :exit, {:noproc, _} -> 
+            # Specific handling for process not alive errors
+            {:error, :process_not_alive}
+          kind, value -> 
+            {:error, {kind, value}}
+        end
+      end, max_retries: 3, initial_delay: 50, max_delay: 500)
+      
+      case retry_result do
+        {:ok, _} = success -> success
+        {:error, reason} -> 
+          # Make a final decision on whether to proceed or abort
+          if fatal_error?(reason) do
+            {:error, reason}
+          else
+            # For non-fatal errors, log and proceed with a warning
+            Output.warn("Sandbox mode configuration issue", inspect(reason))
+            {:ok, :manual_with_warning}
+          end
+      end
     rescue
       e -> {:error, {:sandbox_mode, e}}
     end
@@ -175,15 +275,87 @@ defmodule XIAM.ResilientDatabaseSetup do
       # Application start failed with already_started repo - this is actually fine
       {{:error, {:xiam, {{:shutdown, {:failed_to_start_child, XIAM.Repo, {:already_started, _}}}, _}}}, {:ok, _}, {:ok, _}, _, :ok} -> :ok
       
-      # Any other failure combination - log a warning
+      # Any other failure combination - attempt an aggressive reset and retry
       result -> 
-        IO.warn("Test environment initialization issues: #{inspect(result)}")
-        :warning
+        IO.warn("Test environment initialization issues: #{inspect(result)}, attempting reset...")
+        reset_result = reset_database_connections()
+        Output.debug_print("Database connection reset completed with result", inspect(reset_result))
+        :reset_attempted
+    end
+  end
+  
+  @doc """
+  Resets database connections to a clean state.
+  
+  This function aggressively resets the database connections by:
+  1. Stopping the repository
+  2. Closing all existing connections
+  3. Restarting the repository
+  4. Reconfiguring the sandbox
+  
+  It's designed to handle bootstrap issues and provide a clean slate for tests.
+  """
+  def reset_database_connections do
+    # Stop the repository to prevent any ongoing operations
+    stop_result = stop_repository()
+    
+    # Close all existing connections to prevent any lingering issues
+    close_result = close_all_connections()
+    
+    # Restart the repository to ensure a clean state
+    restart_result = restart_repository()
+    
+    # Reconfigure the sandbox to ensure proper ownership and mode
+    reconfigure_result = reconfigure_sandbox()
+    
+    # Return the result of the reset operation
+    case {stop_result, close_result, restart_result, reconfigure_result} do
+      {:ok, :ok, :ok, :ok} -> :ok
+      result -> {:error, result}
+    end
+  end
+  
+  defp stop_repository do
+    try do
+      XIAM.Repo.stop()
+      :ok
+    rescue
+      e -> {:error, {:stop_error, e}}
+    end
+  end
+  
+  defp close_all_connections do
+    try do
+      Ecto.Adapters.SQL.Sandbox.checkin(XIAM.Repo, [])
+      :ok
+    rescue
+      e -> {:error, {:close_error, e}}
+    end
+  end
+  
+  defp restart_repository do
+    try do
+      ensure_repository_started()
+      :ok
+    rescue
+      e -> {:error, {:restart_error, e}}
+    end
+  end
+  
+  defp reconfigure_sandbox do
+    try do
+      configure_sandbox(%{})
+      :ok
+    rescue
+      e -> {:error, {:reconfigure_error, e}}
     end
   end
   
   @doc """
   Configures the sandbox for testing.
+  
+  This function determines if async mode should be used based on the provided tags.
+  It then sets the sandbox mode and checks out a connection with proper ownership.
   """
   def configure_sandbox(tags) do
     # Determine if async mode should be used
@@ -267,5 +439,72 @@ defmodule XIAM.ResilientDatabaseSetup do
     
     # Then run the operation through the existing helper
     XIAM.ResilientTestHelper.safely_execute_db_operation(function)
+  end
+  
+  # Helper for retrying operations with exponential backoff
+  defp retry_with_backoff(operation, opts) do
+    max_retries = Keyword.get(opts, :max_retries, 3)
+    initial_delay = Keyword.get(opts, :initial_delay, 100)
+    max_delay = Keyword.get(opts, :max_delay, 1000)
+    
+    do_retry_with_backoff(operation, max_retries, initial_delay, max_delay, 0)
+  end
+  
+  defp do_retry_with_backoff(operation, max_retries, initial_delay, max_delay, retry_count) do
+    result = operation.()
+    
+    case result do
+      {:ok, _} = success -> success  # Operation succeeded
+      {:error, _} = error ->
+        if retry_count < max_retries do
+          # Calculate delay using exponential backoff with jitter
+          delay = min(initial_delay * :math.pow(2, retry_count) + :rand.uniform(50), max_delay)
+          Output.debug_print("Operation failed on attempt #{retry_count + 1}, retrying in #{trunc(delay)}ms...")
+          Process.sleep(trunc(delay))
+          do_retry_with_backoff(operation, max_retries, initial_delay, max_delay, retry_count + 1)
+        else
+          error  # Max retries reached, return the error
+        end
+    end
+  end
+  
+  # Helper to ensure the repository is started
+  defp ensure_repo_started do
+    try do
+      case Process.whereis(XIAM.Repo) do
+        pid when is_pid(pid) -> 
+          # Repo is already started
+          :ok
+        nil -> 
+          # Try to start the repo
+          {:ok, _} = Application.ensure_all_started(:ecto_sql)
+          {:ok, _} = Application.ensure_all_started(:postgrex)
+          
+          # Explicitly start the repo
+          case XIAM.Repo.start_link() do
+            {:ok, _} -> :ok
+            {:error, {:already_started, _}} -> :ok
+            error -> {:error, error}
+          end
+      end
+    rescue
+      e -> {:error, e}
+    catch
+      kind, value -> {:error, {kind, value}}
+    end
+  end
+  
+  # Helper to determine if an error is fatal or can be ignored
+  defp fatal_error?(reason) do
+    case reason do
+      # Process not alive errors can be non-fatal if the process might restart
+      :process_not_alive -> false
+      # Repo not started is usually recoverable
+      {:repo_not_started, _} -> false
+      # Other specific errors we know are not fatal
+      {:sandbox_mode, %ArgumentError{}} -> false
+      # Default - treat as fatal
+      _ -> true
+    end
   end
 end

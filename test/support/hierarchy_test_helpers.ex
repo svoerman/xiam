@@ -1,4 +1,5 @@
 defmodule XIAM.HierarchyTestHelpers do
+  alias XIAM.TestOutputHelper, as: Output
   @moduledoc """
   Helper functions for testing the Hierarchy module.
   
@@ -45,12 +46,13 @@ defmodule XIAM.HierarchyTestHelpers do
   Returns a map with the created nodes.
   """
   def create_hierarchy_tree do
-    # Use timestamp + unique integer to avoid path collisions
+    # Use timestamp + random for true uniqueness following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
     timestamp = System.system_time(:millisecond)
-    unique_id = "#{timestamp}_#{System.unique_integer([:positive, :monotonic])}"
+    random_suffix = :rand.uniform(100_000)
+    unique_id = "#{timestamp}_#{random_suffix}"
     
     # Use resilient operations with retry logic wrapped by ResilientTestHelper
-    XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+    result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
       # Create the root node with resilient creation pattern
       root = create_node_with_retry("Root_#{unique_id}", "organization", nil)
       
@@ -65,7 +67,19 @@ defmodule XIAM.HierarchyTestHelpers do
       
       # Return the hierarchy map
       %{root: root, dept: dept, team: team, project: project}
-    end)
+    end, max_retries: 3, retry_delay: 200)
+    
+    # Handle different result formats with pattern matching
+    case result do
+      {:ok, hierarchy} when is_map(hierarchy) -> 
+        hierarchy
+      hierarchy when is_map(hierarchy) ->
+        hierarchy
+      {:error, reason} ->
+        raise "Failed to create hierarchy tree: #{inspect(reason)}"
+      other ->
+        raise "Unexpected result from create_hierarchy_tree: #{inspect(other)}"
+    end
   end
   
   @doc """
@@ -101,7 +115,7 @@ defmodule XIAM.HierarchyTestHelpers do
         
         if path_error && retry_count < 5 do
           # Retry with a different name
-          IO.puts("Retrying node creation with different name due to path collision: #{actual_name}")
+          Output.debug_print("Retrying node creation with different name due to path collision", actual_name)
           create_node_with_retry(name, node_type, parent_id, retry_count + 1)
         else
           # Either not a uniqueness error or we've exceeded retries

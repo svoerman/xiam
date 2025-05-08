@@ -1,7 +1,8 @@
 defmodule XIAM.GDPR.DataRemovalTest do
-  use XIAM.DataCase
+  use XIAM.DataCase, async: false
 
   import Mock
+  import XIAM.ETSTestHelper
 
   alias XIAM.GDPR.DataRemoval
   alias XIAM.Users.User
@@ -10,23 +11,44 @@ defmodule XIAM.GDPR.DataRemovalTest do
 
   describe "data removal" do
     setup do
-      # Create a test user
-      {:ok, user} = %User{}
-        |> User.pow_changeset(%{
-          email: "data_removal_test@example.com",
-          password: "Password123!",
-          password_confirmation: "Password123!"
-        })
-        |> Repo.insert()
+      # Ensure applications are started and DB connections set to shared mode
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      
+      # Ensure ETS tables exist
+      ensure_ets_tables_exist()
+      
+      # Generate a truly unique identifier for test data
+      unique_id = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
+      
+      # Create test user with proper error handling
+      user_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.transaction(fn ->
+          {:ok, user} = %User{}
+            |> User.pow_changeset(%{
+              email: "data_removal_test_#{unique_id}@example.com",
+              password: "Password123!",
+              password_confirmation: "Password123!"
+            })
+            |> Repo.insert()
 
-      # Create consent records
-      {:ok, _consent} = Consent.record_consent(%{
-        consent_type: "marketing",
-        consent_given: true,
-        user_id: user.id
-      })
-
-      {:ok, user: user}
+          # Create consent records
+          {:ok, _consent} = Consent.record_consent(%{
+            consent_type: "marketing",
+            consent_given: true,
+            user_id: user.id
+          })
+          
+          user
+        end)
+      end)
+      
+      case user_result do
+        {:ok, user} -> {:ok, user: user}
+        error -> {:error, "Failed to set up test user: #{inspect(error)}"}
+      end
     end
 
     test "anonymize_user/1 anonymizes a user's data", %{user: user} do

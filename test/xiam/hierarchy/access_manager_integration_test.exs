@@ -13,21 +13,40 @@ defmodule XIAM.Hierarchy.AccessManagerIntegrationTest do
   alias XIAM.Hierarchy.NodeManager
   
   setup do
-    # First ensure the repo is started with explicit applications
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
+    # Use BootstrapHelper for complete sandbox management
+    {:ok, setup_result} = XIAM.BootstrapHelper.with_bootstrap_protection(fn ->
+      # Aggressively reset the connection pool to handle potential bootstrap issues
+      XIAM.BootstrapHelper.reset_connection_pool()
+      
+      # First ensure the repo is started with explicit applications
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure repository is properly started
+      XIAM.ResilientDatabaseSetup.ensure_repository_started()
+      
+      # Force proper sandbox mode
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      
+      # Ensure ETS tables exist for Phoenix-related operations
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      XIAM.ETSTestHelper.initialize_endpoint_config()
+      
+      # Add additional safety check for Phoenix tables which can cause flaky tests
+      XIAM.ETSTestHelper.safely_ensure_table_exists(:phoenix_pubsub)
+      XIAM.ETSTestHelper.safely_ensure_table_exists(:phoenix_endpoint)
+      
+      # Return success indicator
+      :setup_complete
+    end)
     
-    # Ensure repository is properly started
-    XIAM.ResilientDatabaseSetup.ensure_repository_started()
+    # Verify setup completed successfully
+    assert setup_result == :setup_complete
     
-    # Ensure ETS tables exist for Phoenix-related operations
-    XIAM.ETSTestHelper.ensure_ets_tables_exist()
-    XIAM.ETSTestHelper.initialize_endpoint_config()
-    
-    # Create an extended test hierarchy with user, role, department, team using resilient pattern
-    fixtures = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+    # Create an extended test hierarchy with user, role, department, team using the new bootstrap helper
+    {:ok, fixtures} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
       create_extended_test_hierarchy()
-    end, max_retries: 3, retry_delay: 200)
+    end, max_retries: 5, delay_ms: 500, reset_pool: true)
     
     # Also create an additional department for advanced hierarchy tests
     alt_dept = create_local_test_department()

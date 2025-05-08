@@ -1,4 +1,5 @@
 defmodule XIAMWeb.API.HierarchyControllerTest do
+  alias XIAM.TestOutputHelper, as: Output
   use XIAMWeb.ConnCase, async: false
 
   # Import the ETSTestHelper to ensure proper test environment
@@ -6,6 +7,9 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
   alias XIAM.Hierarchy
 
   setup %{conn: conn} do
+    # Ensure all ETS tables are initialized before starting test
+    XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    
     # Create a test user
     {:ok, user} = setup_test_user()
     
@@ -263,8 +267,9 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
     
     @tag :resilient_test
     test "list_user_accessible_nodes returns properly structured nodes", %{conn: conn, user: user, team: team, role: role} do
-      # Use gentle ETS table initialization 
-      ensure_ets_tables_exist()
+      # Use proper ETS table initialization from the ETSTestHelper module
+      # According to memory 66638d70-7aaf-4a8a-a4b5-a61a006e3fd3, this ensures Phoenix ETS tables exist
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
       
       # Verify the team exists before proceeding
       team_check = Hierarchy.get_node(team.id)
@@ -276,7 +281,7 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
         Hierarchy.grant_access(user.id, team.id, role.id)
       rescue
         e in [RuntimeError, ArgumentError] ->
-          IO.puts("Warning: Error granting access: #{inspect(e)}")
+          Output.warn("Error granting access", inspect(e))
           {:ok, _} = XIAM.Repo.start_link()
           Hierarchy.grant_access(user.id, team.id, role.id)
       end
@@ -290,8 +295,8 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
             json_response(conn, 200)
           rescue
             e in [ArgumentError] ->
-              IO.puts("Retrying after ETS error: #{inspect(e)}")
-              ensure_ets_tables_exist()
+              Output.debug_print("Retrying after ETS error", inspect(e))
+              XIAM.ETSTestHelper.ensure_ets_tables_exist()
               conn = get(conn, ~p"/api/hierarchy/users/#{user.id}/accessible-nodes")
               json_response(conn, 200)
           end
@@ -318,7 +323,7 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
           
         error ->
           # If access wasn't granted, provide a helpful message but don't fail
-          IO.puts("Skipping test due to access grant failure: #{inspect(error)}")
+          Output.debug_print("Skipping test due to access grant failure", inspect(error))
           assert true # Avoid test failure
       end
     end

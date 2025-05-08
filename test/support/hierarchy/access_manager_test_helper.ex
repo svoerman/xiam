@@ -3,11 +3,11 @@
 # The TestAccessManager implementation is now in a separate file
 
 defmodule XIAM.Hierarchy.AccessManagerTestHelper do
-  # Set to true to enable debug output during tests
-  @debug_enabled false
-
+  alias XIAM.TestOutputHelper, as: Output
+  
+  # Use the centralized debug function instead of local implementation
   defp debug(message) do
-    if @debug_enabled, do: IO.puts(message)
+    Output.debug_print(message)
   end
   @moduledoc """
   Helper functions for access manager tests.
@@ -123,7 +123,7 @@ defmodule XIAM.Hierarchy.AccessManagerTestHelper do
           {:error, "Error checking access after #{max_retries} retries: #{inspect(reason)}"}
         else
           # Retry after a delay
-          IO.puts("Error checking access on attempt #{current_retry}: #{inspect(reason)}, retrying...")
+          Output.debug_print("Error checking access on attempt #{current_retry}: #{inspect(reason)}, retrying...")
           :timer.sleep(50 * (2 ** current_retry))
           ensure_access_revoked(user_id, dept_path, max_retries, current_retry + 1)
         end
@@ -209,7 +209,7 @@ defmodule XIAM.Hierarchy.AccessManagerTestHelper do
           {:error, "Error checking access after #{max_retries} retries: #{inspect(reason)}"}
         else
           # Retry after a delay
-          IO.puts("Error in check_access on attempt #{current_retry}: #{inspect(reason)}, retrying...")
+          Output.debug_print("Error in check_access on attempt #{current_retry}: #{inspect(reason)}, retrying...")
           :timer.sleep(50 * (2 ** current_retry))
           ensure_check_access_revoked(user_id, dept_id, dept_path, max_retries, current_retry + 1)
         end

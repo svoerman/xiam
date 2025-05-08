@@ -6,7 +6,7 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   without relying on database access or external dependencies.
   """
   
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   
   # Create a mocked adapter that doesn't rely on the database
   defmodule MockAdapter do
@@ -21,7 +21,11 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     
     # User management
     def create_user do
-      user_id = System.unique_integer([:positive, :monotonic])
+      # Use timestamp + random for truly unique identifiers
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
+      user_id = "#{timestamp}_#{random_suffix}"
+      
       user = %{
         id: user_id,
         email: "test_#{user_id}@example.com"
@@ -32,7 +36,11 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     
     # Role management
     def create_role do
-      role_id = System.unique_integer([:positive, :monotonic])
+      # Use timestamp + random for truly unique identifiers
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
+      role_id = "#{timestamp}_#{random_suffix}"
+      
       role = %{
         id: role_id,
         name: "Test Role #{role_id}"
@@ -43,7 +51,11 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     
     # Node creation
     def create_node(attrs) do
-      node_id = System.unique_integer([:positive, :monotonic])
+      # Use timestamp + random for truly unique identifiers
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
+      node_id = "#{timestamp}_#{random_suffix}"
+      
       node_type = attrs[:node_type] || "default_type"
       name = attrs[:name] || "Node #{node_id}"
       path = attrs[:path] || "#{node_type}_#{node_id}"
@@ -70,8 +82,11 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
       parent_path = parent.path || ""
       node_type = attrs[:node_type] || "child"
       
-      # Generate a path that includes the parent path
-      child_path = "#{parent_path}.#{node_type}_#{System.unique_integer([:positive])}"
+      # Generate a path that includes the parent path using timestamp + random for true uniqueness
+      # Following memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc pattern
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
+      child_path = "#{parent_path}.#{node_type}_#{timestamp}_#{random_suffix}"
       attrs = Map.put(attrs, :path, child_path)
       
       create_node(attrs)
@@ -90,8 +105,11 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     # Access control
     def grant_access(user, node, role) do
       key = "#{user.id}:#{node.id}"
+      # Use timestamp + random for truly unique ID following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
+      timestamp = System.system_time(:millisecond)
+      random_suffix = :rand.uniform(100_000)
       grant = %{
-        id: System.unique_integer([:positive]),
+        id: "#{timestamp}_#{random_suffix}",
         user_id: user.id,
         node_id: node.id,
         role_id: role.id,
@@ -157,20 +175,21 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
   end
   
-  # Initialize test state before each test with resilient patterns
+  # Initialize test state before each test with improved resilient patterns
   setup do
-    # First ensure the repo is started
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
+    # Since this is an isolated test that doesn't need actual database connections,
+    # we'll simplify the setup to focus only on the mock adapter initialization
+    # This follows memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc patterns for isolation
     
-    # Ensure ETS tables exist for Phoenix-related operations
+    # Ensure ETS tables exist for Phoenix-related operations if needed
+    # This is safe to call even without a database connection
     XIAM.ETSTestHelper.ensure_ets_tables_exist()
     
-    # Initialize mock state with resilient pattern
-    XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-      MockAdapter.init_test_state()
-    end, max_retries: 3, retry_delay: 200)
+    # Simply initialize the mock state directly - no need for database operations
+    # since this test uses an in-memory mock adapter
+    MockAdapter.init_test_state()
     
+    # No specific context to return in this test
     :ok
   end
   
@@ -201,8 +220,19 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
     
     test "creates a multi-level hierarchy" do
-      # Create a test hierarchy
-      %{root: root, dept: dept, team: team, project: project} = MockAdapter.create_test_hierarchy()
+      # Use BootstrapHelper for resilient operations
+      {:ok, test_result} = XIAM.BootstrapHelper.with_bootstrap_protection(fn ->
+        # Create a test hierarchy with bootstrap protection
+        {:ok, hierarchy} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
+          MockAdapter.create_test_hierarchy()
+        end)
+        
+        # Return the hierarchy for verification
+        hierarchy
+      end)
+      
+      # Extract the hierarchy components
+      %{root: root, dept: dept, team: team, project: project} = test_result
       
       # Verify the relationships
       assert dept.parent_id == root.id
@@ -218,8 +248,14 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   describe "hierarchy access control" do
     setup do
-      # Ensure ETS tables exist for Phoenix-related operations
+      # Apply comprehensive resilient testing patterns from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
+      # First start all critical applications
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure ETS tables exist for Phoenix-related operations - critical for preventing Phoenix table missing errors
       XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      XIAM.ETSTestHelper.initialize_endpoint_config()
       
       # Create test users and roles with resilient pattern
       user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -247,15 +283,41 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
     
     test "inherits access to child nodes", %{user: user, role: role, hierarchy: hierarchy} do
-      # Grant access to the department node
-      {:ok, _access} = MockAdapter.grant_access(user, hierarchy.dept, role)
+      # Use BootstrapHelper for resilient operations
+      {:ok, test_result} = XIAM.BootstrapHelper.with_bootstrap_protection(fn ->
+        # Grant access to the department node with bootstrap protection
+        {:ok, _access} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
+          MockAdapter.grant_access(user, hierarchy.dept, role)
+        end)
+        
+        # Verify access to the department with bootstrap protection
+        {:ok, dept_access} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
+          MockAdapter.can_access?(user, hierarchy.dept)
+        end)
+        
+        # Check inherited access to team with bootstrap protection
+        {:ok, team_access} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
+          MockAdapter.can_access?(user, hierarchy.team)
+        end)
+        
+        # Check inherited access to project with bootstrap protection
+        {:ok, project_access} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
+          MockAdapter.can_access?(user, hierarchy.project)
+        end)
+        
+        # Return all access results for verification
+        {dept_access, team_access, project_access}
+      end)
+      
+      # Destructure the test results
+      {dept_access, team_access, project_access} = test_result
       
       # Verify access to the department
-      assert MockAdapter.can_access?(user, hierarchy.dept)
+      assert dept_access, "User should have direct access to department"
       
       # Access should be inherited by children
-      assert MockAdapter.can_access?(user, hierarchy.team)
-      assert MockAdapter.can_access?(user, hierarchy.project)
+      assert team_access, "User should have inherited access to team"
+      assert project_access, "User should have inherited access to project"
       
       # But not by parent
       refute MockAdapter.can_access?(user, hierarchy.root)
@@ -278,8 +340,14 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   describe "hierarchy edge cases" do
     setup do
-      # Ensure ETS tables exist for Phoenix-related operations
+      # Apply comprehensive resilient testing patterns from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
+      # First start all critical applications
+      {:ok, _} = Application.ensure_all_started(:ecto_sql)
+      {:ok, _} = Application.ensure_all_started(:postgrex)
+      
+      # Ensure ETS tables exist for Phoenix-related operations - critical for preventing Phoenix table missing errors
       XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      XIAM.ETSTestHelper.initialize_endpoint_config()
       
       # Create test users and roles with resilient pattern
       user = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
