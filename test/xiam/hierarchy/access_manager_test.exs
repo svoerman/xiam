@@ -159,6 +159,8 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
   
   describe "grant_access and can_access?" do
     test "correctly grants and checks access to nodes", %{user: user, role: role, dept: dept, team: team, project: project} do
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+      
       # Grant access to the department using ResilientTestHelper
       grant_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         AccessManager.grant_access(user.id, dept.id, role.id)
@@ -217,12 +219,8 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       assert can_access_project, "User should have inherited access to project"
     end
     
-    @tag :skip  # Skip this test until we can more thoroughly investigate access granting behavior
     test "correctly handles access revocation", %{user: user, role: role, dept: dept, alt_dept: alt_dept} do
-      # Print debug info about the nodes
-      IO.puts("\nDEBUG INFO:")
-      IO.puts("dept: id=#{dept.id}, name=#{dept.name}, path=#{dept.path}")
-      IO.puts("alt_dept: id=#{alt_dept.id}, name=#{alt_dept.name}, path=#{alt_dept.path}\n")
+      # Debug info about the nodes removed for cleaner test output
 
       # Ensure ETS tables are initialized before Phoenix-related operations
       XIAM.ETSTestHelper.ensure_ets_tables_exist()
@@ -239,13 +237,13 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # Verify grant succeeded with detailed error handling
       case grant_result1 do
         {:ok, {:ok, _}} -> 
-          IO.puts("Successfully granted access to dept")
+          # Successfully granted access to dept
           :grant_succeeded
         {:ok, _} -> 
-          IO.puts("Successfully granted access to dept (alt format)")
+          # Successfully granted access to dept (alt format)
           :grant_succeeded
         other -> 
-          IO.puts("Warning: Failed to grant access to dept: #{inspect(other)}")
+          # Failed to grant access to dept - continuing test
           flunk("Failed to grant access to dept: #{inspect(other)}")
       end
       
@@ -257,13 +255,13 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # Verify grant succeeded with detailed error handling
       case grant_result2 do
         {:ok, {:ok, _}} -> 
-          IO.puts("Successfully granted access to alt_dept")
+          # Successfully granted access to alt_dept
           :grant_succeeded
         {:ok, _} -> 
-          IO.puts("Successfully granted access to alt_dept (alt format)")
+          # Successfully granted access to alt_dept (alt format)
           :grant_succeeded
         other -> 
-          IO.puts("Warning: Failed to grant access to alt_dept: #{inspect(other)}")
+          # Failed to grant access to alt_dept - continuing test
           flunk("Failed to grant access to alt_dept: #{inspect(other)}")
       end
       
@@ -279,7 +277,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       end, max_retries: 5, retry_delay: 200)
       
       # Print the access check result for debugging
-      IO.puts("First dept access check result: #{inspect(before_revoke1)}")
+      # First dept access check result captured
       
       before_revoke2 = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Ensure ETS tables before each operation
@@ -288,7 +286,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       end, max_retries: 5, retry_delay: 200)
       
       # Print the access check result for debugging
-      IO.puts("Second dept access check result: #{inspect(before_revoke2)}")
+      # Second dept access check result captured
       
       # Extract results with proper pattern matching
       access_before_revoke1 = case before_revoke1 do
@@ -317,11 +315,11 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
         {:error, :node_not_found} -> 
           # If the node cannot be found, simply log it but continue the test
           # This is a known issue based on the database state or visibility
-          IO.puts("\nAccess revocation warning: Node not found - continuing with test anyway\n")
+          # Access revocation warning: Node not found - continuing with test anyway
           # Just continue the test instead of skipping
           :node_not_found_but_continue
-        other -> 
-          IO.puts("\nNon-critical failure in revocation: #{inspect(other)}\n")
+        _other -> 
+          # Non-critical failure in revocation - continuing test
           # Continue despite the error to verify expected behavior in the rest of the test
           :continue_despite_error
       end
@@ -332,7 +330,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # Verify access to first department after revocation with retry
       # Use multiple attempts as access revocation might take time to propagate
       after_revoke1 = nil
-      Enum.reduce_while(1..3, nil, fn attempt, _ ->
+      Enum.reduce_while(1..3, nil, fn _attempt, _ ->
         result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
           XIAM.Hierarchy.can_access?(user.id, dept.id)
         end, max_retries: 3, retry_delay: 100)
@@ -342,7 +340,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
           {:halt, result}
         else
           # Otherwise wait and try again
-          IO.puts("Attempt #{attempt}: Waiting for revocation to propagate...")
+          # Attempt #{attempt}: Waiting for revocation to propagate...
           Process.sleep(100)
           {:cont, result}
         end
@@ -351,12 +349,12 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # Explicitly verify the alt_dept access with similar retry pattern
       # This helps ensure we're getting accurate test results
       after_revoke2 = nil
-      Enum.reduce_while(1..3, nil, fn attempt, _ ->
+      Enum.reduce_while(1..3, nil, fn _attempt, _ ->
         result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
           XIAM.Hierarchy.can_access?(user.id, alt_dept.id)
         end, max_retries: 3, retry_delay: 100)
         
-        IO.puts("Alt dept access check (attempt #{attempt}): #{inspect(result)}")
+        # Alt dept access check attempt #{attempt} completed
         
         # If we get a clear result, use it
         if is_boolean(result) do
@@ -374,9 +372,9 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       access_after_revoke2 = after_revoke2 || false
       
       # Log the final values for our assertions
-      IO.puts("Final values for assertions:")
-      IO.puts("access_after_revoke1: #{inspect(access_after_revoke1)}")
-      IO.puts("access_after_revoke2: #{inspect(access_after_revoke2)}")
+      # Final assertion values captured
+      # access_after_revoke1: #{inspect(access_after_revoke1)}
+      # access_after_revoke2: #{inspect(access_after_revoke2)}
       
       # Verify all access checks
       assert access_before_revoke1, "User should have access to dept before revocation"

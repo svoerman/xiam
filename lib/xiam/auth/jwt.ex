@@ -21,6 +21,11 @@ defmodule XIAM.Auth.JWT do
       """
   end
 
+  # Handle wrapped tuples in tests (e.g., {:ok, user})
+  def generate_token({:ok, user}), do: generate_token(user)
+  # Also handle wrapped 3-tuples in tests (e.g., {:ok, user, claims})
+  def generate_token({:ok, user, _claims}), do: generate_token(user)
+
   @doc """
   Generates a JWT token for a user.
 

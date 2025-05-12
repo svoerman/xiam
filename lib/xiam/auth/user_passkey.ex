@@ -27,7 +27,7 @@ defmodule XIAM.Auth.UserPasskey do
     |> cast(attrs, [:user_id, :credential_id, :public_key, :sign_count, :friendly_name, :aaguid, :last_used_at])
     |> validate_required([:user_id, :credential_id, :public_key, :sign_count])
     |> unique_constraint(:credential_id)
-    |> foreign_key_constraint(:user_id)
+    |> foreign_key_constraint(:user_id, name: "user_passkeys_user_id_fkey")
   end
 
   @doc """

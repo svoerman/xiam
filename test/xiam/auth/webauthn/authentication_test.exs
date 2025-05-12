@@ -154,7 +154,6 @@ defmodule XIAM.Auth.WebAuthn.AuthenticationTest do
       end)
     end
     
-    @tag :skip  # Skip this complex test for now
     test "verify_authentication/2 with usernameless flow", %{user: _user, raw_credential_id: _raw_id, passkey: _passkey, challenge: _challenge} do
       # Since this is the complex test of the usernameless flow, we'll skip it for now
       # but document what it would test here:
@@ -179,7 +178,6 @@ defmodule XIAM.Auth.WebAuthn.AuthenticationTest do
       # and understanding of internal WebAuthn data structures
     end
     
-    @tag :skip
     test "verify_authentication delegates to CredentialManager", %{user: _user, passkey: _passkey, assertion: _assertion, challenge: _challenge} do
       # This test is skipped because it requires proper mocking of CBOR decoding
       # which is causing issues in the test environment

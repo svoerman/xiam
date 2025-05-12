@@ -5,6 +5,24 @@ defmodule XIAMWeb.Plugs.AdminRedirectPlugTest do
   alias XIAM.Users.User
   alias Xiam.Rbac.{Role, Capability}
   alias XIAM.Repo
+  
+  # Ensure the Ecto Repo is properly started and configured for these tests
+  setup_all do
+    # Start the Ecto repository explicitly before running tests
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    
+    # Ensure the repo is started and in sandbox mode
+    try do
+      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+    rescue
+      e -> 
+        IO.puts("Error setting up Repo: #{inspect(e)}")
+        :ok
+    end
+    
+    :ok
+  end
 
   describe "call/2" do
     setup %{conn: _conn} do

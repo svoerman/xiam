@@ -32,6 +32,9 @@ defmodule XIAMWeb.ConnCase do
   end
 
   setup tags do
+    # Ensure the main application is started so Endpoint ETS tables are initialized
+    # Application.ensure_all_started(:xiam)
+
     # Initialize ETS tables to avoid lookup errors during tests
     XIAM.ETSTestHelper.ensure_ets_tables_exist()
     XIAM.ETSTestHelper.initialize_endpoint_config()

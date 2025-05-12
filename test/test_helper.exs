@@ -1,3 +1,11 @@
+# Ensure applications are started
+{:ok, _} = Application.ensure_all_started(:ecto)
+{:ok, _} = Application.ensure_all_started(:ecto_sql)
+{:ok, _} = Application.ensure_all_started(:postgrex)
+
+# Ensure Ecto registry is started
+_ = Ecto.Repo.Registry.start_link([])
+
 # Oban test helper is loaded automatically - don't require it explicitly
 
 # Set up logger configuration to suppress specific error messages during tests
@@ -12,7 +20,7 @@ System.at_exit(fn _status ->
 end)
 
 # Consolidate required applications startup
-[:postgrex, :ecto, :ecto_sql, :xiam, :phoenix, :phoenix_ecto]
+[:postgrex, :ecto, :ecto_sql, :xiam, :phoenix, :phoenix_ecto, :phoenix_live_view, :mox]
 |> Enum.each(&Application.ensure_all_started/1)
 
 # Compile the ResilientDatabaseSetup module to ensure it's available

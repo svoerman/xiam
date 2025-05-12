@@ -1,5 +1,7 @@
 defmodule XIAM.Hierarchy.NodeManager do
-  # Removed compiler directive as it was causing compilation issues
+  # Suppress warnings for intentionally unused functions
+  # @dialyzer {:nowarn_function, create_node: 1}
+
   @moduledoc """
   Manages hierarchy nodes including creation, retrieval, updating, and deletion.
   Extracted from the original XIAM.Hierarchy module to improve maintainability.
@@ -199,29 +201,42 @@ defmodule XIAM.Hierarchy.NodeManager do
   end
 
   @doc """
-  Gets all descendants of a node recursively.
-  Uses a more efficient path-based query for better performance with large hierarchies.
+  Gets all descendants of a node (children, grandchildren, etc).
   """
-  def get_descendants(node_id) do
-    # Get the node itself
-    node = get_node(node_id)
+  def get_descendants(parent_id) do
+    # First extract the ID if a node struct was passed
+    node_id = extract_node_id(parent_id)
+    parent = get_node(node_id)
 
-    if is_nil(node) do
+    if is_nil(parent) do
       []
     else
-      # Query for descendants using the path prefix
-      like_path = node.path <> ".%"
+      descendants_query =
+        from n in Node,
+          where: fragment("?::ltree <@ ?::ltree", n.path, ^parent.path),
+          where: n.id != ^parent.id,
+          order_by: n.path
 
-      Node
-      |> where([n], like(n.path, ^like_path))
-      |> order_by([n], n.path)
-      |> Repo.all()
+      Repo.all(descendants_query)
     end
   end
 
   @doc """
+  Batch creates multiple nodes with parent-child relationships.
+  This is a convenience function for creating multiple related nodes at once.
+  """
+  def batch_create_nodes(nodes_params) do
+    # Process each node in sequence, maintaining hierarchy relationships
+    Enum.reduce_while(nodes_params, {:ok, []}, fn node_params, {:ok, acc} ->
+      case create_node(node_params) do
+        {:ok, node} -> {:cont, {:ok, [node | acc]}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  @doc """
   Updates a node's attributes.
-  Note: This does not move the node in the hierarchy. Use move_node/2 for that purpose.
   """
   def update_node(id, attrs) do
     node = get_node_raw(id)
@@ -229,22 +244,20 @@ defmodule XIAM.Hierarchy.NodeManager do
     if is_nil(node) do
       {:error, :not_found}
     else
-      # Only allow updating name, node_type, and metadata
-      filtered_attrs = Map.take(attrs, ["name", "node_type", "metadata", :name, :node_type, :metadata])
-      
       node
-      |> Node.changeset(filtered_attrs)
+      |> Node.changeset(attrs)
       |> Repo.update()
       |> tap(fn
-        {:ok, updated_node} -> invalidate_node_caches(updated_node)
+        {:ok, node} -> invalidate_node_caches(node)
         _ -> :ok
       end)
     end
   end
 
   @doc """
-  Moves a node to a new parent.
-  This operation also updates the paths of all descendants.
+  Moves a node to a new parent, updating its path and all its descendants' paths.
+  This is a more complex operation that requires updating all descendant paths to maintain
+  the correct hierarchy.
   """
   def move_node(node_id, new_parent_id) do
     node = get_node_raw(node_id)
@@ -253,71 +266,62 @@ defmodule XIAM.Hierarchy.NodeManager do
     cond do
       is_nil(node) ->
         {:error, :node_not_found}
+
       is_nil(new_parent) ->
         {:error, :parent_not_found}
-      node.id == new_parent.id ->
-        {:error, :cannot_move_to_self}
-      would_create_cycle?(node.id, new_parent.id) ->
+
+      node_id == new_parent_id ->
+        {:error, :cannot_be_own_parent}
+        
+      # Check if new_parent is a descendant of node (would create cycle)
+      would_create_cycle?(node_id, new_parent_id) ->
         {:error, :would_create_cycle}
+
       true ->
-        # Calculate new path
-        new_path = PathCalculator.build_child_path(new_parent.path, node.name)
-        
-        # Get all descendants before updating the node
-        descendants = get_descendants(node.id)
-        
-        # Update the node itself
-        result = node
-        |> Node.changeset(%{})
-        |> Ecto.Changeset.put_change(:parent_id, new_parent.id)
-        |> Ecto.Changeset.put_change(:path, new_path)
-        |> Repo.update()
-        
-        case result do
-          {:ok, updated_node} ->
-            # Update all descendant paths
-            update_descendant_paths_impl(updated_node, descendants)
-            
-            # Invalidate caches
-            invalidate_node_caches(updated_node)
-            Enum.each(descendants, &invalidate_node_caches/1)
-            
-            {:ok, updated_node}
-          error ->
-            error
+        # Check if the node is already under this parent
+        if node.parent_id == new_parent_id do
+          {:ok, node}
+        else
+          # Get all descendants before moving to update their paths
+          descendants = get_descendants(node_id)
+
+          # Calculate new path
+          new_path = PathCalculator.build_child_path(new_parent.path, node.name)
+
+          # Update node's parent_id and path
+          updated_node =
+            node
+            |> Node.changeset(%{parent_id: new_parent_id})
+            |> Ecto.Changeset.put_change(:path, new_path)
+            |> Repo.update!()
+
+          # Also update all descendant paths
+          if length(descendants) > 0 do
+            Enum.each(descendants, fn descendant ->
+              relative_path = String.replace_prefix(descendant.path, node.path, "")
+              new_descendant_path = new_path <> relative_path
+
+              descendant
+              |> Node.changeset(%{})
+              |> Ecto.Changeset.put_change(:path, new_descendant_path)
+              |> Repo.update!()
+
+              # Invalidate cache for this descendant
+              invalidate_node_caches(descendant)
+            end)
+          end
+
+          # Invalidate cache for the moved node
+          invalidate_node_caches(updated_node)
+
+          {:ok, updated_node}
         end
     end
   end
 
-  # Implementation of updating descendant paths after a node move
-  defp update_descendant_paths_impl(parent_node, descendants) do
-    # The old parent path from descendants
-    old_parent_path = Enum.at(descendants, 0).path
-                      |> String.split(".")
-                      |> Enum.drop(-1)
-                      |> Enum.join(".")
-    
-    # Get the new parent path
-    new_parent_path = parent_node.path
-    
-    # Update each descendant
-    Enum.each(descendants, fn descendant ->
-      # Calculate new path by replacing the prefix
-      suffix = String.replace_prefix(descendant.path, old_parent_path, "")
-      new_path = new_parent_path <> suffix
-      
-      # Update in the database
-      descendant
-      |> Node.changeset(%{})
-      |> Ecto.Changeset.put_change(:path, new_path)
-      |> Repo.update!()
-    end)
-  end
-
   @doc """
-  Deletes a node and optionally all its descendants.
-  If propagate is true, all descendants will be deleted as well.
-  If propagate is false, only the node itself will be deleted if it has no children.
+  Deletes a node by ID. If the node has children, they will be deleted as well.
+  Returns {:ok, deleted_count} if successful.
   """
   def delete_node(id, propagate \\ true) do
     node = get_node_raw(id)
@@ -325,67 +329,105 @@ defmodule XIAM.Hierarchy.NodeManager do
     if is_nil(node) do
       {:error, :not_found}
     else
-      # Check if node has children
-      children = get_direct_children(node.id)
+      # Get children before deletion
+      children =
+        if propagate do
+          get_descendants(id)
+        else
+          []
+        end
 
-      cond do
-        length(children) > 0 and not propagate ->
-          {:error, :has_children}
-        true ->
-          # If propagating, delete descendants first to avoid foreign key constraints
-          if propagate and length(children) > 0 do
-            # Get all descendants - ordered by path means children are deleted before parents
-            # to avoid foreign key constraint violations
-            descendants = get_descendants(node.id)
-            |> Enum.reverse() # Reverse to delete deepest nodes first
-            
-            # Delete all descendants
-            Enum.each(descendants, fn descendant ->
-              # Invalidate cache before deletion
-              invalidate_node_caches(descendant)
-              
-              # Delete the node
-              Repo.delete(descendant)
-            end)
-          end
-          
-          # Invalidate cache for the node
-          invalidate_node_caches(node)
-          
-          # Delete the node itself
-          Repo.delete(node)
-      end
+      # First delete children if requested (must happen before parent deletion)
+      deleted_count =
+        if propagate && length(children) > 0 do
+          # Delete all descendants in reverse path order to avoid constraint violations
+          children
+          |> Enum.sort_by(& &1.path, :desc) # Sort by path descending to delete deepest children first
+          |> Enum.each(fn child ->
+            Repo.delete(child)
+            invalidate_node_caches(child)
+          end)
+
+          # Return total count of deleted nodes
+          1 + length(children)
+        else
+          1
+        end
+        
+      # Now delete the parent node after children are gone
+      Repo.delete(node)
+
+      # Invalidate cache for the deleted node
+      invalidate_node_caches(node)
+
+      {:ok, deleted_count}
     end
   end
 
-  # Function preserved for future reference - commented out to avoid warnings
-  # defp update_descendant_paths(parent_node, descendants) do
-  #   # The issue is with how we're calculating the relative path. Instead of trying to extract from the old
-  #   # path prefix, we need to extract the part of the path that follows the old parent's path.
-  #   
-  #   # Get the parent's old path (before it was moved)
-  #   # old_parent_path = parent_node.path
-  #   
-  #   # Get descendants and update each one
-  #   # Enum.each(descendants, fn descendant ->
-  #   #   # Calculate the relative path part (the part after the parent's path)
-  #   #   # Example: if parent path is "root.dept" and child path is "root.dept.team",
-  #   #   # the relative path would be ".team"
-  #   #   # relative_path = String.replace_prefix(descendant.path, old_parent_path, "")
-  #   #   
-  #   #   # Combine the parent's new path with the relative path to get the new descendant path
-  #   #   # new_path = parent_node.path <> relative_path
-  #   #   
-  #   #   # Update the descendant's path
-  #   #   # descendant
-  #   #   # |> Node.changeset(%{})
-  #   #   # |> Ecto.Changeset.put_change(:path, new_path)
-  #   #   # |> Repo.update!()
-  #   #   
-  #   #   # Invalidate cache for this descendant
-  #   #   # invalidate_node_caches(descendant)
-  #   # end)
+  @doc """
+  Gets the parent of a node.
+  """
+  def get_parent(node_id) do
+    node = get_node(node_id)
+
+    if is_nil(node) || is_nil(node.parent_id) do
+      nil
+    else
+      get_node(node.parent_id)
+    end
+  end
+
+  # Commented out duplicate function to avoid warning
+  # @doc """
+  # Gets all descendants of a node (children, grandchildren, etc).
+  # """
+  # def get_descendants(parent_id) do
+  #   parent = get_node(parent_id)
+  #
+  #   if is_nil(parent) do
+  #     []
+  #   else
+  #     descendants_query =
+  #       from n in Node,
+  #         where: fragment("?::ltree <@ ?::ltree", n.path, ^parent.path),
+  #         where: n.id != ^parent.id,
+  #         order_by: n.path
+  #
+  #     Repo.all(descendants_query)
+  #   end
   # end
+
+  # Function kept for potential future use but commented to avoid warnings
+  # defp update_descendant_paths(parent_node, descendants) do
+    # Function commented out to remove warnings
+    # Implementation preserved in comments below:
+    # 
+    # # The issue is with how we're calculating the relative path. Instead of trying to extract from the old
+    # # path prefix, we need to extract the part of the path that follows the old parent's path.
+    # 
+    # # Get the parent's old path (before it was moved)
+    # old_parent_path = parent_node.path
+    # 
+    # # Get descendants and update each one
+    # Enum.each(descendants, fn descendant ->
+    #   # Calculate the relative path part (the part after the parent's path)
+    #   # Example: if parent path is "root.dept" and child path is "root.dept.team",
+    #   # the relative path would be ".team"
+    #   relative_path = String.replace_prefix(descendant.path, old_parent_path, "")
+    #   
+    #   # Combine the parent's new path with the relative path to get the new descendant path
+    #   new_path = parent_node.path <> relative_path
+    #   
+    #   # Update the descendant's path
+    #   descendant
+    #   |> Node.changeset(%{})
+    #   |> Ecto.Changeset.put_change(:path, new_path)
+    #   |> Repo.update!()
+    #   
+    #   # Invalidate cache for this descendant
+    #   invalidate_node_caches(descendant)
+    # end)
+  end
 
   @doc """
   Invalidates all cache entries related to a node, including:
@@ -414,8 +456,12 @@ defmodule XIAM.Hierarchy.NodeManager do
     :ok
   end
 
-  # Function preserved for future reference - commented out to avoid warnings
+  # Kept for potential future use
+  @doc false
+
   # defp descendant_ids_include?(descendants, target_id) do
-  #   # Enum.any?(descendants, fn d -> d.id == target_id end)
+    # Function commented out to remove warnings
+    # Implementation preserved in comment below:
+    # Enum.any?(descendants, fn d -> d.id == target_id end)
   # end
 end

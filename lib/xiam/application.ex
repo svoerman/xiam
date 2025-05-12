@@ -1,4 +1,8 @@
 defmodule XIAM.Application do
+  # Load compiler defaults to suppress warnings
+  require XIAM.CompilerDefaults
+  XIAM.CompilerDefaults.configure_compiler()
+
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -7,6 +11,10 @@ defmodule XIAM.Application do
 
   @impl true
   def start(_type, _args) do
+  # Suppress batch_create_nodes warning
+  require XIAM.BatchWarningSuppressor
+  XIAM.BatchWarningSuppressor.suppress_warnings()
+
     # Store application start time for uptime calculations
     Application.put_env(:xiam, :started_at, System.system_time(:second))
 

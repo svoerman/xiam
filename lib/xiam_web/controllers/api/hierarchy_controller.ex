@@ -59,14 +59,12 @@ defmodule XIAMWeb.API.HierarchyController do
   Gets a specific hierarchy node.
   """
   def get_node(conn, %{"id" => id}) do
-    case Hierarchy.get_node(id) do
-      nil ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Node not found"})
-      
-      node ->
-        render(conn, :show, node: node, children: [])
+    # Safely parse ID as integer; invalid IDs or missing nodes yield not_found
+    with {int_id, ""} <- Integer.parse(id),
+         node when not is_nil(node) <- Hierarchy.get_node(int_id) do
+      render(conn, :show, node: node, children: [])
+    else
+      _ -> {:error, :not_found}
     end
   end
 
@@ -75,23 +73,21 @@ defmodule XIAMWeb.API.HierarchyController do
   Updates a hierarchy node.
   """
   def update_node(conn, %{"id" => id} = params) do
-    case Hierarchy.get_node(id) do
-      nil ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Node not found"})
-      
-      node ->
-        case Hierarchy.update_node(node, params) do
-          {:ok, updated_node} ->
-            render(conn, :show, node: updated_node, children: [])
-          
-          {:error, %Ecto.Changeset{} = changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> put_view(XIAMWeb.ErrorJSON)
-            |> render("error.json", changeset: changeset)
-        end
+    # Safely parse ID or return not_found
+    with {int_id, ""} <- Integer.parse(id),
+         node when not is_nil(node) <- Hierarchy.get_node(int_id) do
+      case Hierarchy.update_node(node, params) do
+        {:ok, updated_node} ->
+          render(conn, :show, node: updated_node, children: [])
+        
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(XIAMWeb.ErrorJSON)
+          |> render("error.json", changeset: changeset)
+      end
+    else
+      _ -> {:error, :not_found}
     end
   end
 
@@ -100,22 +96,20 @@ defmodule XIAMWeb.API.HierarchyController do
   Deletes a hierarchy node.
   """
   def delete_node(conn, %{"id" => id}) do
-    case Hierarchy.get_node(id) do
-      nil ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Node not found"})
-      
-      node ->
-        case Hierarchy.delete_node(node) do
-          {:ok, _} ->
-            send_resp(conn, :no_content, "")
-          
-          {:error, reason} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: reason})
-        end
+    # Safely parse ID or return not_found
+    with {int_id, ""} <- Integer.parse(id),
+         node when not is_nil(node) <- Hierarchy.get_node(int_id) do
+      case Hierarchy.delete_node(node) do
+        {:ok, _} ->
+          send_resp(conn, :no_content, "")
+        
+        {:error, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: reason})
+      end
+    else
+      _ -> {:error, :not_found}
     end
   end
 

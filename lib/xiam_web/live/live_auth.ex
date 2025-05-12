@@ -20,13 +20,17 @@ defmodule XIAMWeb.LiveAuth do
   end
 
   defp get_admin_user(session, _socket) do
-    case to_int(session["pow_user_id"]) do
+    # Get user ID from session
+    user_id_str = session["pow_user_id"]
+
+    case to_int(user_id_str) do
       id when is_integer(id) ->
-        case Users.get_user(id) do
-          nil -> nil
-          user -> user
-        end
-      _ -> nil
+        # Get user by ID
+        user = Users.get_user(id)
+        user
+      _ ->
+        # Failed to parse pow_user_id or ID was nil
+        nil
     end
   end
 

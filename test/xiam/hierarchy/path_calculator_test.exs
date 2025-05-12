@@ -88,7 +88,6 @@ defmodule XIAM.Hierarchy.PathCalculatorTest do
       assert List.last(ancestor_paths) == root.path
     end
     
-    @tag :skip
     test "detects if path is descendant of another", %{project: project, root: root} do
       # Use the is_ancestor? function which is available in the current implementation
       # The relation is reversed - is_ancestor? checks if the first path is an ancestor of the second
@@ -173,7 +172,6 @@ defmodule XIAM.Hierarchy.PathCalculatorTest do
   end
   
   describe "path validation" do
-    @tag :skip
     test "validates well-formed paths" do
       # Skipping since is_valid_path? is private or undefined
       # This implementation has been refactored to use dots instead of slashes
@@ -187,7 +185,6 @@ defmodule XIAM.Hierarchy.PathCalculatorTest do
       # This test is preserved for documentation purposes
     end
     
-    @tag :skip
     test "rejects malformed paths" do
       # Skipping since is_valid_path? is private or undefined
       # In the current implementation, validation happens at different layers

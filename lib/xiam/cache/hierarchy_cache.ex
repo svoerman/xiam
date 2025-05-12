@@ -213,14 +213,24 @@ defmodule XIAM.Cache.HierarchyCache do
   @impl true
   def init(_opts) do
     Logger.info("Starting hierarchy cache...")
-    # Create the ETS table as public so any process can read from it
-    table = :ets.new(@table_name, [:set, :public, :named_table, 
-                                 {:read_concurrency, true},
-                                 {:write_concurrency, true}])
+    # Create the main ETS table only if it doesn't exist
+    table = 
+      if :ets.whereis(@table_name) == :undefined do
+        :ets.new(@table_name, [:set, :public, :named_table, 
+                               {:read_concurrency, true},
+                               {:write_concurrency, true}])
+      else
+        @table_name # Table already exists, just use the name
+      end
     
-    # Create metrics table
-    metrics_table = :ets.new(@metrics_table_name, [:set, :public, :named_table, 
-                                                {:write_concurrency, true}])
+    # Create the metrics ETS table only if it doesn't exist
+    metrics_table = 
+      if :ets.whereis(@metrics_table_name) == :undefined do
+        :ets.new(@metrics_table_name, [:set, :public, :named_table, 
+                                       {:write_concurrency, true}])
+      else
+        @metrics_table_name # Table already exists, just use the name
+      end
     
     # Start periodic cleanup of expired entries
     schedule_cleanup()

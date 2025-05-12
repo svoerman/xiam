@@ -17,11 +17,14 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
   Returns the created user or an error tuple.
   """
   def create_test_user do
-    ResilientTestHelper.safely_execute_db_operation(fn ->
+    case ResilientTestHelper.safely_execute_db_operation(fn ->
       attrs = %{email: "test-user-#{System.system_time(:millisecond)}@example.com",
                password_hash: "$2b$12$k6N9.nTHTg0vIGXhx0hMaOScOmYpBqmRVulhbS5TCPZWqIpthRyJ2"}
       %User{} |> Ecto.Changeset.change(attrs) |> Repo.insert!()
-    end, max_retries: 3, retry_delay: 200)
+    end, max_retries: 3, retry_delay: 200) do
+      {:ok, user} -> user
+      other -> other
+    end
   end
   
   @doc """
@@ -29,11 +32,14 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
   Returns the created role or an error tuple.
   """
   def create_test_role do
-    ResilientTestHelper.safely_execute_db_operation(fn ->
+    case ResilientTestHelper.safely_execute_db_operation(fn ->
       name = "TestRole#{System.system_time(:millisecond)}"
       {:ok, role} = Role.create_role(%{name: name, description: "Test role for access management tests"})
       role
-    end, max_retries: 3, retry_delay: 200)
+    end, max_retries: 3, retry_delay: 200) do
+      {:ok, role} -> role
+      other -> other
+    end
   end
   
   @doc """
@@ -41,7 +47,7 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
   Returns the created department or an error tuple.
   """
   def create_test_department do
-    ResilientTestHelper.safely_execute_db_operation(fn ->
+    case ResilientTestHelper.safely_execute_db_operation(fn ->
       dept_attrs = %{
         name: "TestDepartment#{System.unique_integer([:positive, :monotonic])}",
         node_type: "department"
@@ -49,9 +55,12 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
       
       case NodeManager.create_node(dept_attrs) do
         {:ok, dept} -> dept
-        {:error, _reason} = error -> error
+        {:error, _} = error -> error
       end
-    end, retry: 3)
+    end, retry: 3) do
+      {:ok, dept} -> dept
+      other -> other
+    end
   end
   
   @doc """
@@ -59,7 +68,7 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
   Returns the created team or an error tuple.
   """
   def create_test_team(dept) do
-    ResilientTestHelper.safely_execute_db_operation(fn ->
+    case ResilientTestHelper.safely_execute_db_operation(fn ->
       team_attrs = %{
         name: "TestTeam#{System.unique_integer([:positive, :monotonic])}",
         node_type: "team",
@@ -68,9 +77,12 @@ defmodule XIAM.Hierarchy.AccessTestFixtures do
       
       case NodeManager.create_node(team_attrs) do
         {:ok, team} -> team
-        {:error, _reason} = error -> error
+        {:error, _} = error -> error
       end
-    end, retry: 3)
+    end, retry: 3) do
+      {:ok, team} -> team
+      other -> other
+    end
   end
   
   @doc """

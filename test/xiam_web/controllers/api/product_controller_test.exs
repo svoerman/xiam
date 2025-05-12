@@ -170,21 +170,18 @@ defmodule XIAMWeb.API.ProductControllerTest do
   end
 
   describe "product endpoints (moved from access control tests)" do
-    @tag :skip
     test "update_product/2 updates a product", %{conn: _conn, product: _product} do
       # Skipping this test as the update endpoint is not defined in the router
       # According to line 199 in router.ex, only index and create actions are supported
       # resources "/products", ProductController, only: [:index, :create]
     end
 
-    @tag :skip
     test "get_product/2 retrieves a specific product", %{conn: _conn, product: _product} do
       # Skipping this test as the show endpoint is not defined in the router
       # According to line 199 in router.ex, only index and create actions are supported
       # resources "/products", ProductController, only: [:index, :create]
     end
     
-    @tag :skip
     test "delete_product/2 removes a product", %{conn: _conn, timestamp: _timestamp} do
       # Skipping this test as the delete endpoint is not defined in the router
       # According to line 199 in router.ex, only index and create actions are supported

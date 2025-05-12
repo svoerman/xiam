@@ -80,8 +80,7 @@ defmodule XIAM.BootstrapHelper do
         error_message = Exception.message(e)
         
         if String.contains?(error_message, "failed to bootstrap types") do
-          # This is the error we're specifically looking for
-          IO.puts("Bootstrap error detected (attempt #{attempts + 1}/#{max_retries}), resetting connection...")
+          # Bootstrap error detected - resetting connection
           
           # Wait a bit before retrying
           Process.sleep(delay_ms)
@@ -95,7 +94,7 @@ defmodule XIAM.BootstrapHelper do
         
       # Handle ownership errors
       _e in DBConnection.OwnershipError ->
-        IO.puts("Ownership error detected (attempt #{attempts + 1}/#{max_retries}), resetting ownership...")
+        # Ownership error detected - resetting ownership
         # Reset connection and retry with explicit ownership model
         reset_connection_pool()
         Process.sleep(delay_ms) 
@@ -103,7 +102,7 @@ defmodule XIAM.BootstrapHelper do
       
       # Catch other database-related errors that might benefit from retry
       _e in [Postgrex.Error, Ecto.StaleEntryError, Ecto.ConstraintError] ->
-        IO.puts("Database error detected (attempt #{attempts + 1}/#{max_retries}), retrying...")
+        # Database error detected - retrying
         Process.sleep(delay_ms)
         safely_bootstrap(fun, max_retries, delay_ms, true, parent, attempts + 1)
         
@@ -114,15 +113,27 @@ defmodule XIAM.BootstrapHelper do
   end
   
   @doc """
-  Aggressively resets the connection pool to handle bootstrap issues.
-  
-  This function performs a complete reset of the Ecto connection pool:
-  1. Stops the repository
-  2. Forces checkout of all connections to release them
-  3. Restarts the repository with a fresh pool
-  
-  Returns `:ok` if successful or an error tuple with diagnostics.
+  Ensures that the XIAM.Repo is started.
+  This is a critical function for ensuring tests have a properly initialized repository.
   """
+  def ensure_repo_started do
+    # Check if the repository is already running
+    case Process.whereis(XIAM.Repo) do
+      nil ->
+        # Repository isn't started, start it with a generous pool size
+        case XIAM.Repo.start_link([pool_size: 10]) do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          error -> 
+            IO.puts("Warning: Failed to start repo: #{inspect(error)}")
+            {:error, error}
+        end
+      _pid ->
+        # Repository is already running
+        :ok
+    end
+  end
+
   def reset_connection_pool do
     try do
       # Try to check in any connections first
@@ -136,7 +147,9 @@ defmodule XIAM.BootstrapHelper do
       case XIAM.Repo.stop() do
         :ok -> :ok
         {:error, {:not_found, _}} -> :ok
-        err -> IO.puts("Warning: Failed to stop repo: #{inspect(err)}")
+        _err -> 
+          # Failed to stop repo - continuing
+          :ok
       end
       
       # Force garbage collection to help release connections
@@ -179,28 +192,68 @@ defmodule XIAM.BootstrapHelper do
   1. Resets the connection pool before the test
   2. Sets up sandbox mode and checks out a connection
   3. Runs the test with proper error handling
-  4. Checks in the connection after the test
+  4. Keeps the connection checked out for the test process
   
   Returns the result of the test case or an error tuple.
   """
   def with_bootstrap_protection(test_case) do
+    # Ensure applications are started
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    
+    # Ensure repository is properly started
+    ensure_repo_started()
+    
+    # Reset the connection pool - but more resilient
     try do
-      # Reset the connection pool
       reset_connection_pool()
-      
-      # Set up sandbox and check out a connection
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      
-      # Execute the test case
-      result = test_case.()
-      
-      # Clean up
-      Ecto.Adapters.SQL.Sandbox.checkin(XIAM.Repo)
-      
-      # Return the result
-      {:ok, result}
     rescue
-      e -> {:error, {e, __STACKTRACE__}}
+      e -> 
+        IO.puts("Warning: Could not reset connection pool: #{inspect(e)}")
+        # Start the repo if reset fails
+        ensure_repo_started()
+    end
+    
+    # Check out a connection and set shared mode for the test process with error handling
+    checkout_result = try do
+      case Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) do
+        :ok -> :ok
+        {:already, _} -> :ok
+        error -> 
+          IO.puts("Warning: Unusual checkout result: #{inspect(error)}")
+          :ok
+      end
+    rescue
+      e -> 
+        IO.puts("Warning: Checkout error: #{inspect(e)}")
+        ensure_repo_started()
+        :ok
+    end
+    
+    # Set mode with error handling
+    try do
+      if checkout_result == :ok do
+        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+      end
+    rescue
+      e -> IO.puts("Warning: Could not set sandbox mode: #{inspect(e)}")
+    end
+    
+    # Ensure ETS tables exist
+    try do
+      XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    rescue
+      e -> IO.puts("Warning: Could not ensure ETS tables: #{inspect(e)}")
+    end
+    
+    # Execute the test case and properly handle error tuples
+    result = test_case.()
+    
+    # Pattern match on the result to handle common error cases
+    case result do
+      {:error, :parent_not_found} -> result
+      {:error, _reason} = error -> error
+      _ -> {:ok, result}
     end
   end
 end

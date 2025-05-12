@@ -1,9 +1,10 @@
 defmodule XIAM.Auth.UserPasskeyTest do
-  use XIAM.DataCase, async: true
+  use XIAM.DataCase, async: false
   
   alias XIAM.Auth.UserPasskey
   alias XIAM.Users.User
   alias XIAM.Repo
+  alias XIAM.ResilientTestHelper
 
   describe "user_passkey" do
 
@@ -32,22 +33,23 @@ defmodule XIAM.Auth.UserPasskeyTest do
         {:ok, user} -> %{user: user}
         _ -> 
           # Provide a fallback user for tests to continue
-          IO.puts("Creating fallback user for passkey tests")
           fallback_user = %User{id: System.unique_integer([:positive]), email: unique_email}
           %{user: fallback_user}
       end
     end
 
     test "database insertion works with valid attributes", %{user: user} do
-      # Test direct insertion instead of changeset validation
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: <<1, 2, 3, 4>>,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
-      
+      # Test direct insertion with resilient DB operation
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: <<1, 2, 3, 4>>,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
+
       assert passkey.id != nil
       assert passkey.user_id == user.id
       assert passkey.credential_id == <<1, 2, 3, 4>>
@@ -66,13 +68,15 @@ defmodule XIAM.Auth.UserPasskeyTest do
 
     test "create a passkey and retrieve by credential_id", %{user: user} do
       # Create a passkey
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: <<1, 2, 3, 4>>,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: <<1, 2, 3, 4>>,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
       
       # Test retrieval by credential_id
       retrieved = UserPasskey.get_by_credential_id(<<1, 2, 3, 4>>)
@@ -125,13 +129,15 @@ defmodule XIAM.Auth.UserPasskeyTest do
       # Create a passkey with a known credential ID
       credential_id = <<1, 2, 3, 4, 5, 6, 7, 8, 9, 10>>
       
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: credential_id,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: credential_id,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
       
       # Test retrieval with different formats
       assert %UserPasskey{id: id} = UserPasskey.find_by_credential_id_flexible(credential_id)
@@ -150,13 +156,15 @@ defmodule XIAM.Auth.UserPasskeyTest do
 
     test "update_sign_count/2 updates sign count and last_used_at", %{user: user} do
       # Create a passkey
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: <<1, 2, 3, 4>>,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: <<1, 2, 3, 4>>,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
       
       # Update sign count
       assert {:ok, updated} = UserPasskey.update_sign_count(passkey, 10)
@@ -166,13 +174,15 @@ defmodule XIAM.Auth.UserPasskeyTest do
 
     test "update_last_used/1 updates only the last_used_at timestamp", %{user: user} do
       # Create a passkey
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: <<1, 2, 3, 4>>,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: <<1, 2, 3, 4>>,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
       
       # Update last_used_at
       assert {:ok, updated} = UserPasskey.update_last_used(passkey)
@@ -182,13 +192,15 @@ defmodule XIAM.Auth.UserPasskeyTest do
 
     test "delete/1 removes a passkey", %{user: user} do
       # Create a passkey
-      passkey = Repo.insert!(%UserPasskey{
-        user_id: user.id,
-        credential_id: <<1, 2, 3, 4>>,
-        public_key: <<10, 11, 12, 13>>,
-        sign_count: 0,
-        friendly_name: "Test Device"
-      })
+      {:ok, passkey} = ResilientTestHelper.safely_execute_db_operation(fn ->
+        Repo.insert!(%UserPasskey{
+          user_id: user.id,
+          credential_id: <<1, 2, 3, 4>>,
+          public_key: <<10, 11, 12, 13>>,
+          sign_count: 0,
+          friendly_name: "Test Device"
+        })
+      end)
       
       # Delete the passkey
       assert {:ok, _} = UserPasskey.delete(passkey)

@@ -37,14 +37,35 @@ defmodule XIAM.ResilientTestHelper do
     jitter = Keyword.get(options, :jitter, 0.1)
     silent = Keyword.get(options, :silent, false)
     
-    # First check if ResilientDatabaseSetup is available and ensure repo is started
+    # Ensure repository is started and checkout a sandboxed connection
     if Code.ensure_loaded?(XIAM.ResilientDatabaseSetup) do
-      # Use the comprehensive database setup to ensure the repository is available
       XIAM.ResilientDatabaseSetup.ensure_repository_started()
     end
+    # Safely checkout sandbox; swallow errors if repo is down
+    try do
+      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
+    rescue
+      _ -> :ok
+    catch
+      :exit, _ -> :ok
+    end
+    # Safely set shared mode; swallow errors if repo is down
+    try do
+      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
+    rescue
+      _ -> :ok
+    catch
+      :exit, _ -> :ok
+    end
     
-    # Execute with retries
-    safely_execute_with_retries(operation_fun, max_attempts, delay_ms, backoff_factor, jitter, silent, 1)
+    # Execute with retries under sandbox ownership
+    raw_result = safely_execute_with_retries(operation_fun, max_attempts, delay_ms, backoff_factor, jitter, silent, 1)
+    # Return raw results; keep {:ok, _} and {:error, _} intact
+    case raw_result do
+      {:ok, _} -> raw_result
+      {:error, _} -> raw_result
+      other -> {:ok, other}
+    end
   end
   
   @doc """

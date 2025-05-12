@@ -82,7 +82,7 @@ defmodule XIAM.Hierarchy do
   @doc """
   Batch creates nodes with parent-child relationships.
   """
-  defdelegate batch_create_nodes(nodes_params), to: NodeManager
+  defdelegate batch_create_nodes(nodes_params), to: XIAM.Hierarchy.BatchCreateNodesFix
 
   @doc """
   Invalidate cache entries related to a node and its relationships.
@@ -127,6 +127,26 @@ defmodule XIAM.Hierarchy do
   defdelegate check_access_by_path(user_id, path), to: AccessManager
 
   @doc """
+  Checks if a user has access to a specific node, returning only boolean.
+  This function handles multiple formats for backward compatibility.
+  """
+  def can_access?(user_id, node_id) do
+    # Normalize IDs to ensure consistent types
+    user_id = IDHelper.normalize_user_id(user_id)
+    node_id = IDHelper.normalize_node_id(node_id)
+    
+    # Handle multiple response formats for resilience
+    case AccessManager.check_access(user_id, node_id) do
+      {:ok, %{has_access: access}} when is_boolean(access) -> access
+      {:ok, _} -> false
+      {:error, _} -> false
+      {has_access, _, _} when is_boolean(has_access) -> has_access
+      other when is_boolean(other) -> other
+      _ -> false
+    end
+  end
+
+  @doc """
   Bulk grants access to multiple users for multiple nodes.
   """
   defdelegate batch_grant_access(access_list), to: AccessManager
@@ -157,6 +177,86 @@ defmodule XIAM.Hierarchy do
   Sanitizes a name for use in a path.
   """
   defdelegate sanitize_name(name), to: PathCalculator
+
+  @doc """
+  Calculates the path for a node based on its parent's path.
+  """
+  def calculate_path(node) do
+    if node.parent_id do
+      case get_node(node.parent_id) do
+        {:ok, parent} -> "#{parent.path}.#{node.id}"
+        _ -> "#{node.id}"
+      end
+    else
+      "#{node.id}"
+    end
+  end
+
+  @doc """
+  Validates if a path is properly formatted.
+  """
+  def valid_path?(nil), do: false
+  def valid_path?(""), do: false
+  def valid_path?(path) when is_binary(path) do
+    # Paths should not start or end with . and should not have empty parts or invalid chars
+    not String.starts_with?(path, ".") and
+    not String.ends_with?(path, ".") and
+    not String.contains?(path, "..") and
+    not String.contains?(path, "/") and # Explicitly disallow '/'
+    String.match?(path, ~r/^[^.]+(\.[^.]+)*$/)
+  end
+
+  @doc """
+  Splits a path into its component node IDs.
+  """
+  def get_path_parts(nil), do: []
+  def get_path_parts(""), do: []
+  def get_path_parts(path) when is_binary(path) do
+    String.split(path, ".")
+  end
+
+  @doc """
+  Gets the parent path from a node path.
+  """
+  def get_parent_path(nil), do: nil
+  def get_parent_path(""), do: nil
+  def get_parent_path(path) when is_binary(path) do
+    parts = get_path_parts(path)
+    case length(parts) do
+      1 -> nil  # Root node has no parent
+      _ ->
+        parts
+        |> Enum.take(length(parts) - 1)
+        |> Enum.join(".")
+    end
+  end
+
+  @doc """
+  Gets the deepest node ID from a path.
+  """
+  def get_deepest_node_id(nil), do: nil
+  def get_deepest_node_id(""), do: nil
+  def get_deepest_node_id(path) when is_binary(path) do
+    String.split(path, ".") |> List.last()
+  end
+
+  @doc """
+  Checks if a path contains another path (ancestor relationship).
+  """
+  def path_contains?(nil, _), do: false
+  def path_contains?(_, nil), do: false
+  def path_contains?(path, sub_path) when is_binary(path) and is_binary(sub_path) do
+    path_parts = get_path_parts(path)
+    sub_path_parts = get_path_parts(sub_path)
+    
+    # Ensure sub_path_parts is not empty before checking
+    if sub_path_parts == [] do
+      false
+    else
+      length(sub_path_parts) <= length(path_parts) and
+      Enum.take(path_parts, length(sub_path_parts)) == sub_path_parts
+    end
+  end
 
   @doc """
   Gets the parent path from a given path by removing the last label.
@@ -192,36 +292,17 @@ defmodule XIAM.Hierarchy do
   This function can accept either a Node struct or a node ID as the first argument.
   """
   def move_subtree(%Node{} = node, new_parent_id) do
-    NodeManager.move_node(node, new_parent_id)
+    NodeManager.move_node(node.id, new_parent_id)
   end
   
   def move_subtree(node_id, new_parent_id) when is_integer(node_id) or is_binary(node_id) do
-    # First get the node by ID
     case NodeManager.get_node(node_id) do
       nil -> {:error, :node_not_found}
-      node -> NodeManager.move_node(node, new_parent_id)
+      node -> NodeManager.move_node(node.id, new_parent_id)
     end
   end
   
-  @doc """
-  Checks if a user has access to a node.
-  Returns true if user has access, false otherwise.
-  """
-  def can_access?(user_id, node_id) do
-    # Normalize IDs to ensure consistent types
-    user_id = IDHelper.normalize_user_id(user_id)
-    node_id = IDHelper.normalize_node_id(node_id)
-    
-    # The AccessManager.check_access now returns a tuple with a map for consistency with tests
-    # Extract just the boolean value for backward compatibility
-    case AccessManager.check_access(user_id, node_id) do
-      {:ok, %{has_access: has_access}} -> has_access
-      {has_access, _, _} -> has_access
-      _error -> 
-        # For any error response, assume no access
-        false
-    end
-  end
+  # Second implementation merged with the one above
   
   @doc """
   Revokes user access from a node.

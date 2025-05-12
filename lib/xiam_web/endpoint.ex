@@ -1,6 +1,20 @@
 defmodule XIAMWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :xiam
 
+  # Ensure ETS tables needed by the endpoint are created
+  # This is useful for tests that need the tables but don't have a proper Phoenix setup
+  def ensure_ets_tables do
+    for table_name <- [:render_errors, :secret_key_base, :pubsub, :live_view, :telemetry_handler] do
+      try do
+        if :ets.whereis(table_name) == :undefined do
+          :ets.new(table_name, [:named_table, :public])
+        end
+      catch
+        _, _ -> :ok # Table already exists
+      end
+    end
+  end
+
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.

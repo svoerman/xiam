@@ -213,7 +213,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       end)
     end
     
-    @tag :skip
     test "get_capability/2 retrieves a specific capability", %{conn: _conn, product: _product, timestamp: _timestamp} do
       # Skipping this test as the specific capability endpoint is not defined in the router
       # Based on the router.ex, there is no GET route for /api/capabilities/:id

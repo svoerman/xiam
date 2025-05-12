@@ -24,14 +24,13 @@ defmodule XIAM.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import XIAM.DataCase
+      require Logger # Add require for Logger macros
     end
   end
 
   setup tags do
-    # Use the comprehensive resilient database setup for better initialization
-    # This handles ETS tables, database connections, and sandbox configuration
-    XIAM.ResilientDatabaseSetup.initialize_test_environment(tags)
-    :ok
+    # Delegate all setup responsibility to the robust setup_sandbox function
+    setup_sandbox(tags)
   end
 
   @doc """
@@ -106,7 +105,7 @@ defmodule XIAM.DataCase do
         # Only log detailed errors for unexpected failure types, not common race conditions
         case e do
           %MatchError{term: {:error, {{:badmatch, :already_shared}, _}}} ->
-            # This is a common race condition in concurrent tests - don't warn
+            # This is a common case, fall through to shared mode approach
             try_setup_with_shared_mode(tags)
             
           other_error ->

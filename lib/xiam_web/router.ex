@@ -197,7 +197,7 @@ defmodule XIAMWeb.Router do
     # Access Control Routes
     post "/access", AccessControlController, :set_user_access
     get "/access", AccessControlController, :get_user_access
-    resources "/products", ProductController, only: [:index, :create]
+    resources "/products", ProductController, only: [:index, :create, :show, :update, :delete]
     get "/products/:product_id/capabilities", AccessControlController, :get_product_capabilities
     
     # Hierarchy Routes
@@ -206,6 +206,7 @@ defmodule XIAMWeb.Router do
     post "/hierarchy/nodes", HierarchyController, :create_node
     get "/hierarchy/nodes/:id", HierarchyController, :get_node
     put "/hierarchy/nodes/:id", HierarchyController, :update_node
+    patch "/hierarchy/nodes/:id", HierarchyController, :update_node
     delete "/hierarchy/nodes/:id", HierarchyController, :delete_node
     get "/hierarchy/nodes/:id/children", HierarchyController, :get_node_children
     get "/hierarchy/nodes/:id/descendants", HierarchyController, :get_node_descendants

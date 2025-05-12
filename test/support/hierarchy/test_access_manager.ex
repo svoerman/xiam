@@ -1,9 +1,10 @@
 defmodule XIAM.Hierarchy.TestAccessManager do
-  # Set to true to enable debug output during tests
-  @debug_enabled false
-
-  defp debug(message) do
-    if @debug_enabled, do: IO.puts(message)
+  # Debug functionality removed to comply with silent tests requirement
+  # Previously had @debug_enabled false
+  
+  defp debug(_message) do
+    # Debug output disabled
+    :ok
   end
   @moduledoc """
   A test-specific implementation of AccessManager that works in-memory.
@@ -525,7 +526,7 @@ defmodule XIAM.Hierarchy.TestAccessManager do
   Updates parent-child relationships when a node is moved.
   """
   def handle_node_movement(node_id, new_parent_id) do
-    IO.puts("SIMULATING NODE MOVEMENT: Moving node #{node_id} to parent #{new_parent_id}")
+    # SIMULATING NODE MOVEMENT
     
     # Get current parent-child relationships
     parent_children = Process.get(:parent_children, %{})
