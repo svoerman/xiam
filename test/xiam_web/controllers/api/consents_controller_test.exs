@@ -8,18 +8,6 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
   alias XIAM.Rbac.ProductContext
 
   setup %{conn: conn} do
-    # Explicitly ensure repo is available
-    case Process.whereis(XIAM.Repo) do
-      nil ->
-        # Repo is not started, try to start it explicitly
-        {:ok, _} = Application.ensure_all_started(:ecto_sql)
-        {:ok, _} = XIAM.Repo.start_link([])
-        # Set sandbox mode
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      _ ->
-        :ok
-    end
-
     # Generate a unique timestamp for this test run
     timestamp = System.system_time(:second)
 

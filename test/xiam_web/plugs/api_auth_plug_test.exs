@@ -1,38 +1,20 @@
 defmodule XIAMWeb.Plugs.APIAuthPlugTest do
   use XIAMWeb.ConnCase
 
-  # Import ETSTestHelper to ensure ETS tables exist before running tests
-  import XIAM.ETSTestHelper
-  
   alias XIAMWeb.Plugs.APIAuthPlug
   alias XIAM.Users.User
   alias XIAM.Auth.JWT
   alias XIAM.Repo
 
   setup %{conn: conn} do
-    # Ensure ETS tables exist before running the test
-    ensure_ets_tables_exist()
-    
-    # Explicitly ensure repo is available
-    case Process.whereis(XIAM.Repo) do
-      nil ->
-        # Repo is not started, try to start it explicitly
-        {:ok, _} = Application.ensure_all_started(:ecto_sql)
-        {:ok, _} = XIAM.Repo.start_link([])
-        # Set sandbox mode
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      _ -> 
-        :ok
-    end
-    
     # Generate a unique email for this test run
     timestamp = System.system_time(:second)
     test_email = "api_plug_test_#{timestamp}@example.com"
-    
+
     # Delete any existing test users that might cause conflicts
     import Ecto.Query
     Repo.delete_all(from u in User, where: like(u.email, "%api_plug_test%"))
-    
+
     # Create a test user with the unique email
     {:ok, user} = %User{}
       |> User.pow_changeset(%{

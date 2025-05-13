@@ -1,5 +1,5 @@
 defmodule XIAM.Hierarchy.PathTraversalTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   
   alias XIAM.Repo
   alias XIAM.Hierarchy.Node

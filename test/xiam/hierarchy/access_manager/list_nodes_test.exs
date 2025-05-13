@@ -8,16 +8,9 @@ defmodule XIAM.Hierarchy.AccessManager.ListNodesTest do
   
   describe "list_accessible_nodes/1" do
     setup do
-      # First ensure the repo is started with explicit applications
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
-      # Ensure repository is properly started
-      XIAM.ResilientDatabaseSetup.ensure_repository_started()
-      
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
+      # ETS setup handled by ResilientTestCase
+      # App/Repo startup handled by test_helper.exs
+      # Sandbox checkout handled by DataCase (via ResilientTestCase)
       
       # Create test hierarchy with resilient pattern
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->

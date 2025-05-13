@@ -2,8 +2,7 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
   use XIAMWeb.ConnCase, async: false
   
   # Import the ETSTestHelper to ensure proper test environment
-  import XIAM.ETSTestHelper
-  # Only include imports and aliases we actually use
+    # Only include imports and aliases we actually use
   alias XIAM.Repo
   alias XIAM.Users.User
   alias XIAM.Auth.JWT
@@ -76,8 +75,6 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
   
   describe "check_access/2" do
     test "returns access status for a node", %{conn: conn, team: team, user: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -101,8 +98,6 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
     end
     
     test "returns false when user doesn't have access", %{conn: conn, root: root} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -122,8 +117,6 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
     end
     
     test "handles non-existent node", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -139,8 +132,6 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
     end
     
     test "handles inherited access", %{conn: conn, team: team, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create a child node under the team that the user has access to
       child_node = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->

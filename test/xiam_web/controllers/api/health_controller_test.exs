@@ -1,13 +1,9 @@
 defmodule XIAMWeb.API.HealthControllerTest do
   use XIAMWeb.ConnCase, async: false
-
   import Mock
-  import XIAM.ETSTestHelper
 
   describe "health endpoints" do
     test "GET /api/health returns basic health status", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -28,8 +24,6 @@ defmodule XIAMWeb.API.HealthControllerTest do
     end
     
     test "GET /api/health/detailed returns detailed health data", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -59,8 +53,6 @@ defmodule XIAMWeb.API.HealthControllerTest do
     end
     
     test "health endpoint handles database errors", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation with mocking for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -81,8 +73,6 @@ defmodule XIAMWeb.API.HealthControllerTest do
     end
     
     test "GET /api/system/health returns backward compatible health response", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->

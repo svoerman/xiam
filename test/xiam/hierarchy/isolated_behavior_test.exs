@@ -331,7 +331,6 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   # Initialize test state before each test with comprehensive resilient patterns
   setup do
-    # Ensure proper application and database startup for resilience
     {:ok, _} = Application.ensure_all_started(:ecto_sql)
     {:ok, _} = Application.ensure_all_started(:postgrex)
     
@@ -453,9 +452,6 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
     
     test "moves nodes while maintaining paths" do
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
       
       MockAdapter.clear_storage()
       
@@ -501,22 +497,15 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
       assert moved_team.path == "team_#{root_id}_#{team_id}"
     end
   end
-  
+
   describe "hierarchy access control" do
     setup do
-      # Create test users and roles with resilient pattern
-      {:ok, user} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.create_user()
-      end, max_retries: 3, retry_delay: 200)
+      # Create test users and roles
+      user = MockAdapter.create_user()
+      role = MockAdapter.create_role()
       
-      {:ok, role} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.create_role()
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Create a test hierarchy with resilient pattern, using create_node_with_retries internally
-      {:ok, hierarchy} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.create_test_hierarchy()
-      end, max_retries: 3, retry_delay: 200)
+      # Create a test hierarchy
+      hierarchy = MockAdapter.create_test_hierarchy()
       
       # Validate the hierarchy structure to ensure we have valid test data
       if hierarchy && Map.has_key?(hierarchy, :root) do
@@ -528,16 +517,13 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
         
         # Create simplified fallback hierarchy
         root = %{id: "root_#{timestamp}", name: "Fallback Root", node_type: "organization", path: "org_fallback"}
-        dept = %{id: "dept_#{timestamp}", name: "Fallback Department", node_type: "department", parent_id: root.id}
+        dept = %{id: "dept_#{timestamp}", name: "Fallback Dept", path: "dept_fallback", node_type: "department", parent_id: root.id}
         
         %{user: user, role: role, hierarchy: %{root: root, dept: dept}}
       end
     end
     
     test "grants access to nodes", %{user: user, role: role, hierarchy: hierarchy} do
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
       
       MockAdapter.clear_storage()
       
@@ -549,38 +535,18 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
     end
     
     test "inherits access to child nodes", %{user: user, role: role, hierarchy: hierarchy} do
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
       
-      # Grant access to department with resilient handling
-      {:ok, _} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.grant_access(user, hierarchy.dept, role)
-      end, max_retries: 3)
-      
-      # Verify access to the department with resilient handling
-      dept_access = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.can_access?(user, hierarchy.dept)
-      end)
-      
-      # Check inherited access to team with resilient handling
-      team_access = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.can_access?(user, hierarchy.team)
-      end)
-      
-      # Check inherited access to project with resilient handling
-      project_access = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.can_access?(user, hierarchy.project)
-      end)
+      # Grant access to department
+      {:ok, _} = MockAdapter.grant_access(user, hierarchy.dept, role)
       
       # Verify access to the department
+      assert MockAdapter.can_access?(user, hierarchy.dept)
       
-      # Verify access to the department
-      assert dept_access, "User should have direct access to department"
+      # Check inherited access to team
+      assert MockAdapter.can_access?(user, hierarchy.team)
       
-      # Access should be inherited by children
-      assert team_access, "User should have inherited access to team"
-      assert project_access, "User should have inherited access to project"
+      # Check inherited access to project
+      assert MockAdapter.can_access?(user, hierarchy.project)
       
       # But not by parent
       refute MockAdapter.can_access?(user, hierarchy.root)
@@ -603,20 +569,20 @@ defmodule XIAM.IsolatedHierarchyBehaviorTest do
   
   describe "hierarchy edge cases" do
     setup do
-      # Create test users and roles with resilient pattern
-      {:ok, user} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.create_user()
-      end, max_retries: 3, retry_delay: 200)
+      # Create test users and roles
+      user = MockAdapter.create_user()
+      role = MockAdapter.create_role()
       
-      {:ok, role} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        MockAdapter.create_role()
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Create a complex test hierarchy with resilient pattern, using create_node_with_retries
+      # Create a complex test hierarchy
       # This creates a deeper tree structure to test edge cases
       timestamp = System.system_time(:millisecond)
       
-      # Build the hierarchy with safe error handling and retries
+      # Build the hierarchy
+      _root = MockAdapter.create_node(%{
+        name: "Edge Case Org #{timestamp}", 
+        node_type: "organization", 
+        path: "edge_org_#{timestamp}"
+      })
       hierarchy_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Root organization
         {:ok, root} = MockAdapter.create_node_with_retries(%{

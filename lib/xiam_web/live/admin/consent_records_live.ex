@@ -10,8 +10,16 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
   alias XIAM.Users.User
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    current_user = session["pow_user_id"]
+    |> to_int()
+    |> case do
+      id when is_integer(id) -> XIAM.Users.get_user(id)
+      _ -> nil
+    end
+
     {:ok, socket
+      |> assign(current_user: current_user)
       |> assign(page_title: "Consent Records")
       |> assign(consent_records: [])
       |> assign(page: 1)
@@ -30,6 +38,16 @@ defmodule XIAMWeb.Admin.ConsentRecordsLive do
       |> assign(theme: "light")
       |> load_consent_records()}
   end
+
+  # Helper to convert values to integer (copied from UsersLive)
+  defp to_int(value) when is_integer(value), do: value
+  defp to_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {i, ""} -> i
+      _ -> nil
+    end
+  end
+  defp to_int(_), do: nil
 
   @impl true
   def handle_params(params, _url, socket) do

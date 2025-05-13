@@ -1,5 +1,5 @@
 defmodule XIAM.Auth.JWTTest do
-  use XIAM.DataCase
+  use XIAM.DataCase, async: false
 
   alias XIAM.Auth.JWT
   alias XIAM.Users.User

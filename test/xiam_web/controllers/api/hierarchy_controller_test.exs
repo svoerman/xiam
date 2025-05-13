@@ -5,12 +5,8 @@ defmodule XIAMWeb.API.HierarchyControllerTest do
   @compile {:no_warn_undefined, XIAMWeb.API.HierarchyControllerTest}
   
   # alias XIAM.Hierarchy # Commented out to avoid unused alias warning
-  alias XIAM.ETSTestHelper
-  
-  setup %{conn: conn} do
-    # Ensure ETS tables exist for Phoenix endpoint
-    ETSTestHelper.ensure_ets_tables_exist()
     
+  setup %{conn: conn} do
     {:ok, conn: put_req_header(conn, "accept", "application/json")}
   end
   

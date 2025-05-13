@@ -6,6 +6,11 @@ This document outlines our step-by-step approach to un-skipping currently skippe
 - Grep for `@tag :skip` across `test/` to list all skipped test files.
 - Group by feature area: API controllers, hierarchy modules, auth, etc.
 
+### Currently Skipped Tests (as of 2025-05-12):
+(All tests in `test/xiam_web/live/admin/audit_logs_live_test.exs` have been successfully unskipped and fixed as of 2025-05-12).
+
+The next step is to search for any remaining `@tag :skip` instances in the `test/` directory.
+
 ## 2. Module-by-Module Rollout
 1. **Select a small module** (few dependencies) and remove its skip tags.
 2. **Run**:

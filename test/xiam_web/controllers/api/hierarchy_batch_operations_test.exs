@@ -2,8 +2,7 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   use XIAMWeb.ConnCase, async: false
 
   # Import helpers for resilient testing
-  import XIAM.ETSTestHelper
-
+  
   alias XIAM.Hierarchy
   alias XIAM.Users.User
   alias XIAM.Repo
@@ -108,8 +107,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   
   describe "batch_move/2" do
     test "moves multiple nodes to a new parent", %{conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -141,8 +138,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
     end
     
     test "returns error when parent node does not exist", %{conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -175,8 +170,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   
   describe "batch_delete/2" do
     test "deletes multiple nodes", %{conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -211,8 +204,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
     end
     
     test "returns partial success when some nodes cannot be deleted", %{conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -248,8 +239,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   
   describe "batch_check_access/2" do
     test "checks access for multiple nodes", %{conn: conn, nodes: nodes, admin: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # First grant access to some nodes
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -289,8 +278,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   
   describe "batch_grant_access/2" do
     test "grants access to multiple nodes", %{conn: conn, nodes: nodes, admin: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -323,8 +310,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
     end
     
     test "returns partial success when some grants fail", %{conn: conn, nodes: nodes, admin: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -363,8 +348,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
   
   describe "batch_revoke_access/2" do
     test "revokes access from multiple nodes", %{conn: conn, nodes: nodes, admin: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Mock grants for testing
       grants = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -404,8 +387,6 @@ defmodule XIAMWeb.API.HierarchyBatchOperationsTest do
     end
     
     test "returns partial success when some revokes fail", %{conn: conn, nodes: nodes, admin: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Mock a grant for testing
       grant = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->

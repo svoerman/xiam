@@ -37,7 +37,7 @@ defmodule XIAM.MixProject do
   def application do
     [
       mod: {XIAM.Application, []},
-      extra_applications: [:logger, :runtime_tools, :os_mon]
+      extra_applications: [:logger, :runtime_tools, :os_mon, :phoenix_live_view]
     ]
   end
 
@@ -52,7 +52,8 @@ defmodule XIAM.MixProject do
     [
       {:phoenix, "~> 1.7.20"},
       {:phoenix_ecto, "~> 4.5"},
-      {:ecto_sql, "~> 3.10"},
+      {:ecto, "~> 3.12"},
+      {:ecto_sql, "~> 3.12"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},

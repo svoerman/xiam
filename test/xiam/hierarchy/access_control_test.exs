@@ -1,26 +1,9 @@
 defmodule XIAM.Hierarchy.AccessControlTest do
-  # Removed compiler directive as it was causing compilation issues
-  use ExUnit.Case, async: true
+  use XIAM.ResilientTestCase, async: true
 
   # Add compiler directive to suppress unused function warnings
   @compile {:no_warn_undefined, XIAM.Hierarchy.AccessControlTest}
-  
-  alias XIAM.ETSTestHelper
-  
-  setup do
-    # Ensure all required applications are started
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
-    
-    # Set up the database connection
-    Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-    
-    # Ensure ETS tables exist for Phoenix endpoint
-    ETSTestHelper.ensure_ets_tables_exist()
-    
-    :ok
-  end
+
   
   # Regular test cases would go here...
   

@@ -15,6 +15,7 @@ defmodule XIAM.ETSTestHelper do
     ensure_table_exists(:phoenix_endpoint)
     ensure_table_exists(:cache)
     ensure_table_exists(:hierarchy_cache)
+    ensure_table_exists(:hierarchy_cache_metrics)
     ensure_table_exists(:access_cache)
     :ok
   end

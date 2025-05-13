@@ -30,7 +30,7 @@ import os
 
 # Configuration
 DEFAULT_BASE_URL = "http://localhost:4000/api"
-DEFAULT_AUTH_TOKEN = "YOUR_AUTH_TOKEN"  # Replace with a valid token
+DEFAULT_AUTH_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwiZXhwIjoxNzQ3Njg2NDMwLCJpYXQiOjE3NDcwODE2MzAsInJvbGVfaWQiOjEsInN1YiI6MSwidHlwIjoiYWNjZXNzIn0.GA0bZtQr4AuXw9VyN7ELLjA4bv80u7AFehCKNf_RDz8"  # Replace with a valid token
 DEFAULT_RUNS = 5  # Number of times to run each test
 DEFAULT_SAMPLE_SIZE = 50  # Number of random nodes to sample for tests
 

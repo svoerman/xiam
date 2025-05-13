@@ -2,8 +2,7 @@ defmodule XIAMWeb.API.SystemControllerTest do
   use XIAMWeb.ConnCase, async: false
   
   # Import the ETSTestHelper to ensure proper test environment
-  import XIAM.ETSTestHelper
-
+  
   alias XIAM.Users.User
   alias XIAM.Repo
   alias XIAM.Auth.JWT
@@ -70,8 +69,6 @@ defmodule XIAMWeb.API.SystemControllerTest do
 
   describe "health/2" do
     test "returns basic health information without authentication", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -94,8 +91,6 @@ defmodule XIAMWeb.API.SystemControllerTest do
 
   describe "status/2" do
     test "returns detailed health information when authenticated", %{authed_conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation with mocking for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -162,8 +157,6 @@ defmodule XIAMWeb.API.SystemControllerTest do
     end
 
     test "requires authentication", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -179,8 +172,6 @@ defmodule XIAMWeb.API.SystemControllerTest do
     end
 
     test "respects capability check", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create a user without capabilities using safely_execute_db_operation
       {_regular_user, regular_token} = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->

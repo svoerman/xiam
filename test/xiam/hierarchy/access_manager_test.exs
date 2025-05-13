@@ -11,46 +11,35 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
   This file focuses on more complex integration scenarios that span multiple features.
   """
   
-  use XIAM.DataCase, async: false
+  use XIAM.ResilientTestCase, async: false
   
   import XIAM.HierarchyTestHelpers
   
   alias XIAM.Hierarchy.AccessManager
   
   setup do
-    # First ensure the repo is started with explicit applications
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
-    
-    # Get a fresh database connection
-    Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-    
-    # Ensure repository is properly started
-    XIAM.ResilientDatabaseSetup.ensure_repository_started()
-    
-    # Ensure ETS tables exist for Phoenix-related operations
+    # Ensure ETS tables exist for Phoenix endpoint
     XIAM.ETSTestHelper.ensure_ets_tables_exist()
-    XIAM.ETSTestHelper.initialize_endpoint_config()
-    
+
     # Create an extended test hierarchy with user, role, department, team
-    fixtures = create_extended_test_hierarchy()
+    fixtures = create_extended_test_hierarchy_local()
     
     # Also create an additional department for advanced hierarchy tests
-    alt_dept = create_test_department()
+    alt_dept = create_test_department_local()
     
     # Return all fixtures for use in tests
     Map.put(fixtures, :alt_dept, alt_dept)
   end
   
   # Helper to create a test department directly (for specialized test cases)
-  defp create_test_department do
+  defp create_test_department_local do
     # Use timestamp + random for true uniqueness following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
     timestamp = System.system_time(:millisecond)
     random_suffix = :rand.uniform(100_000)
     
     # Create department with resilient database operation pattern
     dept_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+
       %XIAM.Hierarchy.Node{
         name: "TestDept_#{timestamp}_#{random_suffix}",
         node_type: "department",
@@ -67,13 +56,14 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
   end
   
   # Helper to create an extended test hierarchy with direct Repo operations
-  defp create_extended_test_hierarchy do
+  defp create_extended_test_hierarchy_local do
     # Use timestamp + random for true uniqueness across all entities
     timestamp = System.system_time(:millisecond)
     random_suffix = :rand.uniform(100_000)
     
     # Create user directly with proper error handling
     user_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+
       %XIAM.Users.User{}
       |> XIAM.Users.User.pow_changeset(%{
         email: "access_test_user_#{timestamp}_#{random_suffix}@example.com",
@@ -99,6 +89,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
     
     # Create department node with resilient pattern
     dept_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+
       %XIAM.Hierarchy.Node{
         name: "Department_#{timestamp}_#{random_suffix}",
         node_type: "department",
@@ -115,6 +106,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
     
     # Create team node as child of department with resilient pattern
     team_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+
       %XIAM.Hierarchy.Node{
         name: "Team_#{timestamp}_#{random_suffix}",
         node_type: "team",
@@ -132,6 +124,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
     
     # Create project node as child of team with resilient pattern
     project_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+
       %XIAM.Hierarchy.Node{
         name: "Project_#{timestamp}_#{random_suffix}",
         node_type: "project",
@@ -163,6 +156,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       
       # Grant access to the department using ResilientTestHelper
       grant_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         AccessManager.grant_access(user.id, dept.id, role.id)
       end, max_retries: 3, retry_delay: 100)
       
@@ -178,16 +172,19 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       
       # Verify access to the department
       dept_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         XIAM.Hierarchy.can_access?(user.id, dept.id)
       end, max_retries: 3, retry_delay: 100)
       
       # Verify access to the team (should inherit from department)
       team_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         XIAM.Hierarchy.can_access?(user.id, team.id)
       end, max_retries: 3, retry_delay: 100)
       
       # Verify access to the project (should inherit from team)
       project_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         XIAM.Hierarchy.can_access?(user.id, project.id)
       end, max_retries: 3, retry_delay: 100)
       
@@ -222,20 +219,14 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
     test "correctly handles access revocation", %{user: user, role: role, dept: dept, alt_dept: alt_dept} do
       # Debug info about the nodes removed for cleaner test output
 
-      # Ensure ETS tables are initialized before Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-
-      # Explicitly checkout a connection for this test
-      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      
-      # Grant access to first department with increased retries and delay
-      grant_result1 = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      # Grant access to the main department first
+      grant_result_dept = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         AccessManager.grant_access(user.id, dept.id, role.id)
       end, max_retries: 5, retry_delay: 200)
       
       # Verify grant succeeded with detailed error handling
-      case grant_result1 do
+      case grant_result_dept do
         {:ok, {:ok, _}} -> 
           # Successfully granted access to dept
           :grant_succeeded
@@ -248,12 +239,13 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       end
       
       # Grant access to second department with increased resilience
-      grant_result2 = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+      grant_result_alt_dept = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         AccessManager.grant_access(user.id, alt_dept.id, role.id)
       end, max_retries: 5, retry_delay: 200)
       
       # Verify grant succeeded with detailed error handling
-      case grant_result2 do
+      case grant_result_alt_dept do
         {:ok, {:ok, _}} -> 
           # Successfully granted access to alt_dept
           :grant_succeeded
@@ -271,8 +263,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # First check access to both departments after granting access
       # Using increased retries for better resilience
       before_revoke1 = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        # Ensure ETS tables before each operation
-        XIAM.ETSTestHelper.ensure_ets_tables_exist()
+  
         XIAM.Hierarchy.can_access?(user.id, dept.id)
       end, max_retries: 5, retry_delay: 200)
       
@@ -280,8 +271,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       # First dept access check result captured
       
       before_revoke2 = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        # Ensure ETS tables before each operation
-        XIAM.ETSTestHelper.ensure_ets_tables_exist()
+  
         XIAM.Hierarchy.can_access?(user.id, alt_dept.id)
       end, max_retries: 5, retry_delay: 200)
       
@@ -305,6 +295,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       
       # Revoke access to the first department
       revoke_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+  
         XIAM.Hierarchy.revoke_access(user.id, dept.id)
       end, max_retries: 3, retry_delay: 100)
       
@@ -332,6 +323,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       after_revoke1 = nil
       Enum.reduce_while(1..3, nil, fn _attempt, _ ->
         result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+    
           XIAM.Hierarchy.can_access?(user.id, dept.id)
         end, max_retries: 3, retry_delay: 100)
         
@@ -351,6 +343,7 @@ defmodule XIAM.Hierarchy.AccessManagerTest do
       after_revoke2 = nil
       Enum.reduce_while(1..3, nil, fn _attempt, _ ->
         result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
+    
           XIAM.Hierarchy.can_access?(user.id, alt_dept.id)
         end, max_retries: 3, retry_delay: 100)
         

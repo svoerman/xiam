@@ -30,6 +30,16 @@ defmodule XIAM.Users.User do
   end
 
   @doc """
+  Primary changeset for creating and updating users.
+  Handles both Pow standard fields and XIAM custom fields like :admin and :name.
+  """
+  def changeset(user_or_changeset, attrs) do
+    user_or_changeset
+    |> pow_changeset(attrs) # Apply Pow's base changeset for email, password etc.
+    |> cast(attrs, [:admin, :name])     # Cast our custom fields
+  end
+
+  @doc """
   Changeset for updating MFA settings.
   """
   def mfa_changeset(user_or_changeset, attrs) do

@@ -7,26 +7,9 @@ defmodule XIAM.Hierarchy.NodeManagementTest do
   specific implementation details, making them resilient to refactoring.
   """
   
-  use XIAM.DataCase, async: false
+  use XIAM.ResilientTestCase, async: false
   import XIAM.HierarchyTestHelpers
   
-  # Ensure the Ecto Repo is properly initialized before tests
-  setup_all do
-    # Start the Ecto repository and related applications
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    
-    # Explicitly checkout the repo for these tests
-    try do
-      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-    rescue
-      e -> 
-        IO.puts("Error setting up Repo: #{inspect(e)}")
-        :ok
-    end
-    
-    :ok
-  end
   
   # Helper function to sanitize Ecto structs for verification
   defp sanitize_node(node) when is_map(node) do

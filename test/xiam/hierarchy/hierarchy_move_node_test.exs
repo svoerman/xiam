@@ -6,51 +6,14 @@ defmodule XIAM.HierarchyMoveNodeTest do
   hierarchical integrity and prevent invalid operations like circular references.
   """
   
-  use XIAM.DataCase, async: false
+  use XIAM.ResilientTestCase, async: false
   
   alias XIAM.HierarchyMockAdapter, as: MockHierarchy
   alias XIAM.TestOutputHelper, as: Output
   
   describe "move_node" do
     setup do
-      # Implement resilient testing patterns from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
-      # Start applications explicitly for improved test stability
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      
-      # Resilient database connection setup with proper error handling
-      db_result = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
-        Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-        :ok
-      end, max_retries: 3, retry_delay: 200)
-      
-      # Enhanced pattern matching to handle multiple success result formats
-      # This fixes the CaseClauseError with :ok pattern
-      case db_result do
-        {:ok, :ok} -> 
-          # Original expected format
-          setup_hierarchy()
-        {:ok, _} -> 
-          # Other success formats from our enhanced resilient operations
-          setup_hierarchy()
-        :ok -> 
-          # Direct :ok return value
-          setup_hierarchy()
-        {:error, {:already, :owner}} ->
-          Output.debug_print("Process already owns the connection - skipping test")
-          {:ok, %{skip_test: true}}
-        {:error, error} ->
-          Output.debug_print("Database connection failed: #{inspect(error)} - skipping test")
-          {:ok, %{skip_test: true}}
-      end
-    rescue
-      e -> 
-        Output.debug_print("Setup error: #{inspect(e)} - skipping test")
-        {:ok, %{skip_test: true}}
+      setup_hierarchy()
     end
     
     # Extract hierarchy setup to a separate function for cleaner code

@@ -1,5 +1,5 @@
 defmodule XIAMWeb.Admin.ProductsLiveTest do
-  use XIAMWeb.ConnCase
+  use XIAMWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   alias XIAM.Users.User
@@ -10,10 +10,12 @@ defmodule XIAMWeb.Admin.ProductsLiveTest do
   def create_admin_user() do
     # Create a user
     {:ok, user} = %User{}
-      |> User.pow_changeset(%{
+      |> User.changeset(%{
         email: "admin_user_#{System.unique_integer([:positive])}@example.com",
+        name: "Test Admin Product",
         password: "Password123!",
-        password_confirmation: "Password123!"
+        password_confirmation: "Password123!",
+        admin: true
       })
       |> Repo.insert()
 
@@ -55,53 +57,33 @@ defmodule XIAMWeb.Admin.ProductsLiveTest do
     user |> Repo.preload(role: :capabilities)
   end
 
-  defp login(conn, user) do
-    # Using Pow's test helpers with explicit config
-    pow_config = [otp_app: :xiam]
-    conn
-    |> Pow.Plug.assign_current_user(user, pow_config)
-  end
+  setup %{conn: conn} = context do
+    admin_user = create_admin_user()
+    admin_conn = log_in_user(conn, admin_user)
 
-  setup %{conn: conn} do
-    # Create admin user
-    user = create_admin_user()
+    # Create distinct products and capabilities for testing product/capability management
+    {:ok, p1} = %Product{product_name: "TestProduct1_#{System.unique_integer([:positive])}", description: "Product 1 for testing"} |> Repo.insert()
+    {:ok, p2} = %Product{product_name: "TestProduct2_#{System.unique_integer([:positive])}", description: "Product 2 for testing"} |> Repo.insert()
 
-    # Authenticate connection
-    conn = login(conn, user)
+    {:ok, c1} = %Capability{name: "Capability1_P1_#{System.unique_integer([:positive])}", description: "Cap 1 for P1", product_id: p1.id} |> Repo.insert()
+    {:ok, c2} = %Capability{name: "Capability2_P1_#{System.unique_integer([:positive])}", description: "Cap 2 for P1", product_id: p1.id} |> Repo.insert()
 
-    # Create some test products
-    {:ok, product1} = %Product{
-      product_name: "Test Product 1 #{System.unique_integer([:positive])}",
-      description: "First test product"
+    # Any other users or data needed for specific tests can be added here or in their respective test blocks
+
+    new_context = %{
+      conn: admin_conn,
+      admin_user: admin_user,
+      products: [p1, p2],
+      capabilities: [c1, c2],
+      product1: p1, # for convenience in tests that focus on one product
+      capability1: c1 # for convenience
     }
-    |> Repo.insert()
 
-    {:ok, product2} = %Product{
-      product_name: "Test Product 2 #{System.unique_integer([:positive])}",
-      description: "Second test product"
-    }
-    |> Repo.insert()
-    
-    # Create some test capabilities
-    {:ok, capability1} = %Capability{
-      name: "test_capability_1",
-      description: "First test capability",
-      product_id: product1.id
-    }
-    |> Repo.insert()
-
-    {:ok, capability2} = %Capability{
-      name: "test_capability_2",
-      description: "Second test capability",
-      product_id: product2.id
-    }
-    |> Repo.insert()
-
-    {:ok, conn: conn, user: user, products: [product1, product2], capabilities: [capability1, capability2]}
+    Map.merge(context, new_context)
   end
 
   describe "Products LiveView" do
-    test "displays products and capabilities", %{conn: conn, products: [product1, _product2]} do
+    test "displays products and capabilities", %{conn: conn, products: [product1, _product2], capability1: capability1} do
       {:ok, _view, html} = live(conn, ~p"/admin/products")
 
       # Verify products are displayed
@@ -110,7 +92,7 @@ defmodule XIAMWeb.Admin.ProductsLiveTest do
       assert html =~ product1.description
 
       # Verify capabilities are displayed
-      assert html =~ "test_capability_1"
+      assert html =~ capability1.name
     end
 
     test "can create a new product", %{conn: conn} do

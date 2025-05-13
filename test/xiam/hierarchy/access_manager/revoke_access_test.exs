@@ -8,16 +8,8 @@ defmodule XIAM.Hierarchy.AccessManager.RevokeAccessTest do
   
   describe "revoke_access/1 and revoke_access/2" do
     setup do
-      # First ensure the repo is started with explicit applications
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
-      # Ensure repository is properly started
-      XIAM.ResilientDatabaseSetup.ensure_repository_started()
-      
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
+      # App/Repo startup handled by test_helper.exs
+      # Sandbox checkout & ETS setup handled by ResilientTestCase/DataCase
       
       # Create test hierarchy with resilient pattern
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->

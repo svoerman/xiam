@@ -3,8 +3,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
   import Ecto.Query
 
   # Import the ETSTestHelper to ensure proper test environment
-  import XIAM.ETSTestHelper
-  
+    
   alias XIAM.Users.User
   alias XIAM.Repo
   alias XIAM.Auth.JWT
@@ -45,7 +44,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
 
     # Create a test user (without role initially)
     email = "access_ctrl_test_#{timestamp}@example.com"
-    {:ok, user_unlinked} = %User{}
+    {:ok, created_user} = %User{}
       |> User.pow_changeset(%{
         email: email,
         password: "Password123!",
@@ -55,7 +54,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       |> Repo.insert()
 
     # Assign the role to the user
-    {:ok, user} = user_unlinked
+    {:ok, user} = created_user
       |> User.role_changeset(%{role_id: role.id})
       |> Repo.update()
 
@@ -68,15 +67,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       |> put_req_header("content-type", "application/json")
       |> put_req_header("authorization", "Bearer #{token}")
 
-    # Register a teardown function that cleans up data
-    on_exit(fn ->
-      Repo.delete_all(from ea in Xiam.Rbac.EntityAccess, where: ea.user_id == ^user.id)
-      Repo.delete_all(User)
-      Repo.delete_all(Role)
-      Repo.delete_all(Product)
-      Repo.delete_all(Capability)
-    end)
-
     %{
       conn: conn,
       user: user,
@@ -88,8 +78,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
 
   describe "user access endpoints" do
     test "set_user_access/2 creates entity access", %{conn: conn, user: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create access params
       params = %{
@@ -117,8 +105,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
     end
 
     test "get_user_access/2 retrieves user access", %{conn: conn, user: user, product: product, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_db_operation to handle the database setup
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -153,8 +139,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
 
   describe "capability endpoints" do
     test "create_capability/2 creates a capability", %{conn: conn, product: product, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create a unique capability name to avoid conflicts across test runs
       capability_name = "test_api_capability_#{timestamp}"
@@ -180,8 +164,6 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
     end
 
     test "get_product_capabilities/2 returns product capabilities", %{conn: conn, product: product, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create a unique capability name
       capability_name = "View_Dashboard_#{timestamp}"

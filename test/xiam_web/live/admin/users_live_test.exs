@@ -1,108 +1,73 @@
+require XIAMWeb.Router
+
 defmodule XIAMWeb.Admin.UsersLiveTest do
   use XIAMWeb.ConnCase, async: false
-
   import Phoenix.LiveViewTest
-  alias XIAM.Users.User
-  alias Xiam.Rbac.{Role, Capability}
   alias XIAM.Repo
+  alias XIAM.Users.User
+  alias Xiam.Rbac.Role
 
-  # Helper for test authentication
-  def create_admin_user() do
-    # Create a user
-    email = "admin_user_#{System.unique_integer([:positive])}@example.com"
-    {:ok, user} = %User{}
-      |> User.changeset(%{
-        email: email,
-        password: "Password123!",
-        password_confirmation: "Password123!"
-      })
-      |> Repo.insert()
-
-    # Create a role with admin capability
-    timestamp = System.unique_integer([:positive])
-    {:ok, role} = %Role{name: "Administrator_#{timestamp}", description: "Admin role"}
-    |> Repo.insert()
-
-    # Create a product for capabilities
-    {:ok, product} = %Xiam.Rbac.Product{
-      product_name: "Admin Test Product",
-      description: "Product for testing admin access"
+  defp create_admin_user_for_test(attrs) do
+    default_attrs = %{
+      email: "admin_#{"#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"}@example.com",
+      name: "Admin User",
+      admin: true,
+      password: "password123",
+      password_confirmation: "password123"
     }
-    |> Repo.insert()
+    merged_attrs = Enum.into(attrs, default_attrs)
 
-    # Add admin capability
-    {:ok, capability} = %Capability{
-      name: "admin_access",
-      description: "Admin access",
-      product_id: product.id
-    }
-    |> Repo.insert()
-
-    # Associate capability with role
-    role
-    |> Repo.preload(:capabilities)
-    |> Ecto.Changeset.change()
-    |> Ecto.Changeset.put_assoc(:capabilities, [capability])
-    |> Repo.update!()
-
-    # Assign role to user
-    {:ok, user} = user
-      |> User.role_changeset(%{role_id: role.id})
-      |> Repo.update()
-
-    # Return user with preloaded role and capabilities
-    user |> Repo.preload(role: :capabilities)
+    %User{}
+    |> User.changeset(merged_attrs)
+    |> Repo.insert!()
   end
 
-  defp login(conn, user) do
-    # Using Pow's test helpers with explicit config
-    pow_config = [otp_app: :xiam]
-    conn
-    |> Pow.Plug.assign_current_user(user, pow_config)
-  end
+  setup :setup_test_environment
 
-  setup %{conn: conn} do
-    # Create admin user for authentication
-    admin = create_admin_user()
+  defp setup_test_environment(%{conn: conn}) do
+    administrator_role =
+      Repo.get_by(Role, name: "Administrator") ||
+        Repo.insert!(%Role{name: "Administrator", description: "Administrator role"})
+    admin = create_admin_user_for_test(%{role_id: administrator_role.id, admin: true})
+    admin = Repo.get!(User, admin.id) # reload to ensure role_id is present
+    admin_conn = log_in_user(conn, admin)
+    admin_conn = Phoenix.ConnTest.init_test_session(admin_conn, %{"pow_user_id" => admin.id})
 
-    # Create test users with different roles
-    {:ok, regular_user} = %User{}
+
+    test_user_attrs = %{
+      email: "test_#{"#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"}@example.com",
+      name: "Regular Test User",
+      password: "password123",
+      password_confirmation: "password123"
+    }
+    test_user =
+      %User{}
+      |> User.changeset(test_user_attrs)
+      |> Repo.insert!()
+
+    standard_role = %Role{name: "Standard_#{"#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"}", description: "Standard user role"}
+    |> Repo.insert!()
+
+    role_user = %User{}
       |> User.changeset(%{
-        email: "user_#{System.unique_integer([:positive])}@example.com",
+        email: "role_user_#{"#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"}@example.com",
         password: "Password123!",
         password_confirmation: "Password123!"
       })
-      |> Repo.insert()
+      |> Repo.insert!()
 
-    # Create a standard role (not admin)
-    timestamp = System.unique_integer([:positive])
-    {:ok, standard_role} = %Role{name: "Standard_#{timestamp}", description: "Standard user role"}
-    |> Repo.insert()
-
-    # Create another user with a role
-    {:ok, role_user} = %User{}
-      |> User.changeset(%{
-        email: "role_user_#{System.unique_integer([:positive])}@example.com",
-        password: "Password123!",
-        password_confirmation: "Password123!"
-      })
-      |> Repo.insert()
-
-    # Assign role
     {:ok, role_user} = role_user
       |> User.role_changeset(%{role_id: standard_role.id})
       |> Repo.update()
 
-    # Create MFA-enabled user
-    {:ok, mfa_user} = %User{}
+    mfa_user = %User{}
       |> User.changeset(%{
-        email: "mfa_user_#{System.unique_integer([:positive])}@example.com",
+        email: "mfa_user_#{"#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"}@example.com",
         password: "Password123!",
         password_confirmation: "Password123!"
       })
-      |> Repo.insert()
+      |> Repo.insert!()
 
-    # Enable MFA
     secret = User.generate_totp_secret()
     backup_codes = User.generate_backup_codes()
 
@@ -114,17 +79,14 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       })
       |> Repo.update()
 
-    # Authenticate connection as admin
-    conn = login(conn, admin)
-
     {:ok,
-      conn: conn,
-      admin: admin,
-      regular_user: regular_user,
-      role_user: role_user,
-      mfa_user: mfa_user,
-      standard_role: standard_role
-    }
+     conn: admin_conn,
+     admin: admin,
+     test_user: test_user,
+     regular_user: test_user,
+     standard_role: standard_role,
+     role_user: role_user,
+     mfa_user: mfa_user}
   end
 
   describe "Users LiveView" do
@@ -147,7 +109,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert html =~ "Disabled" # For other users' MFA status
     end
 
-    test "can open edit modal for a user", %{conn: conn, regular_user: regular_user} do
+    test "can open edit modal for a user", %{conn: conn, admin: _admin, regular_user: regular_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Open edit modal for regular user directly with the event
@@ -160,7 +122,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert rendered =~ "Assign Role"
     end
 
-    test "can update user role", %{conn: conn, regular_user: regular_user, standard_role: standard_role} do
+    test "can update user role", %{conn: conn, admin: _admin, regular_user: regular_user, standard_role: standard_role} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Open edit modal for regular user directly with the event
@@ -181,7 +143,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert updated_user.role.name == standard_role.name
     end
 
-    test "can remove user role", %{conn: conn, role_user: role_user} do
+    test "can remove user role", %{conn: conn, admin: _admin, role_user: role_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Open edit modal for role user directly with the event
@@ -202,7 +164,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert updated_user.role == nil
     end
 
-    test "can toggle MFA for a user", %{conn: conn, regular_user: regular_user, mfa_user: mfa_user} do
+    test "can toggle MFA for a user", %{conn: conn, admin: _admin, regular_user: regular_user, mfa_user: mfa_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Disable MFA for mfa_user using the event directly
@@ -240,7 +202,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert updated_regular_user.mfa_backup_codes != nil
     end
 
-    test "displays not found message for invalid user ID", %{conn: conn} do
+    test "displays not found message for invalid user ID", %{conn: conn, admin: _admin} do
       # Try to access a user that doesn't exist
       # The route will redirect immediately, so we need to handle that
       {:error, {:live_redirect, %{to: redirect_path, flash: flash}}} = live(conn, ~p"/admin/users/999999")
@@ -261,7 +223,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert rendered =~ "No user selected"
     end
 
-    test "can open MFA setup modal", %{conn: conn, regular_user: regular_user} do
+    test "can open MFA setup modal", %{conn: conn, admin: _admin, regular_user: regular_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Click the Enable MFA button
@@ -276,7 +238,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert rendered =~ regular_user.email
     end
 
-    test "can enable MFA for user", %{conn: conn, regular_user: regular_user} do
+    test "can enable MFA for user", %{conn: conn, admin: _admin, regular_user: regular_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Open MFA setup modal
@@ -297,7 +259,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert updated_user.mfa_backup_codes != nil
     end
 
-    test "can disable MFA for user", %{conn: conn, mfa_user: mfa_user} do
+    test "can disable MFA for user", %{conn: conn, admin: _admin, mfa_user: mfa_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Click Disable MFA button
@@ -314,7 +276,7 @@ defmodule XIAMWeb.Admin.UsersLiveTest do
       assert updated_user.mfa_backup_codes == nil
     end
 
-    test "MFA setup modal shows QR code and backup codes", %{conn: conn, regular_user: regular_user} do
+    test "MFA setup modal shows QR code and backup codes", %{conn: conn, admin: _admin, regular_user: regular_user} do
       {:ok, view, _html} = live(conn, ~p"/admin/users")
 
       # Open MFA setup modal

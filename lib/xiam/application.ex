@@ -61,7 +61,9 @@ defmodule XIAM.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: XIAM.Supervisor]
-    Supervisor.start_link(children, opts)
+    result = Supervisor.start_link(children, opts)
+
+    result # Return original result
   end
 
   # Tell Phoenix to update the endpoint configuration

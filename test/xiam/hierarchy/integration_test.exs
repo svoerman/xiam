@@ -1,29 +1,13 @@
 defmodule XIAM.Hierarchy.IntegrationTest do
-  # Use DataCase for proper repository initialization - this handles most DB setup automatically
-  use XIAM.DataCase
-  
+  # Use ResilientTestCase for robust repository and ETS setup
+  use XIAM.ResilientTestCase
+
   # Import necessary modules
-  alias XIAM.Repo
-  alias XIAM.Hierarchy
+    alias XIAM.Hierarchy
   alias XIAM.Hierarchy.Node
-  alias XIAM.ETSTestHelper
-  alias XIAM.BootstrapHelper
-  
+    
   import XIAM.HierarchyTestHelpers, only: [create_test_user: 1, create_test_role: 1]
-  
-  # Additional setup to ensure repository is properly started and ETS tables exist
-  setup do
-    # Ensure applications are started for database operations with proper error handling
-    BootstrapHelper.ensure_repo_started()
-    
-    # Initialize ETS tables for Phoenix-related operations
-    ETSTestHelper.ensure_ets_tables_exist()
-    ETSTestHelper.initialize_endpoint_config()
-    
-    # Set sandbox mode to shared since some tests involve message passing between processes
-    Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    :ok
-  end
+  # Additional setup is now handled by XIAM.ResilientTestCase
   
   describe "integrated hierarchy operations" do
     setup do

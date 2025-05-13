@@ -3,8 +3,7 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
   use XIAMWeb.ConnCase, async: false
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
-  import Mock
-  alias XIAM.Repo
+    alias XIAM.Repo
   alias XIAM.Users.User
   import XIAM.ETSTestHelper
 
@@ -86,62 +85,8 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
   #   struct(XIAM.Users.User, Map.to_list(user))
   # end
   
-  # Helper function to add admin role to a user
-  defp add_admin_role(user) do
-    # Create admin capability for role
-    admin_capability = %Xiam.Rbac.Capability{
-      id: 1,
-      name: "admin_access",
-      description: "Admin access capability",
-      product_id: 1,
-      inserted_at: NaiveDateTime.utc_now(),
-      updated_at: NaiveDateTime.utc_now()
-    }
     
-    # Create or update role with admin capabilities
-    role = case user.role do
-      %Xiam.Rbac.Role{} = role ->
-        # Keep the existing struct but update capabilities
-        %{role | capabilities: [admin_capability]}
-      _ ->
-        # Create a new role struct if needed
-        %Xiam.Rbac.Role{
-          id: 1,
-          name: "Admin Role",
-          description: "Admin role for tests",
-          capabilities: [admin_capability],
-          inserted_at: NaiveDateTime.utc_now(),
-          updated_at: NaiveDateTime.utc_now()
-        }
-    end
-    
-    # Return user with admin role
-    %{user | role: role}
-  end
   
-  # Create a more resilient helper function for generating a get_by mock
-  # Based on memory 3ac7056a-c79c-4db7-ac76-6b6275f5170e
-  defp create_get_by_mock(user) do
-    fn
-      User, [email: email] when email == user.email -> user
-      User, [id: id] when id == user.id -> user
-      module, params -> 
-        Output.debug_print("Unmatched get_by call", "module: #{inspect(module)}, params: #{inspect(params)}")
-        nil
-    end
-  end
-  
-  # Create a more resilient helper function for generating a preload mock
-  defp create_preload_mock() do
-    fn
-      nil, _ -> nil  # Handle nil user case gracefully
-      user, [:role] -> add_admin_role(user)
-      user, [role: :capabilities] -> add_admin_role(user)
-      user, opts -> 
-        Output.debug_print("Unmatched preload call", "opts: #{inspect(opts)}")
-        user  # Return user unchanged for unmatched preload calls
-    end
-  end
 
   # Helper for logging in with proper LiveView session handling
   defp login(conn, user) do
@@ -258,45 +203,18 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
       # Run the test with the resilient pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Get the admin user from context and ensure they have admin access capability
-        admin_user = %{conn.assigns.current_user | admin: true}
-        
         # Ensure ETS tables exist before LiveView operations
         XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Create mock functions for authentication checks
-        # Using equality checks with guard clauses as per memory 3ac7056a-c79c-4db7-ac76-6b6275f5170e
-        get_by_mock = create_get_by_mock(admin_user)
-        preload_mock = create_preload_mock()
-        
-        # Apply mocks for repository calls
-        with_mocks([
-          {Repo, [], [
-            get_by: fn module, opts -> get_by_mock.(module, opts) end,
-            preload: fn user, opts -> preload_mock.(user, opts) end,
-            config: fn -> [timeout: 15000] end,
-            __adapter__: fn -> Ecto.Adapters.Postgres end,
-            aggregate: fn _, _, _ -> 10 end,
-            all: fn _ -> [] end,
-            query: fn _, _ -> {:ok, %{num_rows: 42}} end
-          ]}
-        ]) do
-          try do
-            # Now the LiveView should mount successfully
-            {:ok, view, _html} = live(conn, ~p"/admin/status")
+        # Now the LiveView should mount successfully
+        {:ok, view, _html} = live(conn, ~p"/admin/status")
 
-            # Verify database metrics are displayed
-            html = render(view)
-            
-            # Flexible assertions that won't break with minor UI changes
-            assert html =~ "Connections" || html =~ "connections", "Expected to find database connection metrics"
-            assert html =~ "Database" || html =~ "database", "Expected to find database section"
-          rescue
-            e ->
-              Output.debug_print("LiveView test encountered error", inspect(e))
-              # Allow test to continue instead of failing completely
-              assert true, "Forcing test to pass due to LiveView error, but error was: #{inspect(e)}"
-          end
-        end
+        # Verify database metrics are displayed
+        html = render(view)
+        
+        # Flexible assertions that won't break with minor UI changes
+        assert html =~ "Connections" || html =~ "connections", "Expected to find database connection metrics"
+        assert html =~ "Database" || html =~ "database", "Expected to find database section"
       end, max_retries: 3, retry_delay: 200, timeout: 10_000)
     end
 
@@ -304,51 +222,22 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
       # Run the test with the resilient pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Get the admin user from context and ensure they have admin access capability
-        admin_user = %{conn.assigns.current_user | admin: true}
         
         # Ensure ETS tables exist before LiveView operations
         XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Create mock functions for authentication checks
-        get_by_mock = create_get_by_mock(admin_user)
-        preload_mock = create_preload_mock()
+        # Ensure ETS tables one more time to handle any race conditions
+        XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Apply mocks for repository and node calls
-        with_mocks([
-          {Repo, [], [
-            get_by: fn module, opts -> get_by_mock.(module, opts) end,
-            preload: fn user, opts -> preload_mock.(user, opts) end,
-            config: fn -> [timeout: 15000] end,
-            __adapter__: fn -> Ecto.Adapters.Postgres end,
-            aggregate: fn _, _, _ -> 10 end,
-            all: fn _ -> [] end,
-            query: fn _, _ -> {:ok, %{num_rows: 42}} end
-          ]},
-          {Node, [], [
-            list: fn -> [:node1, :node2] end
-          ]}
-        ]) do
-          try do
-            # Ensure ETS tables one more time to handle any race conditions
-            XIAM.ETSTestHelper.ensure_ets_tables_exist()
-            
-            # Now the LiveView should mount successfully
-            {:ok, view, _html} = live(conn, ~p"/admin/status")
+        # Now the LiveView should mount successfully
+        {:ok, view, _html} = live(conn, ~p"/admin/status")
 
-            # Verify cluster metrics are displayed
-            html = render(view)
-            
-            # Flexible assertions for cluster metrics
-            assert html =~ "Cluster" || html =~ "cluster", "Expected to find cluster section"
-            assert html =~ "node1" || html =~ "node2" || html =~ "Node", 
-              "Expected to find at least one node in the cluster status"
-          rescue
-            e ->
-              Output.debug_print("LiveView test encountered error", inspect(e))
-              # Allow test to continue instead of failing completely
-              assert true, "Forcing test to pass due to LiveView error, but error was: #{inspect(e)}"
-          end
-        end
+        # Verify cluster metrics are displayed
+        html = render(view)
+        
+        # Flexible assertions for cluster metrics
+        assert html =~ "Cluster" || html =~ "cluster", "Expected to find cluster section"
+        assert html =~ "node" || html =~ "Node", "Expected to find at least one node in the cluster status"
       end, max_retries: 3, retry_delay: 200, timeout: 10_000)
     end
 
@@ -356,55 +245,19 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
       # Run the test with resilient patterns from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Get the admin user from context
-        admin_user = %{conn.assigns.current_user | admin: true}
         
         # Ensure ETS tables exist before LiveView operations
         XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Create mock functions for authentication checks
-        get_by_mock = create_get_by_mock(admin_user)
-        preload_mock = create_preload_mock()
-        
-        # Apply mocks for repository calls including job metrics
-        with_mocks([
-          {Repo, [], [
-            get_by: fn module, opts -> get_by_mock.(module, opts) end,
-            preload: fn user, opts -> preload_mock.(user, opts) end,
-            config: fn -> [timeout: 15000] end,
-            __adapter__: fn -> Ecto.Adapters.Postgres end,
-            aggregate: fn _, _, _ -> 10 end,
-            all: fn _ -> [] end,
-            query: fn _, _ -> {:ok, %{num_rows: 42}} end
-          ]},
-          {Oban.Telemetry, [], [
-            events: fn -> [
-              %{
-                name: "default",
-                dispatched_count: 10,
-                completed_count: 8,
-                discarded_count: 1,
-                cancelled_count: 1
-              }
-            ] end
-          ]}
-        ]) do
-          try do
-            # Now the LiveView should mount successfully
-            {:ok, view, _html} = live(conn, ~p"/admin/status")
+        # Now the LiveView should mount successfully
+        {:ok, view, _html} = live(conn, ~p"/admin/status")
 
-            # Verify background job metrics are displayed
-            html = render(view)
-            
-            # Flexible assertion for job metrics
-            assert html =~ "Background Jobs" || html =~ "Jobs" || html =~ "jobs", 
-              "Expected to find job metrics section"
-          rescue
-            e ->
-              Output.debug_print("LiveView test encountered error", inspect(e))
-              # Allow test to continue instead of failing completely
-              assert true, "Forcing test to pass due to LiveView error, but error was: #{inspect(e)}"
-          end
-        end
+        # Verify background job metrics are displayed
+        html = render(view)
+        
+        # Flexible assertion for job metrics
+        assert html =~ "Background Jobs" || html =~ "Jobs" || html =~ "jobs", 
+          "Expected to find job metrics section"
       end, max_retries: 3, retry_delay: 200, timeout: 10_000)
     end
 
@@ -412,50 +265,25 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
       # Run the test with resilient patterns from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Get the admin user from context
-        admin_user = %{conn.assigns.current_user | admin: true}
         
         # Ensure ETS tables exist before LiveView operations
         XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Create mock functions for authentication checks
-        get_by_mock = create_get_by_mock(admin_user)
-        preload_mock = create_preload_mock()
+        # Set up some cache metrics in ETS table
+        safely_ensure_table_exists(:hierarchy_cache_metrics)
+        :ets.insert(:hierarchy_cache_metrics, {{:path, :hits}, 20})
+        :ets.insert(:hierarchy_cache_metrics, {{:node, :hits}, 15})
+        :ets.insert(:hierarchy_cache_metrics, {{:access, :hits}, 13})
+        :ets.insert(:hierarchy_cache_metrics, {{:total, :hits}, 48})
         
-        # Apply mocks for repository calls
-        with_mocks([
-          {Repo, [], [
-            get_by: fn module, opts -> get_by_mock.(module, opts) end,
-            preload: fn user, opts -> preload_mock.(user, opts) end,
-            config: fn -> [timeout: 15000] end,
-            __adapter__: fn -> Ecto.Adapters.Postgres end,
-            aggregate: fn _, _, _ -> 10 end,
-            all: fn _ -> [] end,
-            query: fn _, _ -> {:ok, %{num_rows: 42}} end
-          ]}
-        ]) do
-          try do
-            # Set up some cache metrics in ETS table
-            safely_ensure_table_exists(:hierarchy_cache_metrics)
-            :ets.insert(:hierarchy_cache_metrics, {{:path, :hits}, 20})
-            :ets.insert(:hierarchy_cache_metrics, {{:node, :hits}, 15})
-            :ets.insert(:hierarchy_cache_metrics, {{:access, :hits}, 13})
-            :ets.insert(:hierarchy_cache_metrics, {{:total, :hits}, 48})
-            
-            # Now the LiveView should mount successfully
-            {:ok, view, _html} = live(conn, ~p"/admin/status")
+        # Now the LiveView should mount successfully
+        {:ok, view, _html} = live(conn, ~p"/admin/status")
 
-            # Verify cache metrics are displayed
-            html = render(view)
-            
-            # Flexible assertion for cache metrics
-            assert html =~ "Cache" || html =~ "cache", "Expected to find cache metrics section"
-          rescue
-            e ->
-              Output.debug_print("LiveView test encountered error", inspect(e))
-              # Allow test to continue instead of failing completely
-              assert true, "Forcing test to pass due to LiveView error, but error was: #{inspect(e)}"
-          end
-        end
+        # Verify cache metrics are displayed
+        html = render(view)
+        
+        # Flexible assertion for cache metrics
+        assert html =~ "Cache" || html =~ "cache", "Expected to find cache metrics section"
       end, max_retries: 3, retry_delay: 200, timeout: 10_000)
     end
 
@@ -491,42 +319,20 @@ defmodule XIAMWeb.Admin.StatusLiveTest do
       # Run the test with the resilient pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
         # Get the admin user from context and ensure they have admin access capability
-        admin_user = %{conn.assigns.current_user | admin: true}
         
         # Ensure ETS tables exist before LiveView operations
         XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Create mock functions for authentication checks
-        get_by_mock = create_get_by_mock(admin_user)
-        preload_mock = create_preload_mock()
+        # Ensure ETS tables one more time to handle any race conditions
+        XIAM.ETSTestHelper.ensure_ets_tables_exist()
         
-        # Apply mocks for repository calls
-        with_mocks([
-          {Repo, [], [
-            get_by: fn module, opts -> get_by_mock.(module, opts) end,
-            preload: fn user, opts -> preload_mock.(user, opts) end,
-            config: fn -> [timeout: 15000] end,
-            __adapter__: fn -> Ecto.Adapters.Postgres end
-          ]}
-        ]) do
-          try do
-            # Ensure ETS tables one more time to handle any race conditions
-            XIAM.ETSTestHelper.ensure_ets_tables_exist()
-            
-            # Now the LiveView should mount successfully
-            {:ok, view, _html} = live(conn, ~p"/admin/status")
-            
-            # Verify admin header elements with flexible assertions
-            html = render(view)
-            assert html =~ "Admin" || html =~ "admin", "Expected to find 'Admin' in the header"
-            assert html =~ "Dashboard" || html =~ "dashboard", "Expected to find 'Dashboard' in the header"
-          rescue
-            e ->
-              Output.debug_print("LiveView test encountered error", inspect(e))
-              # Allow test to continue instead of failing completely
-              assert true, "Forcing test to pass due to LiveView error, but error was: #{inspect(e)}"
-          end
-        end
+        # Now the LiveView should mount successfully
+        {:ok, view, _html} = live(conn, ~p"/admin/status")
+        
+        # Verify admin header elements with flexible assertions
+        html = render(view)
+        assert html =~ "Admin" || html =~ "admin", "Expected to find 'Admin' in the header"
+        assert html =~ "Dashboard" || html =~ "dashboard", "Expected to find 'Dashboard' in the header"
       end, max_retries: 3, retry_delay: 200, timeout: 10_000)
     end
   end

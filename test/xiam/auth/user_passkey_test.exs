@@ -9,10 +9,6 @@ defmodule XIAM.Auth.UserPasskeyTest do
   describe "user_passkey" do
 
     setup do
-      # Explicitly start applications for database resilience
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
       # Use truly unique email with timestamp + random component
       unique_suffix = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
       unique_email = "test-passkey-#{unique_suffix}@example.com"
@@ -28,13 +24,14 @@ defmodule XIAM.Auth.UserPasskeyTest do
         |> Repo.insert()
       end)
       
-      # Return the user context from the case statement
+      # Ensure user creation succeeded and return the persisted user
       case user_result do
-        {:ok, user} -> %{user: user}
-        _ -> 
-          # Provide a fallback user for tests to continue
-          fallback_user = %User{id: System.unique_integer([:positive]), email: unique_email}
-          %{user: fallback_user}
+        {:ok, {:ok, user}} ->
+          %{user: user}
+        {:ok, user} when is_struct(user, User) -> # Handle cases where helper returns the struct directly
+          %{user: user}
+        failed_result ->
+          raise "Setup failed: Could not create test user. Reason: #{inspect(failed_result)}"
       end
     end
 

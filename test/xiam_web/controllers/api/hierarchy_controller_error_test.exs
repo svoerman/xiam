@@ -2,8 +2,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   use XIAMWeb.ConnCase, async: false
 
   # Import the ETSTestHelper to ensure proper test environment
-  import XIAM.ETSTestHelper
-  alias XIAM.Hierarchy
+    alias XIAM.Hierarchy
   alias XIAM.Users.User
   alias XIAM.Repo
 
@@ -103,8 +102,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   
   describe "create_node/2 error cases" do
     test "returns error for missing required fields", %{admin_conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -125,8 +122,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "returns error for invalid parent node", %{admin_conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -149,8 +144,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "requires authentication for node creation", %{unauthenticated_conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -173,8 +166,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   
   describe "update_node/2 error cases" do
     test "returns error for non-existent node", %{admin_conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -194,8 +185,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "returns error when moving node creates a cycle", %{admin_conn: conn, nodes: nodes, timestamp: _timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -218,8 +207,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   
   describe "delete_node/2 error cases" do
     test "returns error for non-existent node", %{admin_conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -234,8 +221,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "prevents deleting nodes with children", %{admin_conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -265,8 +250,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   
   describe "access_control error cases" do
     test "check_user_access returns error for non-existent user", %{admin_conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -284,8 +267,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "check_user_access returns error for non-existent node", %{admin_conn: conn, admin: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -305,8 +286,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
   
   describe "v1 API error cases" do
     test "batch operations handle invalid input", %{admin_conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -323,8 +302,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "batch_move handles invalid parent", %{admin_conn: conn, nodes: nodes} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -342,8 +319,6 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
     end
     
     test "batch_grant_access handles invalid input", %{admin_conn: conn, admin: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->

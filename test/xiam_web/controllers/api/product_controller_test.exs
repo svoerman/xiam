@@ -1,8 +1,7 @@
 defmodule XIAMWeb.API.ProductControllerTest do
   use XIAMWeb.ConnCase, async: false
   import Ecto.Query
-  import XIAM.ETSTestHelper
-
+  
   alias XIAM.Repo
   alias XIAM.Rbac.ProductContext
   alias Xiam.Rbac
@@ -80,8 +79,6 @@ defmodule XIAMWeb.API.ProductControllerTest do
 
   describe "index/2" do
     test "lists all products", %{conn: conn, product: product, token: token} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Use safely_execute_ets_operation for API requests that involve ETS tables
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
@@ -105,8 +102,6 @@ defmodule XIAMWeb.API.ProductControllerTest do
 
   describe "create/2" do
     test "creates a product with valid attributes", %{conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Create a unique product name
       product_name = "New_Test_Product_#{timestamp}"
@@ -133,8 +128,6 @@ defmodule XIAMWeb.API.ProductControllerTest do
     end
 
     test "returns error with invalid attributes", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Try to create a product with empty name
       params = %{"product_name" => ""}
@@ -151,8 +144,6 @@ defmodule XIAMWeb.API.ProductControllerTest do
     end
 
     test "returns error with missing attributes", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Try to create a product with no params
       params = %{}

@@ -85,50 +85,13 @@ defmodule XIAM.ResilientTestCase do
   end
   
   # Setup to run before every test to ensure consistent test environment
-  setup tags do
-    # Explicitly ensure all required applications are started
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
-    
-    # Ensure repository is properly started before any operations
-    XIAM.ResilientDatabaseSetup.ensure_repository_started()
-    
+  setup _tags do
     # Ensure ETS tables exist and are properly initialized 
     XIAM.ETSTestHelper.ensure_ets_tables_exist()
     XIAM.ETSTestHelper.initialize_endpoint_config()
     
-    # Try multiple times to checkout a sandboxed connection, with error handling
-    checkout_result = XIAM.ResilientTestHelper.safely_execute_db_operation(
-      fn -> Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo) end,
-      max_retries: 3,
-      retry_delay: 200
-    )
-    
-    case checkout_result do
-      {:ok, :ok} -> :ok
-      {:ok, result} -> result
-      {:error, _error} -> 
-        # Log error but don't fail - many tests can proceed without perfect checkout
-        # Sandbox checkout failed - test might still work
-        # Try to reconnect
-        XIAM.ResilientDatabaseSetup.ensure_repository_started()
-    end
-    
-    # For non-async tests, allow shared mode for sandbox with error handling
-    unless tags[:async] do
-      try do
-        Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      rescue _e -> 
-          # Could not set shared mode - continuing
-          :ok
-      end
-    end
-
-    # Ensure the database repository is started and cache is clean
-    XIAM.ResilientTestHelper.safely_execute_db_operation(
-      fn -> XIAM.Cache.HierarchyCache.invalidate_all() end,
-      max_retries: 2
-    )
+    # Ensure the hierarchy cache is clean (does not require DB connection)
+    XIAM.Cache.HierarchyCache.invalidate_all()
 
     :ok
   end

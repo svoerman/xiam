@@ -55,10 +55,7 @@ defmodule XIAMWeb.Admin.EntityAccessLiveTest do
   end
 
   defp login(conn, user) do
-    # Using Pow's test helpers with explicit config
-    pow_config = [otp_app: :xiam]
-    conn
-    |> Pow.Plug.assign_current_user(user, pow_config)
+    Pow.Plug.assign_current_user(conn, user, otp_app: :xiam)
   end
 
   setup %{conn: conn} do

@@ -2,7 +2,7 @@ defmodule XIAMWeb.Admin.RolesLiveTest do
   use XIAMWeb.ConnCase
 
   import Phoenix.LiveViewTest
-  alias XIAM.Users.User
+    alias XIAM.Users.User
   alias Xiam.Rbac.{Role, Capability}
   alias XIAM.Repo
 

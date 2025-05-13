@@ -13,102 +13,23 @@ defmodule XIAM.Hierarchy.AccessManagerIntegrationTest do
   alias XIAM.Hierarchy.NodeManager
   
   setup do
-    # Setup flag to track initialization success for better diagnostics
-    _ets_tables_initialized = false
-    _repo_started = false
-    
-    # Use BootstrapHelper for complete sandbox management
-    {:ok, setup_result} = XIAM.BootstrapHelper.with_bootstrap_protection(fn ->
-      # Wrap in try/rescue to provide detailed diagnostics on failure
-      try do
-        # Aggressively reset the connection pool to handle potential bootstrap issues
-        XIAM.BootstrapHelper.reset_connection_pool()
-        
-        # First ensure the repo is started with explicit applications - retry if needed
-        ensure_app_started_with_retry(:ecto_sql, 3)
-        ensure_app_started_with_retry(:postgrex, 3)
-        
-        # Ensure repository is properly started
-        _ = XIAM.ResilientDatabaseSetup.ensure_repository_started()
-        
-        # Initialize ETS tables with retry logic for better resilience
-        ets_init_result = safely_ensure_ets_tables(3)
-        _ets_tables_initialized = ets_init_result == :ok
-        
-        # Log success for diagnostic purposes
-      rescue error -> 
-          # Error caught but continuing with the test anyway
-          # This prevents the entire test suite from failing due to setup issues
-          {:error, error}
-      end
-      
-      # Checkout sandbox connection
-      :ok = Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-      # Force proper sandbox mode
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      
-      # Ensure ETS tables exist for Phoenix-related operations
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
-      
-      # Add additional safety check for Phoenix tables which can cause flaky tests
-      XIAM.ETSTestHelper.safely_ensure_table_exists(:phoenix_pubsub)
-      XIAM.ETSTestHelper.safely_ensure_table_exists(:phoenix_endpoint)
-      
-      # Return success indicator
-      :setup_complete
-    end)
-    
-    # Verify setup completed successfully
-    assert setup_result == :setup_complete
-    
     # Create an extended test hierarchy with user, role, department, team using the new bootstrap helper
     {:ok, fixtures} = XIAM.BootstrapHelper.safely_bootstrap(fn ->
       create_extended_test_hierarchy()
     end, max_retries: 5, delay_ms: 500, reset_pool: true)
-    
+
     # Also create an additional department for advanced hierarchy tests
     alt_dept = create_local_test_department()
-    
+
     # Return all fixtures for use in tests
     Map.put(fixtures, :alt_dept, alt_dept)
   end
   
   # Helper to ensure an application is started with retry logic
-  defp ensure_app_started_with_retry(app, max_retries, attempt \\ 1) do
-    case Application.ensure_all_started(app) do
-      {:ok, _} -> 
-        {:ok, app}
-      {:error, reason} ->
-        if attempt < max_retries do
-          # Retry application start
-          :timer.sleep(attempt * 100)  # Increasing backoff
-          ensure_app_started_with_retry(app, max_retries, attempt + 1)
-        else
-          # Failed to start app after multiple attempts - continuing anyway
-          {:error, reason}
-        end
-    end
-  end
+  # Removed unused function ensure_app_started_with_retry/3
 
   # Helper to safely ensure ETS tables exist with retry
-  defp safely_ensure_ets_tables(max_retries, attempt \\ 1) do
-    try do
-      # Try to initialize ETS tables
-      XIAM.ETSTestHelper.ensure_ets_tables_exist()
-      XIAM.ETSTestHelper.initialize_endpoint_config()
-      :ok
-    rescue error -> 
-        if attempt < max_retries do
-          # Retry ETS table initialization
-          :timer.sleep(attempt * 100)  # Increasing backoff
-          safely_ensure_ets_tables(max_retries, attempt + 1)
-        else
-          # Failed to initialize ETS tables after multiple attempts - continuing anyway
-          {:error, error}
-        end
-    end
-  end
+  # Removed unused function safely_ensure_ets_tables/2
 
   # Helper to create a test department directly (for specialized test cases)
   defp create_local_test_department do

@@ -37,10 +37,6 @@ defmodule XIAM.ResilientTestHelper do
     jitter = Keyword.get(options, :jitter, 0.1)
     silent = Keyword.get(options, :silent, false)
     
-    # Ensure repository is started and checkout a sandboxed connection
-    if Code.ensure_loaded?(XIAM.ResilientDatabaseSetup) do
-      XIAM.ResilientDatabaseSetup.ensure_repository_started()
-    end
     # Safely checkout sandbox; swallow errors if repo is down
     try do
       Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)

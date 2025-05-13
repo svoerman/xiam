@@ -1,8 +1,6 @@
 defmodule XIAMWeb.API.UsersControllerTest do
   use XIAMWeb.ConnCase, async: false
   import Mock
-  import XIAM.ETSTestHelper
-
   alias XIAM.Repo
   alias XIAM.Rbac.ProductContext
   alias Xiam.Rbac
@@ -11,15 +9,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
   alias XIAM.Jobs.AuditLogger
 
   setup %{conn: conn} do
-    # Explicitly start applications for database resilience
-    # Following pattern from memory 995a5ecb-2a88-48d2-a3ce-f99c1269cafc
-    {:ok, _} = Application.ensure_all_started(:ecto_sql)
-    {:ok, _} = Application.ensure_all_started(:postgrex)
-    
-    # Use shared mode for database connections
-    Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-    
     # Generate a timestamp for unique test data with better uniqueness
     # Use a combination of millisecond timestamp and random component
     timestamp = "#{System.system_time(:millisecond)}_#{:rand.uniform(100_000)}"
@@ -97,8 +86,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "index/2" do
     test "lists users with pagination", %{conn: conn, admin: admin, user: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging to avoid actual DB calls
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -125,8 +112,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "filters users by role", %{conn: conn, role: role, user: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Assign the test role to the test user using safely_execute_db_operation
       XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -157,8 +142,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "show/2" do
     test "returns a specific user", %{conn: conn, user: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -179,8 +162,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "returns 404 for non-existent user", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -199,8 +180,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "create/2" do
     test "creates a new user with valid data", %{conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -236,8 +215,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "fails with invalid data", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -262,8 +239,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "creates a user with a role", %{conn: conn, role: role, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -299,8 +274,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "update/2" do
     test "updates a user's email", %{conn: conn, user: user, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -330,8 +303,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "updates a user's role", %{conn: conn, user: user, role: role} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -360,8 +331,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "fails to update with invalid data", %{conn: conn, user: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -409,8 +378,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "delete/2" do
     test "deletes a user", %{conn: conn, user: user} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -447,8 +414,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
 
     test "returns 404 for non-existent user", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -466,8 +431,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
 
   describe "anonymize/2" do
     test "anonymizes a user", %{conn: conn, timestamp: timestamp} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # First create a user to anonymize using safely_execute_db_operation
       user_to_anonymize = XIAM.ResilientTestHelper.safely_execute_db_operation(fn ->
@@ -515,8 +478,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
     
     test "returns 404 for non-existent user", %{conn: conn} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
@@ -533,8 +494,6 @@ defmodule XIAMWeb.API.UsersControllerTest do
     end
     
     test "prevents self-anonymization", %{conn: conn, admin: admin} do
-      # Ensure ETS tables exist before making API requests
-      ensure_ets_tables_exist()
       
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do

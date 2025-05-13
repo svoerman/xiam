@@ -7,9 +7,6 @@ defmodule XIAMWeb.Plugs.APIAuthorizePlugTest do
   @capability "test.capability"
 
   setup do
-    # Ensure database connection is in shared mode
-    Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-    
     # First create a product
     {:ok, product} =
       Product.changeset(%Product{}, %{

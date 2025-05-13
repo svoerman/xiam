@@ -6,41 +6,11 @@ defmodule XIAM.HierarchyBehaviorTest do
   a user's perspective, rather than implementation details.
   """
   
-  use XIAMWeb.ConnCase, async: false
-  # Using ConnCase with async: false to avoid ETS table conflicts
+  use XIAM.ResilientTestCase, async: false
   alias XIAM.ETSTestHelper
   alias XIAM.HierarchyTestAdapter, as: Adapter
   
-  # Global setup for all tests in this module with enhanced resilience
-  setup do
-    # Use BootstrapHelper for complete sandbox management
-    {:ok, setup_result} = XIAM.BootstrapHelper.with_bootstrap_protection(fn ->
-      # Aggressively reset the connection pool to avoid ownership errors
-      XIAM.BootstrapHelper.reset_connection_pool()
-      
-      # First ensure the repo is started with explicit applications
-      {:ok, _} = Application.ensure_all_started(:ecto_sql)
-      {:ok, _} = Application.ensure_all_started(:postgrex)
-      
-      # Ensure database repository is properly started
-      XIAM.ResilientDatabaseSetup.ensure_repository_started()
-      
-      # Set sandbox mode to shared to allow concurrent access
-      Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-      Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
-      
-      # Ensure ETS tables are properly initialized
-      ETSTestHelper.ensure_ets_tables_exist()
-      ETSTestHelper.initialize_endpoint_config()
-      
-      # Return success indicator
-      :setup_complete
-    end)
-    
-    # Verify setup completed successfully
-    assert setup_result == :setup_complete
-    :ok
-  end
+  # Global setup is now handled by XIAM.ResilientTestCase
   
   describe "hierarchy node management" do
     test "creates nodes with unique paths" do

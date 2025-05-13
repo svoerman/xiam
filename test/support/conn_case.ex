@@ -19,6 +19,7 @@ defmodule XIAMWeb.ConnCase do
 
   using do
     quote do
+      require XIAMWeb.Router # Ensure router is compiled before helpers are imported
       # The default endpoint for testing
       @endpoint XIAMWeb.Endpoint
 
@@ -27,25 +28,31 @@ defmodule XIAMWeb.ConnCase do
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
+      import XIAMWeb.Router.Helpers
       import XIAMWeb.ConnCase
     end
   end
 
   setup tags do
-    # Ensure the main application is started so Endpoint ETS tables are initialized
-    # Application.ensure_all_started(:xiam)
+    # Ensure the :xiam application and its dependencies are started.
+    Application.ensure_all_started(:xiam)
 
-    # Initialize ETS tables to avoid lookup errors during tests
-    XIAM.ETSTestHelper.ensure_ets_tables_exist()
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(XIAM.Repo, shared: not tags[:async])
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    # Ensure Phoenix endpoint ETS tables are initialized for tests needing them
     XIAM.ETSTestHelper.initialize_endpoint_config()
-    
-    # Use the improved sandbox setup from DataCase
-    XIAM.DataCase.setup_sandbox(tags)
-    
-    # Build a connection but don't set any default headers
-    # Individual tests can set the appropriate headers
-    conn = Phoenix.ConnTest.build_conn()
-    
-    {:ok, conn: conn}
+    {:ok, conn: Phoenix.ConnTest.build_conn()}
+  end
+
+  @doc """
+  Logs in the given user using Pow in test connection.
+  Prepares the connection state for LiveView tests by initializing the session,
+  loading Pow's session config, creating the session token, recycling the connection,
+  and then reloading the session to ensure it's active on the conn.
+  """
+  def log_in_user(conn, user) do
+    conn
+    |> Pow.Plug.assign_current_user(user, otp_app: :xiam)
+    |> Phoenix.ConnTest.init_test_session(%{"pow_user_id" => user.id})
   end
 end
