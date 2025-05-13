@@ -34,12 +34,14 @@ defmodule XIAMWeb.ConnCase do
   end
 
   setup tags do
-    # Ensure the :xiam application and its dependencies are started.
-    Application.ensure_all_started(:xiam)
+    # Ensure all dependencies are started before running tests
+    {:ok, _} = Application.ensure_all_started(:ecto)
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+    {:ok, _} = Application.ensure_all_started(:xiam)
 
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(XIAM.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
-    # Ensure Phoenix endpoint ETS tables are initialized for tests needing them
     XIAM.ETSTestHelper.initialize_endpoint_config()
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end

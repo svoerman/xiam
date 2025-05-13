@@ -29,9 +29,11 @@ defmodule XIAM.DataCase do
   end
 
   setup tags do
-    # Ensure the application and its dependencies (including the Repo) are started
+    # Ensure all dependencies are started before running tests
+    {:ok, _} = Application.ensure_all_started(:ecto)
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+    {:ok, _} = Application.ensure_all_started(:postgrex)
     {:ok, _} = Application.ensure_all_started(:xiam)
-
 
     # Perform Ecto Sandbox setup AFTER ensuring the app is started
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
