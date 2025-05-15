@@ -71,7 +71,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
   describe "authentication" do
     test "login with valid credentials returns token", %{conn: conn, user: user} do
-      conn = post(conn, ~p"/api/auth/login", %{
+      conn = post(conn, ~p"/api/v1/auth/login", %{
         email: user.email,
         password: "Password123!"
       })
@@ -88,7 +88,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
         |> Ecto.Changeset.change(%{mfa_enabled: true, mfa_secret: XIAM.Users.User.generate_totp_secret()})
         |> Repo.update()
 
-      conn = post(conn, ~p"/api/auth/login", %{
+      conn = post(conn, ~p"/api/v1/auth/login", %{
         email: user_with_mfa.email,
         password: "Password123!"
       })
@@ -105,7 +105,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
     end
 
     test "login with invalid credentials returns error", %{conn: conn} do
-      conn = post(conn, ~p"/api/auth/login", %{
+      conn = post(conn, ~p"/api/v1/auth/login", %{
         email: "wrong@example.com",
         password: "WrongPassword123!"
       })
@@ -119,7 +119,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
       conn = conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> get(~p"/api/auth/verify")
+        |> get(~p"/api/v1/auth/verify")
 
       assert json_response(conn, 200)["valid"] == true
       assert json_response(conn, 200)["user"]["id"] == user.id
@@ -128,7 +128,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
     test "verify token with invalid token fails", %{conn: conn} do
       conn = conn
         |> put_req_header("authorization", "Bearer invalid_token")
-        |> get(~p"/api/auth/verify")
+        |> get(~p"/api/v1/auth/verify")
 
       assert json_response(conn, 401)["error"] =~ "Invalid token"
     end
@@ -139,7 +139,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
       conn = conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/auth/refresh")
+        |> post(~p"/api/v1/auth/refresh")
 
       assert %{"token" => new_token} = json_response(conn, 200)
       assert is_binary(new_token)
@@ -149,7 +149,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
     test "refresh token with invalid token fails", %{conn: conn} do
       conn = conn
         |> put_req_header("authorization", "Bearer invalid_token")
-        |> post(~p"/api/auth/refresh")
+        |> post(~p"/api/v1/auth/refresh")
 
       assert json_response(conn, 401)["error"] =~ "Invalid token"
     end
@@ -160,7 +160,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
       conn = conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/auth/logout")
+        |> post(~p"/api/v1/auth/logout")
 
       assert json_response(conn, 200)["message"] == "Logged out successfully"
 
@@ -186,7 +186,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
     test "MFA challenge returns instructions", %{conn: conn, partial_token: partial_token} do
       conn = conn
         |> put_req_header("authorization", "Bearer #{partial_token}")
-        |> get(~p"/api/auth/mfa/challenge")
+        |> get(~p"/api/v1/auth/mfa/challenge")
 
       response = json_response(conn, 200)
       assert response["success"] == true
@@ -203,7 +203,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
         conn = conn
           |> put_req_header("authorization", "Bearer #{partial_token}")
-          |> post(~p"/api/auth/mfa/verify", %{"code" => "123456"})
+          |> post(~p"/api/v1/auth/mfa/verify", %{"code" => "123456"})
 
         response = json_response(conn, 200)
         assert response["success"] == true
@@ -223,7 +223,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
         conn = conn
           |> put_req_header("authorization", "Bearer #{partial_token}")
-          |> post(~p"/api/auth/mfa/verify", %{"code" => "000000"})
+          |> post(~p"/api/v1/auth/mfa/verify", %{"code" => "000000"})
 
         response = json_response(conn, 401)
         assert response["success"] == false
@@ -239,7 +239,7 @@ defmodule XIAMWeb.API.AuthControllerTest do
 
       conn = conn
         |> put_req_header("authorization", "Bearer #{regular_token}")
-        |> post(~p"/api/auth/mfa/verify", %{"code" => "123456"})
+        |> post(~p"/api/v1/auth/mfa/verify", %{"code" => "123456"})
 
       response = json_response(conn, 400)
       assert response["success"] == false

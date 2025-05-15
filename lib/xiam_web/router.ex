@@ -137,29 +137,33 @@ defmodule XIAMWeb.Router do
   end
 
   # Unprotected API routes
-  scope "/api", XIAMWeb.API do
+  scope "/api/v1", XIAMWeb.API do
     pipe_through :api
 
     post "/auth/login", AuthController, :login
-    get "/health", HealthController, :index
-    get "/health/detailed", HealthController, :health
-    get "/system/health", SystemController, :health # Keep for backward compatibility
-    
-    # Passkey authentication routes (unprotected)
     get "/auth/passkey/options", PasskeyController, :authentication_options
     post "/auth/passkey", PasskeyController, :authenticate
   end
 
-  # MFA API routes - require partial token
+  # Backward compatibility health endpoints (unversioned)
   scope "/api", XIAMWeb.API do
+    pipe_through :api
+
+    get "/health", HealthController, :index
+    get "/health/detailed", HealthController, :health
+    get "/system/health", SystemController, :health # Keep for backward compatibility
+  end
+
+  # MFA API routes - require partial token
+  scope "/api/v1", XIAMWeb.API do
     pipe_through [:api, :api_jwt]
     
     get "/auth/mfa/challenge", AuthController, :mfa_challenge
     post "/auth/mfa/verify", AuthController, :mfa_verify
   end
 
-  # Passkey API using session cookies
-  scope "/api", XIAMWeb.API do
+  # Passkey API using session cookies - now versioned
+  scope "/api/v1", XIAMWeb.API do
     pipe_through [:passkey_api]
     get "/passkeys/registration_options", PasskeyController, :registration_options
     post "/passkeys/register", PasskeyController, :register
@@ -169,7 +173,7 @@ defmodule XIAMWeb.Router do
   end
 
   # Protected API routes requiring JWT authentication
-  scope "/api", XIAMWeb.API do
+  scope "/api/v1", XIAMWeb.API do
     pipe_through [:api, :api_jwt]
 
     # Auth routes
@@ -199,8 +203,35 @@ defmodule XIAMWeb.Router do
     get "/access", AccessControlController, :get_user_access
     resources "/products", ProductController, only: [:index, :create, :show, :update, :delete]
     get "/products/:product_id/capabilities", AccessControlController, :get_product_capabilities
+    post "/capabilities", AccessControlController, :create_capability
     
-    # Hierarchy Routes
+    # Hierarchy routes - all properly organized under /api/v1
+    
+    # Basic hierarchy node management
+    get "/hierarchy", HierarchyController, :index
+    get "/hierarchy/:id", HierarchyController, :show
+    post "/hierarchy", HierarchyController, :create
+    put "/hierarchy/:id", HierarchyController, :update
+    delete "/hierarchy/:id", HierarchyController, :delete
+    
+    # Hierarchy relationships
+    get "/hierarchy/:id/descendants", HierarchyController, :descendants
+    get "/hierarchy/:id/ancestry", HierarchyController, :ancestry
+    post "/hierarchy/:id/move", HierarchyController, :move
+    
+    # Batch operations
+    post "/hierarchy/batch/move", HierarchyController, :batch_move
+    post "/hierarchy/batch/delete", HierarchyController, :batch_delete
+    
+    # Access management
+    get "/hierarchy/access/check/:id", HierarchyController, :check_access
+    post "/hierarchy/access/batch/check", HierarchyController, :batch_check_access
+    post "/hierarchy/access/grant", HierarchyController, :grant_access
+    post "/hierarchy/access/batch/grant", HierarchyController, :batch_grant_access
+    delete "/hierarchy/access/revoke", HierarchyController, :revoke_access
+    post "/hierarchy/access/batch/revoke", HierarchyController, :batch_revoke_access
+
+    # Hierarchy Node Routes
     get "/hierarchy/nodes", HierarchyController, :list_nodes
     get "/hierarchy/nodes/roots", HierarchyController, :list_root_nodes
     post "/hierarchy/nodes", HierarchyController, :create_node
@@ -220,37 +251,9 @@ defmodule XIAMWeb.Router do
     post "/hierarchy/check-access", HierarchyController, :check_user_access
     post "/hierarchy/check-access-by-path", HierarchyController, :check_user_access_by_path
     get "/hierarchy/users/:user_id/accessible-nodes", HierarchyController, :list_user_accessible_nodes
-
-    # Hierarchy Access Control Routes
-    scope "/v1" do
-      # Basic hierarchy node management
-      get "/hierarchy", HierarchyController, :index
-      get "/hierarchy/:id", HierarchyController, :show
-      post "/hierarchy", HierarchyController, :create
-      put "/hierarchy/:id", HierarchyController, :update
-      delete "/hierarchy/:id", HierarchyController, :delete
-      
-      # Hierarchy relationships
-      get "/hierarchy/:id/descendants", HierarchyController, :descendants
-      get "/hierarchy/:id/ancestry", HierarchyController, :ancestry
-      post "/hierarchy/:id/move", HierarchyController, :move
-      
-      # Batch operations
-      post "/hierarchy/batch/move", HierarchyController, :batch_move
-      post "/hierarchy/batch/delete", HierarchyController, :batch_delete
-      
-      # Access management
-      get "/hierarchy/access/check/:id", HierarchyController, :check_access
-      post "/hierarchy/access/batch/check", HierarchyController, :batch_check_access
-      post "/hierarchy/access/grant", HierarchyController, :grant_access
-      post "/hierarchy/access/batch/grant", HierarchyController, :batch_grant_access
-      delete "/hierarchy/access/revoke", HierarchyController, :revoke_access
-      post "/hierarchy/access/batch/revoke", HierarchyController, :batch_revoke_access
-    end
-    post "/capabilities", AccessControlController, :create_capability
-    
-    # Hierarchy Access Routes
     get "/hierarchy/access/:node_id", HierarchyAccessController, :check_access
+    
+    # All hierarchy routes are now under /v1 scope
   end
 
   # Enable Swoosh mailbox preview in development

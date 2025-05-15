@@ -18,10 +18,22 @@ defmodule XIAM.Auth.WebAuthn do
   Generates registration options for creating a new passkey.
   Delegates to `XIAM.Auth.WebAuthn.Registration`.
   """
-  def generate_registration_options(%User{} = user) do
+  def generate_registration_options(user, scheme, host, port) do
     Logger.debug("Delegating registration option generation to Registration module.")
-    Registration.generate_registration_options(user)
+    Registration.generate_registration_options(user, scheme, host, port)
   end
+
+  @doc """
+Generate registration options using default values from config.
+This version exists for backward compatibility.
+
+Prefer the 4-arg version for better control over the origin.
+"""
+def generate_registration_options(%User{} = user) do
+  Logger.debug("Delegating registration option generation to Registration module (using default origin).")
+  # Use Registration's backward compatible implementation which reads from endpoint config
+  Registration.generate_registration_options(user)
+end
 
   @doc """
   Verifies a registration attestation and creates a new passkey.

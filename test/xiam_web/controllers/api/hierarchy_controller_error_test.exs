@@ -112,7 +112,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
         }
         
         # Make request
-        conn = post(conn, ~p"/api/hierarchy/nodes", invalid_params)
+        conn = post(conn, ~p"/api/v1/hierarchy/nodes", invalid_params)
         
         # Verify error response - validation failed
         response = json_response(conn, 422)
@@ -133,7 +133,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
         }
         
         # Make request
-        conn = post(conn, ~p"/api/hierarchy/nodes", invalid_params)
+        conn = post(conn, ~p"/api/v1/hierarchy/nodes", invalid_params)
         
         # Verify error response - parent not found
         response = json_response(conn, 422)
@@ -154,7 +154,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
         }
         
         # Make request without authentication
-        conn = post(conn, ~p"/api/hierarchy/nodes", valid_params)
+        conn = post(conn, ~p"/api/v1/hierarchy/nodes", valid_params)
         
         # Verify unauthorized response
         assert conn.status in [401, 403], "Expected unauthorized status code"
@@ -175,7 +175,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
         }
         
         # Make request with non-existent node ID
-        conn = put(conn, ~p"/api/hierarchy/nodes/999999", update_params)
+        conn = put(conn, ~p"/api/v1/hierarchy/nodes/999999", update_params)
         
         # Verify error response - node not found
         assert conn.status == 404
@@ -194,7 +194,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
         }
         
         # Make request that would create a cycle
-        conn = put(conn, ~p"/api/hierarchy/nodes/#{nodes.root.id}", update_params)
+        conn = put(conn, ~p"/api/v1/hierarchy/nodes/#{nodes.root.id}", update_params)
         
         # Verify error response - should prevent cycles
         assert conn.status in [422, 400], "Expected validation error for cycle creation"
@@ -211,7 +211,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make request with non-existent node ID
-        conn = delete(conn, ~p"/api/hierarchy/nodes/999999")
+        conn = delete(conn, ~p"/api/v1/hierarchy/nodes/999999")
         
         # Verify error response - node not found
         assert conn.status == 404
@@ -225,7 +225,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Try to delete the dept node which has a child (team)
-        conn = delete(conn, ~p"/api/hierarchy/nodes/#{nodes.dept.id}")
+        conn = delete(conn, ~p"/api/v1/hierarchy/nodes/#{nodes.dept.id}")
         
         # Most implementations would either:
         # 1. Return an error (400, 422) that you can't delete a node with children
@@ -254,7 +254,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make request with non-existent user ID
-        conn = post(conn, ~p"/api/hierarchy/check-access", %{
+        conn = post(conn, ~p"/api/v1/hierarchy/check-access", %{
           "user_id" => 999999,
           "node_id" => 1
         })
@@ -271,7 +271,7 @@ defmodule XIAMWeb.API.HierarchyControllerErrorTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make request with non-existent node ID
-        conn = post(conn, ~p"/api/hierarchy/check-access", %{
+        conn = post(conn, ~p"/api/v1/hierarchy/check-access", %{
           "user_id" => user.id,
           "node_id" => 999999
         })

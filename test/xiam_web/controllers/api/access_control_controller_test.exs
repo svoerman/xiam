@@ -90,7 +90,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       # Use safely_execute_ets_operation for API requests that involve ETS tables
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make request
-        conn = post(conn, ~p"/api/access", params)
+        conn = post(conn, ~p"/api/v1/access", params)
 
         # Verify response - focusing on behavior, not implementation
         assert %{"data" => data} = json_response(conn, 200)
@@ -122,7 +122,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       # Use safely_execute_ets_operation for the API request
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Test: Retrieve access
-        conn = get(conn, ~p"/api/access?user_id=#{user.id}")
+        conn = get(conn, ~p"/api/v1/access?user_id=#{user.id}")
 
         # Verify response - focusing on behavior
         assert %{"data" => data} = json_response(conn, 200)
@@ -151,7 +151,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make request
-        conn = post(conn, ~p"/api/capabilities", params)
+        conn = post(conn, ~p"/api/v1/capabilities", params)
 
         # Verify the behavior - capability created successfully
         assert %{"data" => data} = json_response(conn, 201)
@@ -181,7 +181,7 @@ defmodule XIAMWeb.API.AccessControlControllerTest do
       # Use safely_execute_ets_operation for the API request
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Test: Retrieve capabilities
-        conn = get(conn, ~p"/api/products/#{product.id}/capabilities")
+        conn = get(conn, ~p"/api/v1/products/#{product.id}/capabilities")
 
         # Verify the behavior - capabilities are returned
         assert %{"data" => data} = json_response(conn, 200)

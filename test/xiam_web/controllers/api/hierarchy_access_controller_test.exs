@@ -79,7 +79,7 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make the request to check access
-        conn = get(conn, ~p"/api/hierarchy/access/#{team.id}")
+        conn = get(conn, ~p"/api/v1/hierarchy/access/#{team.id}")
         
         # Verify the behavior - focus on response structure and content
         response = json_response(conn, 200)
@@ -102,7 +102,7 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make the request to check access to the root node (which user doesn't have direct access to)
-        conn = get(conn, ~p"/api/hierarchy/access/#{root.id}")
+        conn = get(conn, ~p"/api/v1/hierarchy/access/#{root.id}")
         
         # Verify the behavior - focus on response structure and content
         response = json_response(conn, 200)
@@ -121,7 +121,7 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make the request to check access to a non-existent node
-        conn = get(conn, ~p"/api/hierarchy/access/999999999")
+        conn = get(conn, ~p"/api/v1/hierarchy/access/999999999")
         
         # Verify the behavior - should return appropriate error
         response = json_response(conn, 404)
@@ -146,7 +146,7 @@ defmodule XIAMWeb.API.HierarchyAccessControllerTest do
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
         # Make the request to check access to the child node
-        conn = get(conn, ~p"/api/hierarchy/access/#{child_node.id}")
+        conn = get(conn, ~p"/api/v1/hierarchy/access/#{child_node.id}")
         
         # Verify the behavior - focus on response structure and content
         response = json_response(conn, 200)

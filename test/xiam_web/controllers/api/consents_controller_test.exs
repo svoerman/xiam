@@ -97,7 +97,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
 
   describe "consent records API" do
     test "GET /api/consents returns user's consent records", %{conn: conn, user: _user, consent: consent} do
-      conn = get(conn, ~p"/api/consents")
+      conn = get(conn, ~p"/api/v1/consents")
 
       assert %{"consents" => consents} = json_response(conn, 200)
       assert length(consents) >= 1
@@ -105,7 +105,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
     end
 
     test "GET /api/consents with filters returns filtered results", %{conn: conn, user: _user} do
-      conn = get(conn, ~p"/api/consents?consent_type=marketing")
+      conn = get(conn, ~p"/api/v1/consents?consent_type=marketing")
 
       assert %{"consents" => consents} = json_response(conn, 200)
       assert length(consents) >= 1
@@ -124,7 +124,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
       # Manually set remote_ip for the test connection
       conn = %{conn | remote_ip: {127, 0, 0, 1}}
 
-      conn = post(conn, ~p"/api/consents", consent_params)
+      conn = post(conn, ~p"/api/v1/consents", consent_params)
 
       assert %{"consent" => consent} = json_response(conn, 200)
       assert consent["consent_type"] == "analytics"
@@ -138,7 +138,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
         }
       }
 
-      conn = put(conn, ~p"/api/consents/#{consent.id}", update_params)
+      conn = put(conn, ~p"/api/v1/consents/#{consent.id}", update_params)
 
       assert %{"consent" => updated_consent} = json_response(conn, 200)
       assert updated_consent["id"] == consent.id
@@ -146,7 +146,7 @@ defmodule XIAMWeb.API.ConsentsControllerTest do
     end
 
     test "DELETE /api/consents/:id revokes a consent record", %{conn: conn, consent: consent} do
-      conn = delete(conn, ~p"/api/consents/#{consent.id}")
+      conn = delete(conn, ~p"/api/v1/consents/#{consent.id}")
 
       assert response(conn, 204)
 

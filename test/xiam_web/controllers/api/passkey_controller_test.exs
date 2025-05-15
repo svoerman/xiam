@@ -28,7 +28,7 @@ defmodule XIAMWeb.API.PasskeyControllerTest do
     end
 
     test "registration_options returns correct RP name and structure", %{conn: conn} do
-      conn = get(conn, "/api/passkeys/registration_options")
+      conn = get(conn, ~p"/api/v1/passkeys/registration_options")
       assert json_response(conn, 200)["success"] == true
       opts = json_response(conn, 200)["options"]
 
@@ -49,7 +49,7 @@ defmodule XIAMWeb.API.PasskeyControllerTest do
       conn = delete_session(conn, :passkey_challenge)
       
       response = conn
-        |> post("/api/passkeys/register", %{"attestation" => %{}, "friendly_name" => "Test"})
+        |> post(~p"/api/v1/passkeys/register", %{"attestation" => %{}, "friendly_name" => "Test"})
         |> json_response(400)
       
       assert response["error"] == "No active registration session found"
@@ -74,7 +74,7 @@ defmodule XIAMWeb.API.PasskeyControllerTest do
       })
       
       response = conn
-        |> get("/api/passkeys")
+        |> get(~p"/api/v1/passkeys")
         |> json_response(200)
       
       assert response["success"] == true
@@ -94,7 +94,7 @@ defmodule XIAMWeb.API.PasskeyControllerTest do
       })
       
       response = conn
-        |> delete("/api/passkeys/#{passkey.id}")
+        |> delete(~p"/api/v1/passkeys/#{passkey.id}")
         |> json_response(200)
       
       assert response["success"] == true

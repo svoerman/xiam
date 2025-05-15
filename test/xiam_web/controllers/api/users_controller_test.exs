@@ -92,7 +92,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Request the first page with 10 users per page
-          conn = get(conn, ~p"/api/users?page=1&per_page=10")
+          conn = get(conn, ~p"/api/v1/users?page=1&per_page=10")
 
           # Check response - focus on behavior
           json_response = json_response(conn, 200)
@@ -125,7 +125,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Request users filtered by role
-          conn = get(conn, ~p"/api/users?role_id=#{role.id}")
+          conn = get(conn, ~p"/api/v1/users?role_id=#{role.id}")
 
           # Check response - focus on behavior
           json_response = json_response(conn, 200)
@@ -148,7 +148,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Request a specific user by ID
-          conn = get(conn, ~p"/api/users/#{user.id}")
+          conn = get(conn, ~p"/api/v1/users/#{user.id}")
 
           # Check response - focus on behavior
           json_response = json_response(conn, 200)
@@ -168,7 +168,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Request a non-existent user
-          conn = get(conn, ~p"/api/users/999999")
+          conn = get(conn, ~p"/api/v1/users/999999")
 
           # Check response - verify error handling behavior
           json_response = json_response(conn, 404)
@@ -193,7 +193,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send create request
-          conn = post(conn, ~p"/api/users", %{"user" => user_params})
+          conn = post(conn, ~p"/api/v1/users", %{"user" => user_params})
 
           # Check response - focus on behavior
           json_response = json_response(conn, 201)
@@ -228,7 +228,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send create request
-          conn = post(conn, ~p"/api/users", %{"user" => user_params})
+          conn = post(conn, ~p"/api/v1/users", %{"user" => user_params})
 
           # Check response - verify validation behavior
           json_response = json_response(conn, 422)
@@ -253,7 +253,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send create request
-          conn = post(conn, ~p"/api/users", %{"user" => user_params})
+          conn = post(conn, ~p"/api/v1/users", %{"user" => user_params})
 
           # Check response
           json_response = json_response(conn, 201)
@@ -285,7 +285,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send update request
-          conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+          conn = put(conn, ~p"/api/v1/users/#{user.id}", %{"user" => update_params})
 
           # Check response - focus on behavior
           json_response = json_response(conn, 200)
@@ -314,7 +314,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send update request
-          conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+          conn = put(conn, ~p"/api/v1/users/#{user.id}", %{"user" => update_params})
 
           # Check response - focus on behavior
           json_response = json_response(conn, 200)
@@ -342,7 +342,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
           }
 
           # Send update request
-          conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+          conn = put(conn, ~p"/api/v1/users/#{user.id}", %{"user" => update_params})
 
           # Check response - verify validation behavior
           json_response = json_response(conn, 422)
@@ -362,7 +362,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         }
 
         # Send update request
-        conn = put(conn, ~p"/api/users/#{user.id}", %{"user" => update_params})
+        conn = put(conn, ~p"/api/v1/users/#{user.id}", %{"user" => update_params})
 
         # Check response
         json_response = json_response(conn, 200)
@@ -384,7 +384,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Send delete request
-          conn = delete(conn, ~p"/api/users/#{user.id}")
+          conn = delete(conn, ~p"/api/v1/users/#{user.id}")
 
           # Check response - verify behavior
           assert conn.status == 204
@@ -402,7 +402,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
       # Set up mock for audit logging
       with_mock AuditLogger, [log_action: fn _, _, _, _ -> {:ok, %{}} end] do
         # Try to delete the current user (admin)
-        conn = delete(conn, ~p"/api/users/#{admin.id}")
+        conn = delete(conn, ~p"/api/v1/users/#{admin.id}")
 
         # Check response
         json_response = json_response(conn, 403)
@@ -420,7 +420,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Try to delete a non-existent user
-          conn = delete(conn, ~p"/api/users/999999")
+          conn = delete(conn, ~p"/api/v1/users/999999")
 
           # Check response - verify error handling behavior
           assert json_response(conn, 404)["error"] == "User not found"
@@ -450,7 +450,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Send anonymize request
-          conn = post(conn, ~p"/api/users/#{user_to_anonymize.id}/anonymize")
+          conn = post(conn, ~p"/api/v1/users/#{user_to_anonymize.id}/anonymize")
 
           # Check response - verify behavior
           response = json_response(conn, 200)
@@ -484,7 +484,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Try to anonymize a non-existent user
-          conn = post(conn, ~p"/api/users/999999/anonymize")
+          conn = post(conn, ~p"/api/v1/users/999999/anonymize")
 
           # Check response - verify error handling behavior
           response = json_response(conn, 404)
@@ -500,7 +500,7 @@ defmodule XIAMWeb.API.UsersControllerTest do
         # Use safely_execute_ets_operation for API requests
         XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
           # Try to anonymize the current user (admin)
-          conn = post(conn, ~p"/api/users/#{admin.id}/anonymize")
+          conn = post(conn, ~p"/api/v1/users/#{admin.id}/anonymize")
 
           # Check response - verify protection against self-anonymization
           response = json_response(conn, 403)

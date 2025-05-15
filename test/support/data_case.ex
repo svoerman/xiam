@@ -37,11 +37,11 @@ defmodule XIAM.DataCase do
 
     # Perform Ecto Sandbox setup AFTER ensuring the app is started
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(XIAM.Repo)
-    
+
     unless tags[:async] do
       Ecto.Adapters.SQL.Sandbox.mode(XIAM.Repo, {:shared, self()})
     end
-    
+
     :ok
   end
 

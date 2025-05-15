@@ -53,7 +53,7 @@
   ],
   "servers": [
     {
-      "url": "http://localhost:4000",
+      "url": "http://localhost:4100",
       "description": "Development server"
     }
   ],
@@ -1300,7 +1300,7 @@
     }
   },
   "paths": {
-    "/api/auth/login": {
+    "/api/v1/auth/login": {
       "post": {
         "summary": "User login",
         "description": "Authenticate a user with email and password",
@@ -1401,7 +1401,7 @@
         }
       }
     },
-    "/api/system/health": {
+    "/api/v1/system/health": {
       "get": {
         "summary": "System Health",
         "description": "Get system health status",
@@ -1438,7 +1438,7 @@
         }
       }
     },
-    "/api/auth/passkey/options": {
+    "/api/v1/auth/passkey/options": {
       "get": {
         "summary": "Get Passkey Authentication Options",
         "description": "Get challenge and options for passkey authentication",
@@ -1483,7 +1483,7 @@
         }
       }
     },
-    "/api/auth/passkey": {
+    "/api/v1/auth/passkey": {
       "post": {
         "summary": "Authenticate with Passkey",
         "description": "Authenticate a user with passkey credentials",
@@ -1526,7 +1526,7 @@
         }
       }
     },
-    "/api/auth/mfa/challenge": {
+    "/api/v1/auth/mfa/challenge": {
       "get": {
         "summary": "Request MFA Challenge",
         "description": "Request a challenge for MFA verification",
@@ -1564,7 +1564,7 @@
         }
       }
     },
-    "/api/auth/mfa/verify": {
+    "/api/v1/auth/mfa/verify": {
       "post": {
         "summary": "Verify MFA Code",
         "description": "Verify the MFA code to complete login",
@@ -1612,7 +1612,7 @@
         }
       }
     },
-    "/api/passkeys/registration_options": {
+    "/api/v1/passkeys/registration_options": {
       "get": {
         "summary": "Get Passkey Registration Options",
         "description": "Get challenge and options for registering a new passkey",
@@ -1649,7 +1649,7 @@
         }
       }
     },
-    "/api/passkeys/register": {
+    "/api/v1/passkeys/register": {
       "post": {
         "summary": "Register Passkey",
         "description": "Register a new passkey for the authenticated user",
@@ -1706,7 +1706,7 @@
         }
       }
     },
-    "/api/passkeys": {
+    "/api/v1/passkeys": {
       "get": {
         "summary": "List User Passkeys",
         "description": "Get a list of passkeys registered for the authenticated user",
@@ -1743,7 +1743,7 @@
         }
       }
     },
-    "/api/passkeys/debug": {
+    "/api/v1/passkeys/debug": {
       "get": {
         "summary": "Debug Passkeys",
         "description": "Get debug information about passkeys (development only)",
@@ -1781,7 +1781,7 @@
         }
       }
     },
-    "/api/passkeys/{id}": {
+    "/api/v1/passkeys/{id}": {
       "delete": {
         "summary": "Delete Passkey",
         "description": "Delete a passkey by ID",
@@ -1839,7 +1839,7 @@
         }
       }
     },
-    "/api/auth/refresh": {
+    "/api/v1/auth/refresh": {
       "post": {
         "summary": "Refresh Token",
         "description": "Refresh an authentication token",
@@ -1876,7 +1876,7 @@
         }
       }
     },
-    "/api/auth/verify": {
+    "/api/v1/auth/verify": {
       "get": {
         "summary": "Verify Token",
         "description": "Verify an authentication token and get user information",
@@ -1913,7 +1913,7 @@
         }
       }
     },
-    "/api/auth/logout": {
+    "/api/v1/auth/logout": {
       "post": {
         "summary": "Logout",
         "description": "Log out a user and invalidate their token",
@@ -1950,7 +1950,7 @@
         }
       }
     },
-    "/api/system/status": {
+    "/api/v1/system/status": {
       "get": {
         "summary": "System Status",
         "description": "Get detailed system status and statistics",
@@ -1987,7 +1987,7 @@
         }
       }
     },
-    "/api/users": {
+    "/api/v1/users": {
       "get": {
         "summary": "List Users",
         "description": "Get a paginated list of users",
@@ -2102,7 +2102,7 @@
         }
       }
     },
-    "/api/users/{id}": {
+    "/api/v1/users/{id}": {
       "get": {
         "summary": "Get User",
         "description": "Get a user by ID",
@@ -2292,7 +2292,7 @@
         }
       }
     },
-    "/api/users/{id}/anonymize": {
+    "/api/v1/users/{id}/anonymize": {
       "post": {
         "summary": "Anonymize User",
         "description": "Anonymize a user's data for GDPR compliance",
@@ -2371,7 +2371,7 @@
         }
       }
     },
-    "/api/consents": {
+    "/api/v1/consents": {
       "get": {
         "summary": "List Consents",
         "description": "Get a paginated list of consents",
@@ -2494,7 +2494,7 @@
         }
       }
     },
-    "/api/consents/{id}": {
+    "/api/v1/consents/{id}": {
       "put": {
         "summary": "Update Consent",
         "description": "Update a consent record by ID",
@@ -2628,7 +2628,7 @@
         }
       }
     },
-    "/api/access": {
+    "/api/v1/access": {
       "post": {
         "summary": "Set User Access",
         "description": "Assign a role to a user for a specific product",
@@ -2731,7 +2731,7 @@
         }
       }
     },
-    "/api/products": {
+    "/api/v1/products": {
       "get": {
         "summary": "List Products",
         "description": "Get a list of all products",
@@ -2823,7 +2823,7 @@
         }
       }
     },
-    "/api/products/{product_id}/capabilities": {
+    "/api/v1/products/{product_id}/capabilities": {
       "get": {
         "summary": "Get Product Capabilities",
         "description": "Get a list of capabilities for a specific product",
@@ -2939,7 +2939,7 @@
         }
       }
     },
-    "/api/hierarchy/nodes": {
+    "/api/v1/hierarchy/nodes": {
       "get": {
         "summary": "List Hierarchy Nodes",
         "description": "Get a list of all hierarchy nodes",
@@ -3060,7 +3060,7 @@
         }
       }
     },
-    "/api/hierarchy/nodes/{id}": {
+    "/api/v1/hierarchy/nodes/{id}": {
       "get": {
         "summary": "Get Hierarchy Node",
         "description": "Get a hierarchy node by ID",
@@ -3298,7 +3298,7 @@
         }
       }
     },
-    "/api/hierarchy/nodes/{id}/children": {
+    "/api/v1/hierarchy/nodes/{id}/children": {
       "get": {
         "summary": "Get Node Children",
         "description": "Get all direct children of a hierarchy node",
@@ -3366,7 +3366,7 @@
         }
       }
     },
-    "/api/hierarchy/nodes/{id}/descendants": {
+    "/api/v1/hierarchy/nodes/{id}/descendants": {
       "get": {
         "summary": "Get Node Descendants",
         "description": "Get all descendants of a hierarchy node",
@@ -3434,7 +3434,7 @@
         }
       }
     },
-    "/api/hierarchy/access": {
+    "/api/v1/hierarchy/access": {
       "get": {
         "summary": "List Hierarchy Access Grants",
         "description": "Get a list of all hierarchy access grants",
@@ -3555,7 +3555,7 @@
         }
       }
     },
-    "/api/hierarchy/access/{id}": {
+    "/api/v1/hierarchy/access/{id}": {
       "delete": {
         "summary": "Revoke Hierarchy Access",
         "description": "Revoke an existing hierarchy access grant",
@@ -3623,7 +3623,7 @@
         }
       }
     },
-    "/api/hierarchy/access/node/{node_id}": {
+    "/api/v1/hierarchy/access/node/{node_id}": {
       "get": {
         "summary": "List Node Access Grants",
         "description": "Get all access grants for a specific node",
@@ -3691,7 +3691,7 @@
         }
       }
     },
-    "/api/hierarchy/access/user/{user_id}": {
+    "/api/v1/hierarchy/access/user/{user_id}": {
       "get": {
         "summary": "List User Access Grants",
         "description": "Get all access grants for a specific user",
@@ -3759,7 +3759,7 @@
         }
       }
     },
-    "/api/hierarchy/check-access": {
+    "/api/v1/hierarchy/check-access": {
       "post": {
         "summary": "Check User Access",
         "description": "Check if a user has access to a specific node",

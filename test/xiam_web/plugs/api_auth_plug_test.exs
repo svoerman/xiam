@@ -71,7 +71,7 @@ defmodule XIAMWeb.Plugs.APIAuthPlugTest do
     test "rejects requests with expired or tampered token", %{conn: conn, token: token} do
       # Tamper with the token
       tampered_token = token <> "a"
-      
+
       conn = conn
         |> put_req_header("authorization", "Bearer #{tampered_token}")
         |> APIAuthPlug.call([])
@@ -85,7 +85,7 @@ defmodule XIAMWeb.Plugs.APIAuthPlugTest do
     test "has_capability?/2 delegates to AuthHelpers", %{user: user} do
       # Preload role and capabilities
       user = user |> Repo.preload(role: :capabilities)
-      
+
       # Test the delegation - should match AuthHelpers behavior
       result = APIAuthPlug.has_capability?(user, "test_capability")
       assert is_boolean(result)

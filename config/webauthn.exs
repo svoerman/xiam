@@ -10,8 +10,8 @@ config :wax_,
   rp_id: System.get_env("WEBAUTHN_RP_ID", "localhost"),
   
   # The origin of the Relying Party (your application URL)
-  # In development, this is usually "http://localhost:4000"
-  origin: System.get_env("WEBAUTHN_ORIGIN", "http://localhost:4000"),
+  # In development, this matches the Phoenix endpoint port
+  origin: System.get_env("WEBAUTHN_ORIGIN", "http://localhost:4100"),
   
   # Timeout for WebAuthn operations (in milliseconds)
   timeout: 60000,

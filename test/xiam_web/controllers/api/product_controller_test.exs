@@ -86,7 +86,7 @@ defmodule XIAMWeb.API.ProductControllerTest do
           |> put_req_header("accept", "application/json")
           |> put_req_header("content-type", "application/json")
           |> put_req_header("authorization", "Bearer #{token}")
-          |> get(~p"/api/products")
+          |> get(~p"/api/v1/products")
 
         # Verify the behavior - focus on the API response structure and content
         assert %{"data" => products} = json_response(conn, 200)
@@ -109,7 +109,7 @@ defmodule XIAMWeb.API.ProductControllerTest do
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
-        conn = post(conn, ~p"/api/products", params)
+        conn = post(conn, ~p"/api/v1/products", params)
 
         # Verify the behavior - product created successfully
         assert %{"data" => data} = json_response(conn, 201)
@@ -134,7 +134,7 @@ defmodule XIAMWeb.API.ProductControllerTest do
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
-        conn = post(conn, ~p"/api/products", params)
+        conn = post(conn, ~p"/api/v1/products", params)
 
         # Verify the behavior - validation error expected
         assert %{"errors" => errors} = json_response(conn, 422)
@@ -150,7 +150,7 @@ defmodule XIAMWeb.API.ProductControllerTest do
       
       # Use safely_execute_ets_operation for API requests
       XIAM.ResilientTestHelper.safely_execute_ets_operation(fn ->
-        conn = post(conn, ~p"/api/products", params)
+        conn = post(conn, ~p"/api/v1/products", params)
 
         # Verify the behavior - validation error expected
         assert %{"errors" => errors} = json_response(conn, 422)

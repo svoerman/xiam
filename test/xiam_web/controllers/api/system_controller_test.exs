@@ -125,7 +125,7 @@ defmodule XIAMWeb.API.SystemControllerTest do
             }
           end
         ] do
-          conn = get(conn, ~p"/api/system/status")
+          conn = get(conn, ~p"/api/v1/system/status")
           
           # Verify behavior - focus on response structure and content
           response = json_response(conn, 200)
@@ -163,7 +163,7 @@ defmodule XIAMWeb.API.SystemControllerTest do
         # Test the endpoint without authentication
         conn = conn
           |> put_req_header("accept", "application/json")
-          |> get(~p"/api/system/status")
+          |> get(~p"/api/v1/system/status")
         
         # Verify behavior - unauthenticated requests should be rejected
         response = json_response(conn, 401)
@@ -197,7 +197,7 @@ defmodule XIAMWeb.API.SystemControllerTest do
           |> put_req_header("authorization", "Bearer #{regular_token}")
 
         # Make the request
-        conn = get(conn, ~p"/api/system/status")
+        conn = get(conn, ~p"/api/v1/system/status")
         
         # Verify behavior - should reject users without the required capability
         response = json_response(conn, 403)

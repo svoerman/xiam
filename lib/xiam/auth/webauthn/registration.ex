@@ -23,46 +23,65 @@ defmodule XIAM.Auth.WebAuthn.Registration do
   ## Returns
   - `{options, challenge}` tuple
   """
-  def generate_registration_options(%User{} = user) do
-    # Create a new registration challenge
-    authenticator_selection = %{
-      authenticator_attachment: "platform",
-      resident_key: "preferred",
-      user_verification: "preferred"
-    }
+  def generate_registration_options(%User{} = user, scheme, host, port) do
+  # Create a new registration challenge
+  authenticator_selection = %{
+    authenticator_attachment: "platform",
+    resident_key: "preferred",
+    user_verification: "preferred"
+  }
 
-    challenge = Wax.new_registration_challenge(
-      rp_id: @rp_id,
-      user_id: Helpers.encode_user_id(user.id), # Use helper
-      user_name: user.email,
-      user_display_name: user.name || user.email,
-      attestation: "none",
-      authenticator_selection: authenticator_selection
-    )
+  rp_origin = "#{scheme}://#{host}:#{port}"
 
-    # Build options for client
-    options = %{
-      challenge: Base.url_encode64(challenge.bytes, padding: false),
-      rp: %{
-        id: challenge.rp_id,
-        name: @rp_name
-      },
-      user: %{
-        id: Base.url_encode64(Helpers.encode_user_id(user.id), padding: false), # Use helper
-        name: user.email,
-        displayName: user.name || user.email
-      },
-      pubKeyCredParams: [
-        %{type: "public-key", alg: -7}, # ES256
-        %{type: "public-key", alg: -257} # RS256
-      ],
-      timeout: challenge.timeout,
-      attestation: challenge.attestation,
-      authenticatorSelection: authenticator_selection
-    }
+  challenge = Wax.new_registration_challenge(
+    rp_id: @rp_id,
+    rp_origin: rp_origin,
+    user_id: Helpers.encode_user_id(user.id), # Use helper
+    user_name: user.email,
+    user_display_name: user.name || user.email,
+    attestation: "none",
+    authenticator_selection: authenticator_selection
+  )
 
-    {options, challenge}
-  end
+  # Build options for client
+  options = %{
+    challenge: Base.url_encode64(challenge.bytes, padding: false),
+    rp: %{
+      id: challenge.rp_id,
+      name: @rp_name
+    },
+    user: %{
+      id: Base.url_encode64(Helpers.encode_user_id(user.id), padding: false), # Use helper
+      name: user.email,
+      displayName: user.name || user.email
+    },
+    pubKeyCredParams: [
+      %{type: "public-key", alg: -7}, # ES256
+      %{type: "public-key", alg: -257} # RS256
+    ],
+    timeout: challenge.timeout,
+    attestation: challenge.attestation,
+    authenticatorSelection: authenticator_selection
+  }
+
+  {options, challenge}
+end
+
+@doc """
+Backward compatible version of generate_registration_options that uses config values
+for the scheme, host, and port.
+
+Preferably use the 4-argument version directly with values from the current request.
+"""
+def generate_registration_options(%User{} = user) do
+  # Get default values from endpoint config
+  endpoint_config = Application.get_env(:xiam, XIAMWeb.Endpoint)
+  host = endpoint_config[:url][:host] || "localhost"
+  port = endpoint_config[:url][:port] || endpoint_config[:http][:port] || 4100
+  scheme = endpoint_config[:url][:scheme] || "http"
+  
+  generate_registration_options(user, scheme, host, port)
+end
 
   @doc """
   Verifies a registration attestation and creates a new passkey.

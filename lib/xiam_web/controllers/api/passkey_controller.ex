@@ -23,82 +23,119 @@ defmodule XIAMWeb.API.PasskeyController do
   Requires authentication.
   """
   def registration_options(conn, _params) do
-    user = conn.assigns.current_user
-    {options, challenge} = WebAuthn.generate_registration_options(user)
-    
-    conn
-    |> put_session(:passkey_challenge, challenge)
-    |> json(%{
-      success: true,
-      options: options
-    })
-  end
+  user = conn.assigns.current_user
+  scheme = conn.scheme |> to_string()
+  host = conn.host
+  port = conn.port
+  {options, challenge} = WebAuthn.generate_registration_options(user, scheme, host, port)
+  conn
+  |> put_session(:passkey_challenge, challenge)
+  |> json(%{
+    success: true,
+    options: options
+  })
+end
   
   @doc """
   Registers a new passkey for the authenticated user.
   Requires authentication.
   """
   def register(conn, %{"attestation" => attestation_response, "friendly_name" => name}) do
-    user = conn.assigns.current_user
-    challenge = get_session(conn, :passkey_challenge)
-    
-    if is_nil(challenge) do
-      conn
-      |> put_status(:bad_request)
-      |> json(%{error: "No active registration session found"})
-    else
-      # Clear the challenge from session
-      conn = delete_session(conn, :passkey_challenge)
-      
-      # Log the raw attestation for debugging
-      IO.inspect(attestation_response, label: "Attestation Response")
-      IO.inspect(challenge, label: "Challenge")
-      
-      # Pass the full attestation response object to WebAuthn.verify_registration
-      try do
-        # Make sure we're passing the complete attestation object which includes id, type, and response
-        case Users.create_user_passkey(user, attestation_response, challenge, name) do
-          {:ok, _passkey} ->
-            # Log the passkey registration
-            AuditLogger.log_action("passkey_register", user.id, %{
-              "resource_type" => "passkey", 
-              "ip" => format_ip(conn.remote_ip),
-              "friendly_name" => name
-            }, user.email)
-            
-            conn
-            |> json(%{success: true, message: "Passkey registered successfully"})
-            
-          {:error, reason} ->
-            # Log the failed registration
-            AuditLogger.log_action("passkey_register_failure", user.id, %{
-              "resource_type" => "passkey", 
-              "ip" => format_ip(conn.remote_ip),
-              "error" => reason
-            }, user.email)
-            
-            conn
-            |> put_status(:bad_request)
-            |> json(%{error: reason})
-        end
-      rescue
-        e ->
-          # Handle any uncaught exceptions to prevent HTML errors
-          error_message = "Passkey registration failed: #{inspect(e)}"
-          
-          # Log the error
-          AuditLogger.log_action("passkey_register_failure", user.id, %{
-            "resource_type" => "passkey", 
-            "ip" => format_ip(conn.remote_ip),
-            "error" => error_message
-          }, user.email)
-          
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "An error occurred during passkey registration"})
+  user = conn.assigns.current_user
+  challenge = get_session(conn, :passkey_challenge)
+
+  if is_nil(challenge) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "No active registration session found"})
+  else
+    # Clear the challenge from session
+    conn = delete_session(conn, :passkey_challenge)
+
+    # Log the raw attestation for debugging
+    IO.inspect(attestation_response, label: "Attestation Response")
+    IO.inspect(challenge, label: "Challenge")
+
+    # --- Begin dynamic origin verification ---
+    # Extract clientDataJSON from attestation response (handle both top-level and nested response)
+    client_data_json_b64 =
+      cond do
+        is_map(attestation_response) && Map.has_key?(attestation_response, "clientDataJSON") ->
+          attestation_response["clientDataJSON"]
+        is_map(attestation_response) && Map.has_key?(attestation_response, "response") && is_map(attestation_response["response"]) ->
+          attestation_response["response"]["clientDataJSON"]
+        true ->
+          nil
       end
+
+    with {:ok, client_data_json_b64} when not is_nil(client_data_json_b64) <- {:ok, client_data_json_b64},
+         {:ok, client_data_json} <- Base.url_decode64(client_data_json_b64, padding: false),
+         {:ok, client_data_parsed} <- Jason.decode(client_data_json),
+         origin when is_binary(origin) <- client_data_parsed["origin"] do
+      endpoint_config = Application.get_env(:xiam, XIAMWeb.Endpoint)
+      host = endpoint_config[:url][:host] || "localhost"
+      port = endpoint_config[:url][:port] || endpoint_config[:http][:port] || 4100
+      scheme = endpoint_config[:url][:scheme] || "http"
+      rp_origin = "#{scheme}://#{host}:#{port}"
+
+      if origin == rp_origin do
+        # Pass the full attestation response object to WebAuthn.verify_registration
+        try do
+          case Users.create_user_passkey(user, attestation_response, challenge, name) do
+            {:ok, _passkey} ->
+              AuditLogger.log_action("passkey_register", user.id, %{
+                "resource_type" => "passkey",
+                "ip" => format_ip(conn.remote_ip),
+                "friendly_name" => name
+              }, user.email)
+              conn
+              |> json(%{success: true, message: "Passkey registered successfully"})
+            {:error, reason} ->
+              AuditLogger.log_action("passkey_register_failure", user.id, %{
+                "resource_type" => "passkey",
+                "ip" => format_ip(conn.remote_ip),
+                "error" => reason
+              }, user.email)
+              conn
+              |> put_status(:bad_request)
+              |> json(%{error: reason})
+          end
+        rescue
+          e ->
+            error_message = "Passkey registration failed: #{inspect(e)}"
+            AuditLogger.log_action("passkey_register_failure", user.id, %{
+              "resource_type" => "passkey",
+              "ip" => format_ip(conn.remote_ip),
+              "error" => error_message
+            }, user.email)
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "An error occurred during passkey registration"})
+        end
+      else
+        AuditLogger.log_action("passkey_register_failure", user.id, %{
+          "resource_type" => "passkey",
+          "ip" => format_ip(conn.remote_ip),
+          "error" => "Origin mismatch: received '#{origin}', expected '#{rp_origin}'"
+        }, user.email)
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Origin mismatch: received '#{origin}', expected '#{rp_origin}'"})
+      end
+    else
+      _ ->
+        AuditLogger.log_action("passkey_register_failure", user.id, %{
+          "resource_type" => "passkey",
+          "ip" => format_ip(conn.remote_ip),
+          "error" => "Could not extract or decode clientDataJSON/origin from attestation response"
+        }, user.email)
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid attestation: missing or malformed clientDataJSON/origin"})
     end
+    # --- End dynamic origin verification ---
   end
+end
   
   @doc """
   Generate authentication options for passkey login.
@@ -288,7 +325,11 @@ defmodule XIAMWeb.API.PasskeyController do
           
           # Verify origin
           origin = client_data_parsed["origin"]
-          rp_origin = "http://localhost:4000" # TODO: This should be configurable
+          endpoint_config = Application.get_env(:xiam, XIAMWeb.Endpoint)
+          host = endpoint_config[:url][:host] || "localhost"
+          port = endpoint_config[:url][:port] || endpoint_config[:http][:port] || 4100
+          scheme = endpoint_config[:url][:scheme] || "http"
+          rp_origin = "#{scheme}://#{host}:#{port}" # Dynamically generated origin
           
           # Simple verification of challenge and origin - skip other Wax checks
           if type == "webauthn.get" && decoded_challenge == challenge.bytes && origin == rp_origin do
